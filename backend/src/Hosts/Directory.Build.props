@@ -1,0 +1,12 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <!-- Hosts contain composition only: no business logic (backend plan 1.3, rule 4). -->
+    <IsPublishable>true</IsPublishable>
+    <UserSecretsId>pishkhan-dev</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Settings shared by every host (config/), loaded before the host's own appsettings by AddPishkhanPlatform. -->
+    <None Include="$(MSBuildThisFileDirectory)../../config/appsettings*.json" Link="shared/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

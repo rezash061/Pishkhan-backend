@@ -1,0 +1,52 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
+using Pishkhan.Infrastructure.Caching;
+using Pishkhan.Infrastructure.Persistence;
+using Pishkhan.Modules.Tenancy.Contracts;
+using Pishkhan.Modules.Tenancy.Domain;
+using Pishkhan.Modules.Tenancy.Persistence;
+using Pishkhan.Web.Auth;
+
+namespace Pishkhan.Modules.Tenancy.Services;
+
+/// <summary>Cached membership lookup used by every workspace-scoped endpoint (<c>ws:{ws}:member:{user}</c>, 5 minutes).</summary>
+internal sealed class WorkspaceAccessResolver(TenancyDbContext db, HybridCache cache) : IWorkspaceAccessResolver
+{
+    private static readonly HybridCacheEntryOptions Entry = new() { Expiration = TimeSpan.FromMinutes(5), LocalCacheExpiration = TimeSpan.FromMinutes(1) };
+
+    public async Task<WorkspaceAccess?> ResolveAsync(Guid userId, Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var cached = await cache.GetOrCreateAsync(
+            $"ws:{workspaceId:N}:member:{userId:N}",
+            (db, userId, workspaceId),
+            static async (state, ct) =>
+            {
+                var row = await state.db.Memberships.AsNoTracking()
+                    .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+                    .Where(m => m.WorkspaceId == state.workspaceId && m.UserId == state.userId)
+                    .Join(state.db.Workspaces, m => m.WorkspaceId, w => w.Id, (m, w) => new { Membership = m, w.Status })
+                    .FirstOrDefaultAsync(ct);
+                return row is null || row.Status == WorkspaceStatus.PendingDeletion
+                    ? null
+                    : new CachedAccess(row.Membership.Role, [.. row.Membership.EffectivePermissions()], row.Status == WorkspaceStatus.Suspended);
+            },
+            Entry,
+            [CacheTags.Workspace(workspaceId), CacheTags.Member(workspaceId, userId)],
+            cancellationToken);
+
+        return cached is null ? null : new WorkspaceAccess(workspaceId, cached.Role, cached.Permissions.ToHashSet(StringComparer.Ordinal), cached.Suspended);
+    }
+
+    internal sealed record CachedAccess(string Role, string[] Permissions, bool Suspended);
+}
+
+internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQueries
+{
+    public async Task<IReadOnlyList<Guid>> GetWorkspaceIdsAsync(Guid userId, CancellationToken cancellationToken) =>
+        await db.Memberships.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.WorkspaceId)
+            .Select(m => m.WorkspaceId)
+            .ToListAsync(cancellationToken);
+}

@@ -132,3 +132,8 @@ dotnet_diagnostic.CA5394.severity = none
 dotnet_diagnostic.MA0099.severity = none
 dotnet_diagnostic.CA1806.severity = none
 dotnet_diagnostic.CA2012.severity = none
+
+# EF Core migrations are generated code.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

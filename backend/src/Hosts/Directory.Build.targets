@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../')))" />
+
+  <!-- The OpenAPI export writes pishkhan_{document}.json; the contract files are openapi/{document}.v1.json (overview: API contract). -->
+  <Target Name="RenameOpenApiDocuments" AfterTargets="GenerateOpenApiDocuments" Condition="'$(OpenApiGenerateDocuments)' == 'true'">
+    <ItemGroup>
+      <_PishkhanOpenApi Include="$(OpenApiDocumentsDirectory)/pishkhan_*.json" />
+    </ItemGroup>
+    <Move SourceFiles="@(_PishkhanOpenApi)" DestinationFiles="@(_PishkhanOpenApi->'$(OpenApiDocumentsDirectory)/%(Filename).v1.json'->Replace('pishkhan_', ''))" />
+  </Target>
+</Project>

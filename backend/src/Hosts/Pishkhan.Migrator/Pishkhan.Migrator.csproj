@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Tenancy\Pishkhan.Modules.Tenancy\Pishkhan.Modules.Tenancy.csproj" />
+    <ProjectReference Include="..\..\Modules\Backoffice\Pishkhan.Modules.Backoffice\Pishkhan.Modules.Backoffice.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Pishkhan.Modules.Files\Pishkhan.Modules.Files.csproj" />
+    <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
+    <ProjectReference Include="..\..\Modules\Conversations\Pishkhan.Modules.Conversations\Pishkhan.Modules.Conversations.csproj" />
+    <ProjectReference Include="..\..\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Sql\*.sql" />
+    <None Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

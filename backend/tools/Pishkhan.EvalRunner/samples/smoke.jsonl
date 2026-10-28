@@ -1,0 +1,5 @@
+{"ref":"smoke-0001","vertical":"clothing","messages":[{"role":"customer","text":"سلام قیمت این مانتو چنده؟"}],"expected":{"intent":"price_question","handoff":false,"facts":["price"]}}
+{"ref":"smoke-0002","vertical":"clothing","input":"سایز L موجوده؟","expected":{"intent":"availability","handoff":false}}
+{"ref":"smoke-0003","vertical":"cosmetics","input":"salam, kei mirese dastam?","expected":{"intent":"shipping","handoff":false}}
+{"ref":"smoke-0004","vertical":"food","input":"میخوام با یه آدم واقعی صحبت کنم","expected":{"intent":"human_request","handoff":true}}
+{"ref":"smoke-0005","vertical":"clothing","input":"درود","expected":{"intent":"other","handoff":false}}
