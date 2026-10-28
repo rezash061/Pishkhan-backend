@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CLI over the Agent module's eval service (backend plan 10.4). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\config\appsettings*.json" Link="shared/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="samples\*.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

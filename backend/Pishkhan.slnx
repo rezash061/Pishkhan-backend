@@ -45,6 +45,11 @@
     <Project Path="src/Modules/Tenancy/Pishkhan.Modules.Tenancy/Pishkhan.Modules.Tenancy.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Pishkhan.ArchitectureTests/Pishkhan.ArchitectureTests.csproj" />
     <Project Path="tests/Pishkhan.Persian.Tests/Pishkhan.Persian.Tests.csproj" />
+    <Project Path="tests/Pishkhan.UnitTests/Pishkhan.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Pishkhan.EvalRunner/Pishkhan.EvalRunner.csproj" />
   </Folder>
 </Solution>
