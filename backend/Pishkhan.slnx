@@ -2,8 +2,39 @@
   <Folder Name="/src/" />
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/Pishkhan.Contracts/Pishkhan.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/Pishkhan.Infrastructure/Pishkhan.Infrastructure.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.Persian/Pishkhan.Persian.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.SharedKernel/Pishkhan.SharedKernel.csproj" />
+    <Project Path="src/BuildingBlocks/Pishkhan.Web/Pishkhan.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Agent/">
+    <Project Path="src/Modules/Agent/Pishkhan.Modules.Agent.Contracts/Pishkhan.Modules.Agent.Contracts.csproj" />
+    <Project Path="src/Modules/Agent/Pishkhan.Modules.Agent/Pishkhan.Modules.Agent.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Backoffice/">
+    <Project Path="src/Modules/Backoffice/Pishkhan.Modules.Backoffice.Contracts/Pishkhan.Modules.Backoffice.Contracts.csproj" />
+    <Project Path="src/Modules/Backoffice/Pishkhan.Modules.Backoffice/Pishkhan.Modules.Backoffice.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Channels/">
+    <Project Path="src/Modules/Channels/Pishkhan.Modules.Channels.Contracts/Pishkhan.Modules.Channels.Contracts.csproj" />
+    <Project Path="src/Modules/Channels/Pishkhan.Modules.Channels/Pishkhan.Modules.Channels.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Conversations/">
+    <Project Path="src/Modules/Conversations/Pishkhan.Modules.Conversations.Contracts/Pishkhan.Modules.Conversations.Contracts.csproj" />
+    <Project Path="src/Modules/Conversations/Pishkhan.Modules.Conversations/Pishkhan.Modules.Conversations.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Files/">
+    <Project Path="src/Modules/Files/Pishkhan.Modules.Files.Contracts/Pishkhan.Modules.Files.Contracts.csproj" />
+    <Project Path="src/Modules/Files/Pishkhan.Modules.Files/Pishkhan.Modules.Files.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Pishkhan.Modules.Identity.Contracts/Pishkhan.Modules.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/Pishkhan.Modules.Identity/Pishkhan.Modules.Identity.csproj" />
+    <Project Path="src/Modules/Tenancy/Pishkhan.Modules.Tenancy.Contracts/Pishkhan.Modules.Tenancy.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tenancy/">
+    <Project Path="src/Modules/Tenancy/Pishkhan.Modules.Tenancy/Pishkhan.Modules.Tenancy.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Pishkhan.Persian.Tests/Pishkhan.Persian.Tests.csproj" />

@@ -1,0 +1,329 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using FluentValidation;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Pishkhan.Infrastructure.Application;
+using Pishkhan.Infrastructure.Caching;
+using Pishkhan.Infrastructure.Security;
+using Pishkhan.Infrastructure.Storage;
+using Pishkhan.Modules.Backoffice.Contracts;
+using Pishkhan.Modules.Backoffice.Domain;
+using Pishkhan.Modules.Backoffice.Persistence;
+using Pishkhan.SharedKernel;
+using Pishkhan.Web.Auth;
+using StackExchange.Redis;
+
+namespace Pishkhan.Modules.Backoffice.Features;
+
+public sealed record StaffLoginRequest(string Username, string Password, string? TotpCode);
+
+/// <param name="Status"><c>ok</c> (tokens present) or <c>totp_enrollment_required</c> (enrollment fields present).</param>
+public sealed record StaffLoginResponse(
+    string Status,
+    string? AccessToken = null,
+    DateTimeOffset? AccessTokenExpiresAt = null,
+    string? RefreshToken = null,
+    DateTimeOffset? RefreshTokenExpiresAt = null,
+    string? EnrollmentToken = null,
+    string? TotpSecret = null,
+    string? OtpAuthUri = null);
+
+public sealed record TotpEnrollRequest(string EnrollmentToken, string Code);
+
+public sealed record StaffRefreshRequest(string RefreshToken);
+
+public sealed record StepUpRequest(string Password, string TotpCode);
+
+public sealed record StepUpResponse(string AccessToken, DateTimeOffset AccessTokenExpiresAt);
+
+public sealed record StaffMeResponse(Guid Id, string Username, IReadOnlyList<string> Roles);
+
+public sealed record CreateStaffRequest(string Username, string Password, IReadOnlyList<string> Roles);
+
+public sealed record StaffSummary(Guid Id, string Username, IReadOnlyList<string> Roles, string Status, bool TotpEnabled, DateTimeOffset CreatedAt);
+
+public sealed record StaffLogoutCommand;
+
+public sealed record StaffMeQuery;
+
+public sealed record ListStaffQuery;
+
+internal sealed class StaffLoginValidator : AbstractValidator<StaffLoginRequest>
+{
+    public StaffLoginValidator()
+    {
+        RuleFor(x => x.Username).NotEmpty().WithErrorCode("validation.required").MaximumLength(64).WithErrorCode("validation.too_long");
+        RuleFor(x => x.Password).NotEmpty().WithErrorCode("validation.required").MaximumLength(200).WithErrorCode("validation.too_long");
+    }
+}
+
+internal sealed class CreateStaffValidator : AbstractValidator<CreateStaffRequest>
+{
+    public CreateStaffValidator()
+    {
+        RuleFor(x => x.Username).Matches("^[a-z][a-z0-9._-]{2,63}$").WithErrorCode("validation.username.invalid");
+        RuleFor(x => x.Password).MinimumLength(14).WithErrorCode("validation.password.too_short").MaximumLength(200).WithErrorCode("validation.too_long");
+        RuleFor(x => x.Roles).NotEmpty().WithErrorCode("validation.required").Must(r => r.All(StaffRoles.All.Contains)).WithErrorCode("validation.role.invalid");
+    }
+}
+
+public sealed class BackofficeOptions
+{
+    public const string Section = "Backoffice";
+
+    public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(15);
+
+    public TimeSpan AbsoluteTimeout { get; set; } = TimeSpan.FromHours(8);
+
+    public TimeSpan StepUpLifetime { get; set; } = TimeSpan.FromMinutes(5);
+}
+
+/// <summary>Staff sign-in: password, then mandatory TOTP (enrolled on first sign-in), with lockout after 5 failures.</summary>
+internal sealed class StaffAuthHandlers(
+    BackofficeDbContext db,
+    TokenFactory tokens,
+    ISecretProtector secrets,
+    ISessionRevocationStore revocations,
+    [FromKeyedServices(RedisInstances.State)] IConnectionMultiplexer redis,
+    RedisKeys keys,
+    ICurrentUser caller,
+    IClock clock,
+    Microsoft.Extensions.Options.IOptions<BackofficeOptions> options) :
+    ICommandHandler<StaffLoginRequest, StaffLoginResponse>,
+    ICommandHandler<TotpEnrollRequest, StaffLoginResponse>,
+    ICommandHandler<StaffRefreshRequest, StaffLoginResponse>,
+    ICommandHandler<StaffLogoutCommand, Unit>,
+    ICommandHandler<StepUpRequest, StepUpResponse>,
+    IQueryHandler<StaffMeQuery, StaffMeResponse>,
+    IQueryHandler<ListStaffQuery, IReadOnlyList<StaffSummary>>,
+    ICommandHandler<CreateStaffRequest, StaffSummary>,
+    IStaffProvisioning
+{
+    internal const string TotpPurpose = "backoffice.totp";
+    private static readonly PasswordHasher<StaffUser> Hasher = new();
+
+    public async Task<Result<StaffLoginResponse>> HandleAsync(StaffLoginRequest command, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var staff = await db.StaffUsers.FirstOrDefaultAsync(s => s.Username == command.Username.Trim().ToLowerInvariant(), cancellationToken);
+        if (staff is null)
+        {
+            Hasher.HashPassword(null!, command.Password); // equalize timing
+            return Error.Unauthorized("auth.login.invalid_credentials");
+        }
+
+        if (staff.Status != StaffStatus.Active || staff.IsLocked(now))
+        {
+            return Error.Unauthorized("auth.login.locked");
+        }
+
+        if (Hasher.VerifyHashedPassword(staff, staff.PasswordHash, command.Password) == PasswordVerificationResult.Failed)
+        {
+            staff.RecordFailure(now);
+            await db.SaveChangesAsync(cancellationToken);
+            return Error.Unauthorized("auth.login.invalid_credentials");
+        }
+
+        if (!staff.TotpEnabled)
+        {
+            var secret = Totp.NewSecret();
+            staff.SetTotpSecret(secrets.Protect(Convert.ToBase64String(secret), TotpPurpose));
+            staff.RecordSuccess();
+            await db.SaveChangesAsync(cancellationToken);
+            var enrollmentToken = Base64Url.Encode(RandomNumberGenerator.GetBytes(24));
+            await redis.GetDatabase().StringSetAsync(keys.For("staff", "enroll:" + Hash(enrollmentToken)), staff.Id.ToString(), TimeSpan.FromMinutes(10));
+            return new StaffLoginResponse("totp_enrollment_required", EnrollmentToken: enrollmentToken, TotpSecret: Totp.ToBase32(secret), OtpAuthUri: Totp.ProvisioningUri("Pishkhan Admin", staff.Username, secret));
+        }
+
+        if (!VerifyTotp(staff, command.TotpCode, now))
+        {
+            staff.RecordFailure(now);
+            await db.SaveChangesAsync(cancellationToken);
+            return Error.Unauthorized(string.IsNullOrEmpty(command.TotpCode) ? "auth.totp.required" : "auth.totp.invalid");
+        }
+
+        staff.RecordSuccess();
+        return await StartSessionAsync(staff, cancellationToken);
+    }
+
+    public async Task<Result<StaffLoginResponse>> HandleAsync(TotpEnrollRequest command, CancellationToken cancellationToken)
+    {
+        var db0 = redis.GetDatabase();
+        var staffId = await db0.StringGetDeleteAsync(keys.For("staff", "enroll:" + Hash(command.EnrollmentToken)));
+        if (staffId.IsNullOrEmpty)
+        {
+            return Error.Unauthorized("auth.totp.enrollment_expired");
+        }
+
+        var staff = await db.StaffUsers.FirstAsync(s => s.Id == Guid.Parse(staffId.ToString()), cancellationToken);
+        var secret = Convert.FromBase64String(secrets.Unprotect(staff.TotpSecretEnc!, TotpPurpose));
+        if (!Totp.Verify(secret, command.Code, clock.UtcNow, out var step))
+        {
+            return Error.Unauthorized("auth.totp.invalid");
+        }
+
+        staff.EnableTotp(step);
+        return await StartSessionAsync(staff, cancellationToken);
+    }
+
+    public async Task<Result<StaffLoginResponse>> HandleAsync(StaffRefreshRequest command, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var session = await db.StaffSessions.FirstOrDefaultAsync(s => s.RefreshHash == Hash(command.RefreshToken), cancellationToken);
+        if (session is null)
+        {
+            return Error.Unauthorized("auth.refresh.invalid");
+        }
+
+        if (session.RevokedReason == "rotated")
+        {
+            await RevokeFamilyAsync(session.FamilyId, "reuse_detected", cancellationToken);
+            return Error.Unauthorized("auth.refresh.reused");
+        }
+
+        if (!session.IsActive(now))
+        {
+            return Error.Unauthorized("auth.refresh.expired");
+        }
+
+        var staff = await db.StaffUsers.FirstAsync(s => s.Id == session.StaffId, cancellationToken);
+        if (staff.Status != StaffStatus.Active)
+        {
+            return Error.Unauthorized("auth.login.locked");
+        }
+
+        var refresh = Base64Url.Encode(RandomNumberGenerator.GetBytes(32));
+        var next = session.Rotate(Hash(refresh), options.Value.IdleTimeout, caller.IpAddress, caller.UserAgent, now);
+        db.StaffSessions.Add(next);
+        await db.SaveChangesAsync(cancellationToken);
+        return Issue(staff, next, refresh, stepUp: false);
+    }
+
+    public async Task<Result<Unit>> HandleAsync(StaffLogoutCommand command, CancellationToken cancellationToken)
+    {
+        await RevokeFamilyAsync(caller.SessionId, "logout", cancellationToken);
+        return Unit.Value;
+    }
+
+    public async Task<Result<StepUpResponse>> HandleAsync(StepUpRequest command, CancellationToken cancellationToken)
+    {
+        var staff = await db.StaffUsers.FirstAsync(s => s.Id == caller.UserId, cancellationToken);
+        if (Hasher.VerifyHashedPassword(staff, staff.PasswordHash, command.Password) == PasswordVerificationResult.Failed || !VerifyTotp(staff, command.TotpCode, clock.UtcNow))
+        {
+            staff.RecordFailure(clock.UtcNow);
+            await db.SaveChangesAsync(cancellationToken);
+            return Error.Unauthorized("auth.step_up.invalid");
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        var token = tokens.CreateAccessToken(AuthSchemes.Staff, staff.Id, caller.SessionId, Claims(staff, stepUp: true), options.Value.StepUpLifetime);
+        return new StepUpResponse(token.Token, token.ExpiresAt);
+    }
+
+    public async Task<Result<StaffMeResponse>> HandleAsync(StaffMeQuery query, CancellationToken cancellationToken)
+    {
+        var staff = await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == caller.UserId, cancellationToken);
+        return new StaffMeResponse(staff.Id, staff.Username, staff.Roles);
+    }
+
+    public async Task<Result<IReadOnlyList<StaffSummary>>> HandleAsync(ListStaffQuery query, CancellationToken cancellationToken) =>
+        (await db.StaffUsers.AsNoTracking().OrderBy(s => s.Username).ToListAsync(cancellationToken)).Select(ToSummary).ToList();
+
+    public async Task<Result<StaffSummary>> HandleAsync(CreateStaffRequest command, CancellationToken cancellationToken)
+    {
+        if (await db.StaffUsers.AnyAsync(s => s.Username == command.Username, cancellationToken))
+        {
+            return Error.Conflict("backoffice.staff.username_taken");
+        }
+
+        var id = await CreateAsync(command.Username, command.Password, command.Roles, cancellationToken);
+        return ToSummary(await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == id, cancellationToken));
+    }
+
+    public async Task<Guid> CreateAsync(string username, string password, IReadOnlyList<string> roles, CancellationToken cancellationToken)
+    {
+        var staff = StaffUser.Create(username, string.Empty, roles, clock.UtcNow);
+        staff.SetPasswordHash(Hasher.HashPassword(staff, password));
+        db.StaffUsers.Add(staff);
+        await db.SaveChangesAsync(cancellationToken);
+        return staff.Id;
+    }
+
+    private bool VerifyTotp(StaffUser staff, string? code, DateTimeOffset now)
+    {
+        if (staff.TotpSecretEnc is null || string.IsNullOrEmpty(code))
+        {
+            return false;
+        }
+
+        var secret = Convert.FromBase64String(secrets.Unprotect(staff.TotpSecretEnc, TotpPurpose));
+        return Totp.Verify(secret, code, now, out var step) && staff.AcceptTotpStep(step);
+    }
+
+    private async Task<StaffLoginResponse> StartSessionAsync(StaffUser staff, CancellationToken cancellationToken)
+    {
+        var o = options.Value;
+        var refresh = Base64Url.Encode(RandomNumberGenerator.GetBytes(32));
+        var session = StaffSession.Start(staff.Id, Hash(refresh), o.IdleTimeout, o.AbsoluteTimeout, caller.IpAddress, caller.UserAgent, clock.UtcNow);
+        db.StaffSessions.Add(session);
+        await db.SaveChangesAsync(cancellationToken);
+        return Issue(staff, session, refresh, stepUp: false);
+    }
+
+    private StaffLoginResponse Issue(StaffUser staff, StaffSession session, string refresh, bool stepUp)
+    {
+        var access = tokens.CreateAccessToken(AuthSchemes.Staff, staff.Id, session.FamilyId, Claims(staff, stepUp));
+        return new StaffLoginResponse("ok", access.Token, access.ExpiresAt, refresh, session.IdleExpiresAt);
+    }
+
+    private IEnumerable<Claim> Claims(StaffUser staff, bool stepUp)
+    {
+        foreach (var role in staff.Roles)
+        {
+            yield return new Claim(PishkhanClaims.Roles, role);
+        }
+
+        yield return new Claim(PishkhanClaims.AuthMethods, stepUp ? "pwd+otp+stepup" : "pwd+otp");
+        if (stepUp)
+        {
+            yield return new Claim("step_up_at", clock.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64);
+        }
+    }
+
+    private async Task RevokeFamilyAsync(Guid familyId, string reason, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        await db.StaffSessions.Where(s => s.FamilyId == familyId && s.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now).SetProperty(x => x.RevokedReason, reason).SetProperty(x => x.UpdatedAt, now), cancellationToken);
+        await revocations.RevokeAsync(AuthSchemes.Staff, familyId.ToString(), tokens.AccessTokenLifetime(AuthSchemes.Staff) + TimeSpan.FromMinutes(1), cancellationToken);
+    }
+
+    private static StaffSummary ToSummary(StaffUser s) => new(s.Id, s.Username, s.Roles, s.Status.ToString().ToLowerInvariant(), s.TotpEnabled, s.CreatedAt);
+
+    private static string Hash(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+}
+
+/// <summary>Endpoint filter for dangerous actions: requires a step-up token issued in the last few minutes.</summary>
+public static class StepUp
+{
+    public static TBuilder RequireStepUp<TBuilder>(this TBuilder builder)
+        where TBuilder : Microsoft.AspNetCore.Builder.IEndpointConventionBuilder
+    {
+        builder.AddEndpointFilter(async (context, next) =>
+        {
+            var claim = context.HttpContext.User.FindFirst("step_up_at")?.Value;
+            if (claim is null || !long.TryParse(claim, System.Globalization.CultureInfo.InvariantCulture, out var at) || DateTimeOffset.UtcNow.ToUnixTimeSeconds() - at > 300)
+            {
+                return Microsoft.AspNetCore.Http.Results.Problem(statusCode: 403, type: Web.Http.ProblemTypes.Forbidden, title: "auth.step_up.required");
+            }
+
+            return await next(context);
+        });
+        return builder;
+    }
+}

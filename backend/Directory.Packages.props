@@ -23,8 +23,8 @@
     <!-- Messaging and jobs -->
     <PackageVersion Include="MassTransit" Version="[8.5.12,8.6)" />
     <PackageVersion Include="MassTransit.Kafka" Version="[8.5.12,8.6)" />
-    <PackageVersion Include="Quartz.Extensions.Hosting" Version="4.6.2" />
-    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="4.6.2" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.22.9" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.22.9" />
 
     <!-- Caching -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
@@ -45,7 +45,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.14" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
 
     <!-- Observability -->

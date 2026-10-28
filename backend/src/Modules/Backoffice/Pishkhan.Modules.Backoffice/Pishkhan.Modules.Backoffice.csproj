@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Web\Pishkhan.Web.csproj" />
+    <ProjectReference Include="..\Pishkhan.Modules.Backoffice.Contracts\Pishkhan.Modules.Backoffice.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />
+    <InternalsVisibleTo Include="Pishkhan.UnitTests" />
+    <InternalsVisibleTo Include="Pishkhan.ArchitectureTests" />
+  </ItemGroup>
+</Project>
