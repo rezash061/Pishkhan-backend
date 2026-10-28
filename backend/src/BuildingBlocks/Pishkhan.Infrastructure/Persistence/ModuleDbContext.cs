@@ -165,18 +165,7 @@ public abstract class ModuleDbContext : DbContext
     {
         var attribute = Topics.Describe(typeof(TEvent));
         var now = DateTimeOffset.UtcNow;
-        var envelope = new EventEnvelope
-        {
-            MessageId = Uuid.NewV7(),
-            Type = Topics.TypeName(typeof(TEvent)),
-            OccurredAt = now,
-            WorkspaceId = workspaceId ?? Tenant.WorkspaceId,
-            CorrelationId = correlationId ?? MessagingContext.CurrentCorrelationId ?? Uuid.NewV7(),
-            CausationId = causationId ?? MessagingContext.CurrentMessageId,
-            Traceparent = Activity.Current?.Id,
-            SchemaVersion = attribute.SchemaVersion,
-            Payload = EnvelopeJson.SerializePayload(integrationEvent),
-        };
+        var envelope = Messaging.EventEnvelopes.Create(integrationEvent, workspaceId ?? Tenant.WorkspaceId, correlationId, causationId, now);
 
         var message = new OutboxMessage
         {

@@ -96,6 +96,18 @@ public sealed class EnvelopeSecretProtector : ISecretProtector, IBlindIndexer
 
     public string Unprotect(string protectedValue, string purpose)
     {
+        try
+        {
+            return UnprotectCore(protectedValue, purpose);
+        }
+        catch (Exception ex) when (ex is FormatException or IndexOutOfRangeException or ArgumentOutOfRangeException)
+        {
+            throw new CryptographicException("Malformed protected value.", ex);
+        }
+    }
+
+    private string UnprotectCore(string protectedValue, string purpose)
+    {
         var span = Convert.FromBase64String(protectedValue).AsSpan();
         if (span[0] != Version)
         {

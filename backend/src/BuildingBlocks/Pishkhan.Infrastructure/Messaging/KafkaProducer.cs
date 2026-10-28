@@ -1,8 +1,11 @@
+using System.Diagnostics;
 using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pishkhan.Contracts;
+using Pishkhan.Infrastructure.Persistence;
+using Uuid = Pishkhan.SharedKernel.Uuid;
 
 namespace Pishkhan.Infrastructure.Messaging;
 
@@ -95,4 +98,31 @@ internal static class KafkaClientConfig
             config.SaslPassword = o.Password;
         }
     }
+}
+
+/// <summary>Builds envelopes for an integration event. Used by the outbox and by hosts that produce directly (Ingress).</summary>
+public static class EventEnvelopes
+{
+    public static EventEnvelope Create<TEvent>(TEvent integrationEvent, Guid? workspaceId, Guid? correlationId = null, Guid? causationId = null, DateTimeOffset? occurredAt = null)
+        where TEvent : IIntegrationEvent
+    {
+        var attribute = Topics.Describe(typeof(TEvent));
+        return new EventEnvelope
+        {
+            MessageId = Uuid.NewV7(),
+            Type = Topics.TypeName(typeof(TEvent)),
+            OccurredAt = occurredAt ?? DateTimeOffset.UtcNow,
+            WorkspaceId = workspaceId,
+            CorrelationId = correlationId ?? MessagingContext.CurrentCorrelationId ?? Uuid.NewV7(),
+            CausationId = causationId ?? MessagingContext.CurrentMessageId,
+            Traceparent = Activity.Current?.Id,
+            SchemaVersion = attribute.SchemaVersion,
+            Payload = EnvelopeJson.SerializePayload(integrationEvent),
+        };
+    }
+
+    /// <summary>Produces an event straight to Kafka, bypassing the outbox. Only for producers without a database transaction to join (webhook ingress).</summary>
+    public static Task PublishAsync<TEvent>(this IKafkaProducer producer, TEvent integrationEvent, string key, Guid? workspaceId = null, CancellationToken cancellationToken = default)
+        where TEvent : IIntegrationEvent =>
+        producer.ProduceAsync(Topics.Describe(typeof(TEvent)).Topic, key, Create(integrationEvent, workspaceId), cancellationToken);
 }
