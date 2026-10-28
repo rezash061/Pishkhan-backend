@@ -16,6 +16,7 @@ builder.AddPishkhanWebHost("pishkhan-workers")
 
 var services = builder.Services;
 var configuration = builder.Configuration;
+services.AddAuthentication();
 services.AddAuthorization();
 services
     .AddFilesModule(configuration)

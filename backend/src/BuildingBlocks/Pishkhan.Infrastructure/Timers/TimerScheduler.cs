@@ -73,7 +73,7 @@ public sealed class TimerDispatcher(NpgsqlDataSource dataSource, ILogger<TimerDi
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var due = (await connection.QueryAsync<DueTimer>(new CommandDefinition(
             """
-            SELECT id, workspace_id AS workspaceid, kind, payload::text AS payload, due_at AS dueat
+            SELECT id, workspace_id AS workspaceid, kind, payload::text AS payload, due_at AS dueatutc
             FROM platform.timers
             WHERE status = 'Pending' AND due_at <= now()
             ORDER BY due_at
@@ -130,5 +130,19 @@ public sealed class TimerDispatcher(NpgsqlDataSource dataSource, ILogger<TimerDi
         return due.Count;
     }
 
-    private sealed record DueTimer(Guid Id, Guid? WorkspaceId, string Kind, string Payload, DateTimeOffset DueAt);
+    /// <summary>Dapper row. Npgsql reads timestamptz as a UTC <see cref="DateTime"/>, hence the conversion.</summary>
+    private sealed class DueTimer
+    {
+        public Guid Id { get; init; }
+
+        public Guid? WorkspaceId { get; init; }
+
+        public string Kind { get; init; } = string.Empty;
+
+        public string Payload { get; init; } = "{}";
+
+        public DateTime DueAtUtc { get; init; }
+
+        public DateTimeOffset DueAt => new(DateTime.SpecifyKind(DueAtUtc, DateTimeKind.Utc));
+    }
 }

@@ -7,6 +7,7 @@ using Pishkhan.Web.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddPishkhanWebHost("pishkhan-ingress")
     .AddRedisChecks().AddKafkaCheck();
+builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 builder.Services.AddChannelsIngress(builder.Configuration);
 builder.Services.AddPishkhanMessaging(builder.Configuration, "ingress", _ => { });
