@@ -54,3 +54,29 @@ public class ConversationTests
         Cursor.TryRead("not-a-cursor", out _, out _).ShouldBeFalse();
     }
 }
+
+public class TotpTests
+{
+    private static readonly byte[] RfcSecret = System.Text.Encoding.ASCII.GetBytes("12345678901234567890");
+
+    [Theory]
+    [InlineData(59L, "287082")]
+    [InlineData(1111111109L, "081804")]
+    [InlineData(1234567890L, "005924")]
+    [InlineData(2000000000L, "279037")]
+    public void Matches_rfc_6238_sha1_vectors(long unixSeconds, string expected)
+    {
+        Pishkhan.Infrastructure.Security.Totp.Compute(RfcSecret, DateTimeOffset.FromUnixTimeSeconds(unixSeconds)).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Verify_accepts_one_step_of_drift_and_persian_digits()
+    {
+        var now = DateTimeOffset.FromUnixTimeSeconds(1234567890);
+        var previous = Pishkhan.Infrastructure.Security.Totp.Compute(RfcSecret, now.AddSeconds(-30));
+        Pishkhan.Infrastructure.Security.Totp.Verify(RfcSecret, previous, now, out var step).ShouldBeTrue();
+        step.ShouldBe(now.ToUnixTimeSeconds() / 30 - 1);
+        Pishkhan.Infrastructure.Security.Totp.Verify(RfcSecret, "۰۰۵۹۲۴", now, out _).ShouldBeTrue();
+        Pishkhan.Infrastructure.Security.Totp.Verify(RfcSecret, Pishkhan.Infrastructure.Security.Totp.Compute(RfcSecret, now.AddMinutes(2)), now, out _).ShouldBeFalse();
+    }
+}
