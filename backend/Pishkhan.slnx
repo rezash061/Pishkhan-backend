@@ -46,6 +46,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Pishkhan.ArchitectureTests/Pishkhan.ArchitectureTests.csproj" />
+    <Project Path="tests/Pishkhan.IntegrationTests/Pishkhan.IntegrationTests.csproj" />
     <Project Path="tests/Pishkhan.Persian.Tests/Pishkhan.Persian.Tests.csproj" />
     <Project Path="tests/Pishkhan.UnitTests/Pishkhan.UnitTests.csproj" />
   </Folder>
