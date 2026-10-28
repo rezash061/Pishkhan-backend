@@ -1,0 +1,43 @@
+name: backend
+
+on:
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+      - name: Restore
+        run: dotnet restore Pishkhan.slnx
+      - name: Build (warnings are errors; exports OpenAPI)
+        run: dotnet build Pishkhan.slnx --no-restore -c Release
+      - name: OpenAPI contract drift
+        run: |
+          if ! git diff --exit-code -- openapi; then
+            echo "::error::backend/openapi is out of date. Build locally and commit the regenerated files."
+            exit 1
+          fi
+      - name: Persian tests
+        run: dotnet test --project tests/Pishkhan.Persian.Tests -c Release --no-build
+      - name: Unit tests
+        run: dotnet test --project tests/Pishkhan.UnitTests -c Release --no-build
+      - name: Architecture tests
+        run: dotnet test --project tests/Pishkhan.ArchitectureTests -c Release --no-build
