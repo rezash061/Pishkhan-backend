@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -114,6 +115,8 @@ public static class AuthSetup
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        services.TryAddSingleton<ISessionRevocationStore, RedisSessionRevocationStore>();
+        services.TryAddSingleton<TokenFactory>();
         return services;
     }
 

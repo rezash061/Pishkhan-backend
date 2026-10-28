@@ -39,6 +39,10 @@ public sealed class JwtKeyRing
         {
             ecdsa.ImportFromPem(DevKey(name, configuration));
         }
+        else if (Infrastructure.Hosting.BuildTime.IsActive)
+        {
+            ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // throwaway: the OpenAPI export never signs anything
+        }
         else
         {
             throw new InvalidOperationException($"Auth:{name}:SigningKeyPem must be configured.");

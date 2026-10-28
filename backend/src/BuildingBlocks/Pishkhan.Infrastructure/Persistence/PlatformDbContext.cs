@@ -13,3 +13,9 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         // Outbox, inbox and timers are mapped by the base class; this context owns their migrations.
     }
 }
+
+internal sealed class PlatformDbContextFactory : Microsoft.EntityFrameworkCore.Design.IDesignTimeDbContextFactory<PlatformDbContext>
+{
+    public PlatformDbContext CreateDbContext(string[] args) =>
+        new(PersistenceExtensions.DesignTimeOptions<PlatformDbContext>(PlatformTables.Schema), new Tenancy.TenantContext());
+}

@@ -60,6 +60,13 @@ public abstract class ModuleDbContext : DbContext
         foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(e => !e.IsOwned()).ToList())
         {
             var clr = entityType.ClrType;
+            var applies = typeof(ITenantOwned).IsAssignableFrom(clr) || typeof(ISoftDeletable).IsAssignableFrom(clr) || IsAggregateRoot(clr);
+            if (!applies)
+            {
+                // Do not touch other types: configuring a convention-discovered value type (a JSON-converted record) would make it an entity.
+                continue;
+            }
+
             var builder = modelBuilder.Entity(clr);
 
             if (typeof(ITenantOwned).IsAssignableFrom(clr))

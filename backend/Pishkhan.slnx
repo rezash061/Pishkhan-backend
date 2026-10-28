@@ -1,11 +1,19 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Pishkhan.AI/Pishkhan.AI.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.Contracts/Pishkhan.Contracts.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.Infrastructure/Pishkhan.Infrastructure.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.Persian/Pishkhan.Persian.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.SharedKernel/Pishkhan.SharedKernel.csproj" />
     <Project Path="src/BuildingBlocks/Pishkhan.Web/Pishkhan.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Hosts/">
+    <Project Path="src/Hosts/Pishkhan.AdminApi/Pishkhan.AdminApi.csproj" />
+    <Project Path="src/Hosts/Pishkhan.Api/Pishkhan.Api.csproj" />
+    <Project Path="src/Hosts/Pishkhan.Ingress/Pishkhan.Ingress.csproj" />
+    <Project Path="src/Hosts/Pishkhan.Migrator/Pishkhan.Migrator.csproj" />
+    <Project Path="src/Hosts/Pishkhan.Workers/Pishkhan.Workers.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Agent/">

@@ -1,0 +1,69 @@
+# Local development infrastructure. `make up` (or `docker compose -f infra/docker-compose.yml up -d`), then `make migrate`.
+name: pishkhan
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: pishkhan
+      POSTGRES_USER: pishkhan
+      POSTGRES_PASSWORD: pishkhan
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_preload_libraries=pg_stat_statements"]
+    ports: ["5432:5432"]
+    volumes: ["postgres:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pishkhan -d pishkhan"]
+      interval: 5s
+      retries: 20
+
+  # Two Redis instances (backend plan 4): cache (evictable) and state (rate limits, locks, OTP, sessions; noeviction).
+  redis-cache:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lfu", "--save", ""]
+    ports: ["6379:6379"]
+
+  redis-state:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    ports: ["6380:6379"]
+    volumes: ["redis-state:/data"]
+
+  kafka:
+    image: apache/kafka:4.1.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports: ["9092:9092"]
+    volumes: ["kafka:/var/lib/kafka/data"]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    profiles: ["tools"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports: ["8085:8080"]
+    depends_on: [kafka]
+
+  # Production uses a private signature mirror because the official CDN blocks Iran (backend plan 8.2).
+  clamav:
+    image: clamav/clamav:1.4
+    ports: ["3310:3310"]
+    volumes: ["clamav:/var/lib/clamav"]
+
+volumes:
+  postgres:
+  redis-state:
+  kafka:
+  clamav:

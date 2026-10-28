@@ -1,0 +1,172 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Pishkhan Public API",
+    "description": "Contract owned by the backend (overview section 6). Errors are RFC 9457 Problem Details whose `errors` hold message keys.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/v1/public/altcha/challenge": {
+      "get": {
+        "tags": [
+          "Bot protection"
+        ],
+        "summary": "ALTCHA proof-of-work challenge for sign-up and forms",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AltchaChallenge"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/meta/instagram/data-deletion/{code}": {
+      "get": {
+        "tags": [
+          "Meta callbacks"
+        ],
+        "summary": "Status of a Meta data deletion request",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataDeletionStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AltchaChallenge": {
+        "required": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "algorithm": {
+            "type": "string"
+          },
+          "challenge": {
+            "type": "string"
+          },
+          "maxNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "salt": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "DataDeletionStatusResponse": {
+        "required": [
+          "confirmationCode",
+          "status",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "confirmationCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Bot protection"
+    },
+    {
+      "name": "Meta callbacks"
+    }
+  ]
+}

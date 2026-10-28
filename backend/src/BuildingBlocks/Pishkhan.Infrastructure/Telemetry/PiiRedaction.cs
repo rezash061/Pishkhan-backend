@@ -25,6 +25,10 @@ public static partial class PiiRedactor
     [GeneratedRegex(@"\b(?:IGAA|EAA)[A-Za-z0-9_\-]{20,}\b", RegexOptions.CultureInvariant, 250)]
     private static partial Regex MetaTokens();
 
+    /// <summary>Kavenegar puts the API key in the URL path: <c>/v1/{key}/sms/send.json</c>.</summary>
+    [GeneratedRegex(@"(api\.kavenegar\.com/v1/)[^/\s]+", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, 250)]
+    private static partial Regex KavenegarKey();
+
     public static string Redact(string value)
     {
         if (string.IsNullOrEmpty(value))
@@ -33,6 +37,7 @@ public static partial class PiiRedactor
         }
 
         var result = Secrets().Replace(value, m => m.Groups[1].Value + "***");
+        result = KavenegarKey().Replace(result, m => m.Groups[1].Value + "***");
         result = MetaTokens().Replace(result, "***token***");
         result = Sheba().Replace(result, "IR**-****");
         result = Card().Replace(result, m => "****-****-****-" + Tail(m.Value, 4));

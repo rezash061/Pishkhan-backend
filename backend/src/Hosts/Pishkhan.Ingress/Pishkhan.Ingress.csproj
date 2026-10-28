@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Webhook ingress (international zone): verifies, dedupes and produces to Kafka. No database access. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
+  </ItemGroup>
+</Project>

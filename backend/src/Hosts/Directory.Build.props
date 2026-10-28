@@ -5,4 +5,8 @@
     <IsPublishable>true</IsPublishable>
     <UserSecretsId>pishkhan-dev</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Settings shared by every host (config/), loaded before the host's own appsettings by AddPishkhanPlatform. -->
+    <None Include="$(MSBuildThisFileDirectory)../../config/appsettings*.json" Link="shared/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
