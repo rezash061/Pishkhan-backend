@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Pishkhan.Contracts/Pishkhan.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/Pishkhan.Persian/Pishkhan.Persian.csproj" />
+    <Project Path="src/BuildingBlocks/Pishkhan.SharedKernel/Pishkhan.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pishkhan.Persian.Tests/Pishkhan.Persian.Tests.csproj" />
+  </Folder>
+</Solution>

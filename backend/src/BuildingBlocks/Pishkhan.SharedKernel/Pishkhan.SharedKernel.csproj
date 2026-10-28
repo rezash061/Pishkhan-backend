@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Depends on nothing: Domain folders in every module may reference only this project. -->
+</Project>

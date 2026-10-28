@@ -1,0 +1,77 @@
+<Project>
+  <!-- Every package version is pinned here. Licenses checked: all MIT / Apache-2.0 / BSD.
+       MassTransit is pinned to 8.5.x because version 9 is commercially licensed. -->
+  <ItemGroup>
+    <!-- Analyzers -->
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.317" />
+
+    <!-- Persistence -->
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
+    <PackageVersion Include="Dapper" Version="2.1.89" />
+
+    <!-- Application -->
+    <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
+    <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
+    <PackageVersion Include="Scrutor" Version="7.0.0" />
+
+    <!-- Messaging and jobs -->
+    <PackageVersion Include="MassTransit" Version="[8.5.12,8.6)" />
+    <PackageVersion Include="MassTransit.Kafka" Version="[8.5.12,8.6)" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="4.6.2" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="4.6.2" />
+
+    <!-- Caching -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.14" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.14" />
+
+    <!-- HTTP, AI, files -->
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
+    <PackageVersion Include="nClam" Version="9.0.0" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.7" />
+    <PackageVersion Include="SkiaSharp" Version="4.154.0" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.154.0" />
+
+    <!-- Web -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
+
+    <!-- Observability -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
+
+    <!-- Hosting -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+
+    <!-- Tests -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="Bogus" Version="35.6.5" />
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageVersion Include="Testcontainers" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.Kafka" Version="4.16.0" />
+    <PackageVersion Include="WireMock.Net" Version="2.20.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+  </ItemGroup>
+</Project>

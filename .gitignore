@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+TestResults/
+*.swp
+.env
+infra/.data/
+.pishkhan/
+node_modules/

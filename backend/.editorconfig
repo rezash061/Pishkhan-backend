@@ -1,0 +1,134 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,props,csproj,slnx,xml}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace
+dotnet_sort_system_directives_first = true
+csharp_style_var_for_built_in_types = true
+csharp_style_var_when_type_is_apparent = true
+csharp_style_var_elsewhere = true
+csharp_prefer_braces = when_multiline
+dotnet_style_qualification_for_field = false
+
+# Noise we accept on purpose (each one is a conscious decision):
+# CA1848/CA1873: LoggerMessage source generators everywhere is overkill for this codebase; hot paths use them explicitly.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+# CA2007: ASP.NET Core has no sync context; ConfigureAwait(false) adds noise.
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.MA0004.severity = none
+# CA1062: nullable reference types already cover argument null checks.
+dotnet_diagnostic.CA1062.severity = none
+# CA1711/CA1716/CA1720: naming rules conflict with domain words (Event, Error, Handler).
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1720.severity = none
+# CA1724: type names may match namespaces in vertical slices.
+dotnet_diagnostic.CA1724.severity = none
+# CA1812: internal classes are instantiated by DI.
+dotnet_diagnostic.CA1812.severity = none
+# CA1515: public types in app projects are needed for tests and DI.
+dotnet_diagnostic.CA1515.severity = none
+# CA1031: catch-all is used deliberately at process boundaries (consumers, relays) and is logged.
+dotnet_diagnostic.CA1031.severity = none
+# CA2000/CA2213: false positives with DI-owned disposables.
+dotnet_diagnostic.CA2000.severity = suggestion
+# CA1859/CA1822: micro-optimisations, informational only.
+dotnet_diagnostic.CA1859.severity = suggestion
+dotnet_diagnostic.CA1822.severity = suggestion
+# CA1305/CA1307/CA1309/CA1310/CA1311: culture rules, MA0011/MA0074/MA0006 cover the important cases.
+dotnet_diagnostic.CA1305.severity = suggestion
+dotnet_diagnostic.CA1307.severity = suggestion
+dotnet_diagnostic.CA1309.severity = suggestion
+dotnet_diagnostic.CA1311.severity = suggestion
+dotnet_diagnostic.CA1304.severity = suggestion
+# CA1819: arrays on DTOs/records are fine.
+dotnet_diagnostic.CA1819.severity = none
+# CA1002/CA2227: collection properties on DTOs/entities are fine.
+dotnet_diagnostic.CA1002.severity = none
+dotnet_diagnostic.CA2227.severity = none
+# CA1054/CA1055/CA1056: URLs as strings in DTOs.
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1055.severity = none
+dotnet_diagnostic.CA1056.severity = none
+# CA1034: nested types used for grouped constants.
+dotnet_diagnostic.CA1034.severity = none
+# CA1000: static members on generic types (Result<T>.Success).
+dotnet_diagnostic.CA1000.severity = none
+# CA1030/CA1003: event naming in domain sense.
+dotnet_diagnostic.CA1030.severity = none
+dotnet_diagnostic.CA1003.severity = none
+# CA5394: Random is used only where unpredictability is not a security property; security uses RandomNumberGenerator.
+dotnet_diagnostic.CA5394.severity = suggestion
+# CA1308: lower-case normalisation for keys/identifiers is intended.
+dotnet_diagnostic.CA1308.severity = none
+# CA2201/CA1032/CA1064/CA1065: exception style rules.
+dotnet_diagnostic.CA1032.severity = none
+dotnet_diagnostic.CA1064.severity = none
+# CA1707: test names use underscores.
+dotnet_diagnostic.CA1707.severity = none
+# CA1051: visible fields on structs.
+dotnet_diagnostic.CA1051.severity = none
+# CA1028/CA1008: enum storage and zero values decided per enum.
+dotnet_diagnostic.CA1028.severity = none
+dotnet_diagnostic.CA1008.severity = none
+# CA2234/CA1863: style.
+dotnet_diagnostic.CA2234.severity = none
+dotnet_diagnostic.CA1863.severity = none
+# CA1869: JsonSerializerOptions instances are cached where hot.
+dotnet_diagnostic.CA1869.severity = suggestion
+# CA2326/CA2327/CA2328: not used (no TypeNameHandling).
+# Meziantou: style rules we do not adopt.
+dotnet_diagnostic.MA0048.severity = none
+dotnet_diagnostic.MA0051.severity = none
+dotnet_diagnostic.MA0016.severity = none
+dotnet_diagnostic.MA0026.severity = none
+dotnet_diagnostic.MA0038.severity = none
+dotnet_diagnostic.MA0041.severity = none
+dotnet_diagnostic.MA0049.severity = none
+dotnet_diagnostic.MA0007.severity = none
+dotnet_diagnostic.MA0003.severity = none
+dotnet_diagnostic.MA0002.severity = suggestion
+dotnet_diagnostic.MA0006.severity = suggestion
+dotnet_diagnostic.MA0009.severity = suggestion
+dotnet_diagnostic.MA0011.severity = suggestion
+dotnet_diagnostic.MA0074.severity = suggestion
+dotnet_diagnostic.MA0076.severity = suggestion
+dotnet_diagnostic.MA0001.severity = suggestion
+dotnet_diagnostic.MA0005.severity = suggestion
+dotnet_diagnostic.MA0018.severity = none
+dotnet_diagnostic.MA0025.severity = suggestion
+dotnet_diagnostic.MA0040.severity = suggestion
+dotnet_diagnostic.MA0042.severity = suggestion
+dotnet_diagnostic.MA0045.severity = none
+dotnet_diagnostic.MA0053.severity = none
+dotnet_diagnostic.MA0097.severity = none
+dotnet_diagnostic.MA0109.severity = none
+dotnet_diagnostic.MA0110.severity = suggestion
+dotnet_diagnostic.MA0144.severity = none
+dotnet_diagnostic.MA0154.severity = none
+dotnet_diagnostic.MA0158.severity = none
+dotnet_diagnostic.IDE0005.severity = none
+dotnet_diagnostic.MA0008.severity = none
+dotnet_diagnostic.MA0023.severity = none
+dotnet_diagnostic.IDE0161.severity = warning
+
+[tests/**.cs]
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1849.severity = none
+dotnet_diagnostic.CA5394.severity = none
+dotnet_diagnostic.MA0099.severity = none
+dotnet_diagnostic.CA1806.severity = none
+dotnet_diagnostic.CA2012.severity = none
