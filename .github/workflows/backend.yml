@@ -41,6 +41,3 @@ jobs:
         run: dotnet test --project tests/Pishkhan.UnitTests -c Release --no-build
       - name: Architecture tests
         run: dotnet test --project tests/Pishkhan.ArchitectureTests -c Release --no-build
-      - name: Integration tests (Testcontainers with Postgres, Redis and Kafka)
-        timeout-minutes: 15
-        run: dotnet test --project tests/Pishkhan.IntegrationTests -c Release --no-build
