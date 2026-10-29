@@ -13,5 +13,6 @@
     <PackageReference Include="Testcontainers.Redis" />
     <PackageReference Include="Testcontainers.Kafka" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 </Project>

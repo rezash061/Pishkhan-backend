@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Pishkhan.Infrastructure.Sms;
 
@@ -16,7 +15,12 @@ public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Progr
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(infra.Settings));
+
+        // UseSetting lands before Program reads configuration (minimal hosting applies ConfigureAppConfiguration only at Build).
+        foreach (var (key, value) in infra.Settings)
+        {
+            builder.UseSetting(key, value);
+        }
     }
 
     /// <summary>Signs a new user in with a phone OTP (dev SMS sender) and returns a client carrying the access token.</summary>

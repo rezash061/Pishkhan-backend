@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Features;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Conversations.Realtime;
 using Pishkhan.Modules.Conversations.Services;
 
 namespace Pishkhan.Modules.Conversations;
@@ -34,9 +36,28 @@ public static class ConversationsModule
         messaging.AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
             "outbound", new RetryPolicy(OutboundSendHandler.MaxAttempts, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(60)));
 
+    /// <summary>Api host: SignalR inbox (call after <c>AddPishkhanRealtime</c>).</summary>
+    public static IServiceCollection AddConversationsRealtime(this IServiceCollection services)
+    {
+        services.AddSingleton<IInboxNotifier, InboxNotifier>();
+        return services;
+    }
+
+    /// <summary>Api host, <c>realtime</c> group: pipeline events pushed to the panel. One replica handles each event; the backplane fans it out.</summary>
+    public static MessagingBuilder AddConversationsRealtimeConsumers(this MessagingBuilder messaging) => messaging
+        .AddHostConsumer<InboundMessageReceived, RealtimeInboundHandler>(RealtimeGroup)
+        .AddHostConsumer<OutboundMessageRequested, RealtimeOutboundQueuedHandler>(RealtimeGroup)
+        .AddHostConsumer<OutboundMessageCompleted, RealtimeOutboundCompletedHandler>(RealtimeGroup)
+        .AddHostConsumer<MessagesRead, RealtimeReadHandler>(RealtimeGroup)
+        .AddHostConsumer<HandoffRequested, RealtimeHandoffHandler>(RealtimeGroup)
+        .AddHostConsumer<ChannelStatusChanged, RealtimeChannelStatusHandler>(RealtimeGroup);
+
+    public const string RealtimeGroup = "realtime";
+
     public static IEndpointRouteBuilder MapConversationsEndpoints(this IEndpointRouteBuilder app)
     {
         ConversationEndpoints.Map(app);
+        app.MapHub<InboxHub>(InboxHub.Path);
         return app;
     }
 }

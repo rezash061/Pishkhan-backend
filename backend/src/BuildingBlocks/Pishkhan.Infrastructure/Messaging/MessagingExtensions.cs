@@ -40,6 +40,18 @@ public sealed class MessagingBuilder
     }
 
     /// <summary>
+    /// Adds a handler in a group this host type owns whatever <c>Workers:Groups</c> says (for example the Api host's
+    /// <c>realtime</c> group, which pushes events to SignalR clients).
+    /// </summary>
+    public MessagingBuilder AddHostConsumer<TEvent, THandler>(string group)
+        where TEvent : class, IIntegrationEvent
+        where THandler : class, IIntegrationEventHandler<TEvent>
+    {
+        Add<TEvent, THandler>(group, null, broadcast: false);
+        return this;
+    }
+
+    /// <summary>
     /// Adds a handler that every process instance receives (its own consumer group), for example cache invalidation.
     /// Broadcast consumers start from the latest offset.
     /// </summary>
@@ -92,7 +104,8 @@ public static class MessagingExtensions
             services.AddHostedService<TopicBootstrapHostedService>();
         }
 
-        if (builder.Registrations.Count == 0)
+        // No consumers, or the build-time OpenAPI export (which starts the host): no bus to run.
+        if (builder.Registrations.Count == 0 || Hosting.BuildTime.IsActive)
         {
             return services;
         }

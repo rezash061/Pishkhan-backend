@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.5 Live inbox, 2026-10-29)
+- SignalR hub `/hubs/inbox` (realtime token only) with `JoinWorkspace` / `JoinConversation`; membership and `inbox.read` checked on every join.
+- Redis backplane on the state instance, so events reach clients on every Api replica.
+- Api `realtime` consumer group turns pipeline events into `conversation.updated`, `message.created`, `message.status`, `handoff.requested` and `channel.status`; inbox actions push `conversation.updated` directly.
+- The build-time OpenAPI export no longer starts the Kafka bus.
+- Deferred: persistent handoff notifications (bell, web push, SMS) come with BE-1.14.
+
 ### Added (Phase 1, BE-1.2 Conversations and outbound pipeline, 2026-10-29)
 - Outbound policy: normal messages only inside the 24-hour window; a team member's reply within 7 days goes out with the `HUMAN_AGENT` tag (never automated messages); private replies limited to one per comment; suspended workspaces cannot send.
 - Read receipts from Instagram mark our earlier messages `read` (`conversations.messages-read`); sent message ids are kept for receipts and echoes.
