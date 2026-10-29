@@ -48,15 +48,33 @@ public sealed record InboundAttachment(string Type, string? Url);
 /// <summary>
 /// What to send. Exactly one of <see cref="Text"/>, <see cref="Attachment"/> or <see cref="Cards"/> carries the body;
 /// <see cref="QuickReplies"/> and <see cref="Buttons"/> decorate a text message (Instagram: up to 13 quick replies, 3 buttons, 10 cards).
+/// <see cref="Tag"/> is <see cref="MessageTags.HumanAgent"/> only for a person's reply outside the 24-hour window (Conversations enforces it).
 /// </summary>
 public sealed record OutboundContent(
     string? Text,
     OutboundAttachment? Attachment = null,
     IReadOnlyList<QuickReply>? QuickReplies = null,
     IReadOnlyList<MessageButton>? Buttons = null,
-    IReadOnlyList<MessageCard>? Cards = null)
+    IReadOnlyList<MessageCard>? Cards = null,
+    string? Tag = null)
 {
     public bool IsEmpty => string.IsNullOrWhiteSpace(Text) && Attachment is null && (Cards is null || Cards.Count == 0);
+}
+
+public static class MessageTags
+{
+    public const string HumanAgent = "HUMAN_AGENT";
+}
+
+/// <summary>Kinds of normalized inbound events. <see cref="Read"/> means the customer read our messages up to the one named.</summary>
+public static class InboundKinds
+{
+    public const string Text = "text";
+    public const string Attachment = "attachment";
+    public const string StoryReply = "story_reply";
+    public const string QuickReply = "quick_reply";
+    public const string Postback = "postback";
+    public const string Read = "read";
 }
 
 public static class AttachmentTypes

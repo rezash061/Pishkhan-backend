@@ -25,6 +25,7 @@ public static class TenancyModule
         services.AddModuleDbContext<TenancyDbContext>(TenancyDbContext.SchemaName);
         services.AddScoped<IWorkspaceAccessResolver, WorkspaceAccessResolver>();
         services.AddScoped<IMembershipQueries, MembershipQueries>();
+        services.AddScoped<IWorkspaceQueries, WorkspaceQueries>();
         services.AddHandlersFrom(typeof(TenancyModule).Assembly);
         return services;
     }

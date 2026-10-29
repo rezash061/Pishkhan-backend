@@ -1,3 +1,6 @@
+using System.Text.Json;
+using Pishkhan.Contracts;
+using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.SharedKernel;
 
@@ -53,6 +56,9 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
     /// <summary>Instagram's standard messaging window after the customer's last message.</summary>
     public static readonly TimeSpan MessagingWindow = TimeSpan.FromHours(24);
 
+    /// <summary>How long after the customer's last message a person may still reply with the <c>HUMAN_AGENT</c> tag.</summary>
+    public static readonly TimeSpan HumanAgentWindow = TimeSpan.FromDays(7);
+
     private Conversation()
     {
     }
@@ -96,6 +102,42 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
     };
 
     public bool IsWindowOpen(DateTimeOffset now) => WindowExpiresAt > now;
+
+    public bool IsHumanAgentWindowOpen(DateTimeOffset now) => LastInboundAt + HumanAgentWindow > now;
+
+    public bool Assign(Guid? assigneeId)
+    {
+        if (AssigneeId == assigneeId)
+        {
+            return false;
+        }
+
+        AssigneeId = assigneeId;
+        return true;
+    }
+
+    /// <summary>Changes the status. Returns false for an unknown status or no change.</summary>
+    public bool ChangeStatus(string status)
+    {
+        if (!ConversationStatuses.All.Contains(status) || Status == status)
+        {
+            return false;
+        }
+
+        Status = status;
+        return true;
+    }
+
+    public bool SetAiPaused(bool paused)
+    {
+        if (AiPaused == paused)
+        {
+            return false;
+        }
+
+        AiPaused = paused;
+        return true;
+    }
 
     public void RecordInbound(DateTimeOffset sentAt, string? preview)
     {
@@ -154,6 +196,17 @@ public sealed class Message : ITenantOwned
     /// <summary>Raw attachment descriptors (type and CDN URL) until the media worker downloads them.</summary>
     public string? AttachmentsJson { get; init; }
 
+    /// <summary>Outbound only: the full content (quick replies, buttons, cards, media) when it is more than plain text.</summary>
+    public string? ContentJson { get; init; }
+
+    /// <summary>Outbound only: the Meta message tag used (<c>HUMAN_AGENT</c> outside the 24-hour window).</summary>
+    public string? Tag { get; private set; }
+
+    /// <summary>Outbound private reply: the comment it answers (one private reply per comment).</summary>
+    public string? ReplyToCommentId { get; init; }
+
+    public DateTimeOffset? ReadAt { get; private set; }
+
     public string? ExternalId { get; private set; }
 
     public string Status { get; private set; } = MessageStatuses.Received;
@@ -180,24 +233,39 @@ public sealed class Message : ITenantOwned
         AttachmentsJson = attachmentsJson,
     };
 
-    public static Message QueueOutbound(Guid workspaceId, Guid conversationId, string text, string handledBy, Guid? sentBy, DateTimeOffset now) => new()
-    {
-        Id = Uuid.NewV7(now),
-        CreatedAt = now,
-        WorkspaceId = workspaceId,
-        ConversationId = conversationId,
-        Direction = MessageDirections.Outbound,
-        Kind = "text",
-        Text = text,
-        Status = MessageStatuses.Queued,
-        HandledBy = handledBy,
-        SentBy = sentBy,
-    };
+    public static Message QueueOutbound(Guid workspaceId, Guid conversationId, string text, string handledBy, Guid? sentBy, DateTimeOffset now) =>
+        QueueOutbound(workspaceId, conversationId, new OutboundContent(text), handledBy, sentBy, now);
 
-    public void MarkSent(string? externalId, DateTimeOffset now)
+    /// <summary>Queues an outbound message. <see cref="Text"/> holds the text or a short summary for the inbox list and search.</summary>
+    public static Message QueueOutbound(Guid workspaceId, Guid conversationId, OutboundContent content, string handledBy, Guid? sentBy, DateTimeOffset now, string? replyToCommentId = null)
+    {
+        var plain = content is { Attachment: null, QuickReplies: null or { Count: 0 }, Buttons: null or { Count: 0 }, Cards: null or { Count: 0 } };
+        return new Message
+        {
+            Id = Uuid.NewV7(now),
+            CreatedAt = now,
+            WorkspaceId = workspaceId,
+            ConversationId = conversationId,
+            Direction = MessageDirections.Outbound,
+            Kind = content.Cards is { Count: > 0 } ? "cards" : content.Attachment is { } a ? a.Type : "text",
+            Text = content.Text ?? content.Cards?.FirstOrDefault()?.Title,
+            ContentJson = plain ? null : JsonSerializer.Serialize(content with { Tag = null }, EnvelopeJson.Options),
+            Status = MessageStatuses.Queued,
+            HandledBy = handledBy,
+            SentBy = sentBy,
+            ReplyToCommentId = replyToCommentId,
+        };
+    }
+
+    /// <summary>The content to hand to the channel adapter.</summary>
+    public OutboundContent ToContent(string? tag) =>
+        (ContentJson is null ? new OutboundContent(Text) : JsonSerializer.Deserialize<OutboundContent>(ContentJson, EnvelopeJson.Options)!) with { Tag = tag };
+
+    public void MarkSent(string? externalId, string? tag, DateTimeOffset now)
     {
         Status = MessageStatuses.Sent;
         ExternalId = externalId;
+        Tag = tag;
         SentAt = now;
     }
 
@@ -214,6 +282,59 @@ public sealed class ExternalMessageKey
     public Guid ChannelAccountId { get; init; }
 
     public required string ExternalId { get; init; }
+
+    public Guid MessageId { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>An internal note on a conversation, visible to the team only.</summary>
+public sealed class ConversationNote : Entity<Guid>, ITenantOwned
+{
+    public Guid WorkspaceId { get; init; }
+
+    public Guid ConversationId { get; init; }
+
+    public Guid AuthorId { get; init; }
+
+    public required string Text { get; init; }
+
+    public static ConversationNote Create(Guid workspaceId, Guid conversationId, Guid authorId, string text, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = workspaceId,
+        ConversationId = conversationId,
+        AuthorId = authorId,
+        Text = text,
+        CreatedAt = now,
+    };
+}
+
+/// <summary>A saved reply the team inserts with <c>/shortcut</c> in the composer.</summary>
+public sealed class QuickReplyTemplate : Entity<Guid>, ITenantOwned
+{
+    public Guid WorkspaceId { get; init; }
+
+    public string Shortcut { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
+
+    public static QuickReplyTemplate Create(Guid workspaceId, string shortcut, string text, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = workspaceId,
+        Shortcut = shortcut,
+        Text = text,
+        CreatedAt = now,
+    };
+}
+
+/// <summary>Enforces one private reply per comment (Meta allows exactly one).</summary>
+public sealed class PrivateReplyKey
+{
+    public Guid ChannelAccountId { get; init; }
+
+    public required string CommentId { get; init; }
 
     public Guid MessageId { get; init; }
 

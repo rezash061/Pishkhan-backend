@@ -24,7 +24,14 @@ public static class InstagramMessageBuilder
         var to = recipient.CommentId is { Length: > 0 } commentId
             ? new JsonObject { ["comment_id"] = commentId }
             : new JsonObject { ["id"] = recipient.UserId ?? throw new ArgumentException("A recipient needs a user id or a comment id.", nameof(recipient)) };
-        return new JsonObject { ["recipient"] = to, ["message"] = Message(content) };
+        var body = new JsonObject { ["recipient"] = to, ["message"] = Message(content) };
+        if (content.Tag is { Length: > 0 } tag)
+        {
+            body["messaging_type"] = "MESSAGE_TAG";
+            body["tag"] = tag;
+        }
+
+        return body;
     }
 
     private static JsonObject Message(OutboundContent content)
