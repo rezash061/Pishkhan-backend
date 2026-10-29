@@ -107,6 +107,49 @@ public sealed class Product : AggregateRoot<Guid>, ITenantOwned, ISoftDeletable
         Revision++;
     }
 
+    /// <summary>Appends an image (a no-op if it is already there). False when the product already has <see cref="CatalogValidator.MaxImages"/>.</summary>
+    public bool AddImage(Guid fileId, DateTimeOffset now)
+    {
+        if (ImageFileIds.Contains(fileId))
+        {
+            return true;
+        }
+
+        if (ImageFileIds.Count >= CatalogValidator.MaxImages)
+        {
+            return false;
+        }
+
+        ImageFileIds = [.. ImageFileIds, fileId];
+        Touch(now);
+        return true;
+    }
+
+    public bool RemoveImage(Guid fileId, DateTimeOffset now)
+    {
+        if (!ImageFileIds.Contains(fileId))
+        {
+            return false;
+        }
+
+        ImageFileIds = [.. ImageFileIds.Where(f => f != fileId)];
+        Touch(now);
+        return true;
+    }
+
+    /// <summary>Puts the images in the given order. False unless <paramref name="fileIds"/> holds exactly the product's images.</summary>
+    public bool ReorderImages(IReadOnlyList<Guid> fileIds, DateTimeOffset now)
+    {
+        if (fileIds.Count != ImageFileIds.Count || fileIds.Distinct().Count() != fileIds.Count || !fileIds.All(ImageFileIds.Contains))
+        {
+            return false;
+        }
+
+        ImageFileIds = [.. fileIds];
+        Touch(now);
+        return true;
+    }
+
     public Money? PriceOf(ProductVariant variant) => (variant.Price ?? Price) is { } rial ? Money.Rial(rial) : null;
 
     /// <summary>Lowest and highest price over the variants that are for sale (all variants when none is in stock).</summary>
@@ -125,6 +168,12 @@ public sealed class Product : AggregateRoot<Guid>, ITenantOwned, ISoftDeletable
 
     /// <summary>A product without variants is in stock; with variants, when any variant is.</summary>
     public bool InStock => Variants.Where(v => v.DeletedAt is null).ToList() is not { Count: > 0 } live || live.Any(v => v.InStock);
+
+    private void Touch(DateTimeOffset now)
+    {
+        UpdatedAt = now;
+        Revision++;
+    }
 
     private void Apply(ProductDefinition d, DateTimeOffset now)
     {

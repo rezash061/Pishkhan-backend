@@ -3634,7 +3634,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettingsView"
+                  "$ref": "#/components/schemas/SettingsResponse"
                 }
               }
             }
@@ -3650,7 +3650,8 @@
         "tags": [
           "Automation"
         ],
-        "summary": "AI on or off, business hours (`sat`..`fri`: [\"09:00-18:00\"]), fallback message",
+        "summary": "AI on or off, fallback message",
+        "description": "The outside-business-hours trigger and flow conditions use the workspace's business hours (`/workspaces/{workspaceId}/business-hours`).",
         "parameters": [
           {
             "name": "workspaceId",
@@ -3678,7 +3679,180 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettingsView"
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/automation/test": {
+      "post": {
+        "tags": [
+          "Automation"
+        ],
+        "summary": "Dry-run the rules against a sample message or comment",
+        "description": "Shows which rule would answer (or the AI, the fallback, nothing) and what it would send, with variables filled in. Nothing is sent or stored, and cooldowns are ignored.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleTestResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/automation/flows/{flowId}/test": {
+      "post": {
+        "tags": [
+          "Automation"
+        ],
+        "summary": "Dry-run a flow with sample answers",
+        "description": "Runs the draft (or `published`) from its start, then feeds `answers` one at a time while it waits for input. Delays end at once. An invalid draft is refused with 422 and the validation result.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowTestResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4292,6 +4466,242 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/catalog/products/{productId}/images": {
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Add an image to the end of a product's images",
+        "description": "`fileId` is a Files upload with purpose `product_image`. Adding an image the product already has changes nothing. At most 10 images.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/catalog/products/{productId}/images/{fileId}": {
+      "delete": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Remove an image from a product",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/catalog/products/{productId}/images/order": {
+      "put": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Reorder a product's images",
+        "description": "`fileIds` must list every image of the product exactly once; the first is the cover.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5154,30 +5564,6 @@
           }
         }
       },
-      "BusinessHours": {
-        "required": [
-          "timeZone",
-          "days"
-        ],
-        "type": "object",
-        "properties": {
-          "timeZone": {
-            "type": "string"
-          },
-          "days": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "isConfigured": {
-            "type": "boolean"
-          }
-        }
-      },
       "BusinessHoursDto": {
         "required": [
           "days",
@@ -5950,6 +6336,114 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "FlowTestRequest": {
+        "required": [
+          "answers"
+        ],
+        "type": "object",
+        "properties": {
+          "answers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SandboxMessage"
+            }
+          },
+          "published": {
+            "type": "boolean",
+            "default": false
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SandboxContact"
+              }
+            ]
+          }
+        }
+      },
+      "FlowTestResponse": {
+        "required": [
+          "flowId",
+          "version",
+          "status",
+          "currentNode",
+          "variables",
+          "turns"
+        ],
+        "type": "object",
+        "properties": {
+          "flowId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currentNode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowTestTurn"
+            }
+          }
+        }
+      },
+      "FlowTestTurn": {
+        "required": [
+          "input",
+          "steps"
+        ],
+        "type": "object",
+        "properties": {
+          "input": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SandboxMessage"
+              }
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SandboxStep"
+            }
           }
         }
       },
@@ -6816,6 +7310,36 @@
           }
         }
       },
+      "ProductImageOrderRequest": {
+        "required": [
+          "fileIds"
+        ],
+        "type": "object",
+        "properties": {
+          "fileIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "ProductImageRequest": {
+        "required": [
+          "fileId"
+        ],
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ProductImageResponse": {
         "required": [
           "fileId",
@@ -7487,6 +8011,284 @@
           }
         }
       },
+      "RuleTestRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "payload": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "channelAccountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "mediaId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isNewConversation": {
+            "type": "boolean",
+            "default": false
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ruleId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SandboxContact"
+              }
+            ]
+          }
+        }
+      },
+      "RuleTestResponse": {
+        "required": [
+          "outcome",
+          "ruleId",
+          "ruleName",
+          "businessOpen",
+          "otherMatches",
+          "steps",
+          "flow"
+        ],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "ruleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "businessOpen": {
+            "type": "boolean"
+          },
+          "otherMatches": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SandboxStep"
+            }
+          },
+          "flow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FlowTestResponse"
+              }
+            ]
+          }
+        }
+      },
+      "SandboxContact": {
+        "required": [
+          "name",
+          "username",
+          "tags",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SandboxMessage": {
+        "required": [
+          "text",
+          "payload"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "payload": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SandboxStep": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OutboundContent"
+              }
+            ]
+          },
+          "replies": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "cardSetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "tag": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "field": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "flowId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "until": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "goal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "text",
@@ -7579,7 +8381,6 @@
       "SettingsRequest": {
         "required": [
           "aiEnabled",
-          "businessHours",
           "fallbackText",
           "fallbackCooldownMinutes"
         ],
@@ -7587,16 +8388,6 @@
         "properties": {
           "aiEnabled": {
             "type": "boolean"
-          },
-          "businessHours": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/BusinessHours"
-              }
-            ]
           },
           "fallbackText": {
             "type": [
@@ -7613,10 +8404,9 @@
           }
         }
       },
-      "SettingsView": {
+      "SettingsResponse": {
         "required": [
           "aiEnabled",
-          "businessHours",
           "fallbackText",
           "fallbackCooldownMinutes"
         ],
@@ -7624,9 +8414,6 @@
         "properties": {
           "aiEnabled": {
             "type": "boolean"
-          },
-          "businessHours": {
-            "$ref": "#/components/schemas/BusinessHours"
           },
           "fallbackText": {
             "type": [

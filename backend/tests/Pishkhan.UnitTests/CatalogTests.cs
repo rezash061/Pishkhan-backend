@@ -6,6 +6,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Catalog.Domain;
 using Pishkhan.Modules.Catalog.Services;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.UnitTests;

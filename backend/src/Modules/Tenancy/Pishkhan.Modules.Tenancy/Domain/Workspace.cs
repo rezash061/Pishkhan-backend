@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.Modules.Tenancy.Domain;
@@ -88,35 +89,3 @@ public sealed partial class Workspace : AggregateRoot<Guid>
         return latin.Length >= 3 ? $"{latin[..Math.Min(latin.Length, 30)].TrimEnd('-')}-{suffix}" : "shop-" + suffix;
     }
 }
-
-/// <summary>Weekly opening hours in Asia/Tehran, plus closed dates (holidays). Used by the "outside business hours" trigger.</summary>
-public sealed record BusinessHours(IReadOnlyList<DayHours> Days, IReadOnlyList<DateOnly> ClosedDates)
-{
-    /// <summary>Saturday to Wednesday 9-21, Thursday 9-14, Friday closed: a common Iranian shop schedule.</summary>
-    public static readonly BusinessHours Default = new(
-    [
-        new(DayOfWeek.Saturday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(21, 0))]),
-        new(DayOfWeek.Sunday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(21, 0))]),
-        new(DayOfWeek.Monday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(21, 0))]),
-        new(DayOfWeek.Tuesday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(21, 0))]),
-        new(DayOfWeek.Wednesday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(21, 0))]),
-        new(DayOfWeek.Thursday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(14, 0))]),
-        new(DayOfWeek.Friday, []),
-    ], []);
-
-    public bool IsOpen(DateTimeOffset utc)
-    {
-        var local = TehranTime.ToTehran(utc);
-        if (ClosedDates.Contains(DateOnly.FromDateTime(local.DateTime)))
-        {
-            return false;
-        }
-
-        var time = TimeOnly.FromDateTime(local.DateTime);
-        return Days.FirstOrDefault(d => d.Day == local.DayOfWeek)?.Ranges.Any(r => time >= r.From && time < r.To) ?? false;
-    }
-}
-
-public sealed record DayHours(DayOfWeek Day, IReadOnlyList<TimeRange> Ranges);
-
-public sealed record TimeRange(TimeOnly From, TimeOnly To);

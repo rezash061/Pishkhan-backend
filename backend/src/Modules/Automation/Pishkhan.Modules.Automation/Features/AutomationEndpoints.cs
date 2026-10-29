@@ -39,7 +39,10 @@ public sealed record FlowRequest(string Name, FlowGraph? Graph);
 
 public sealed record FlowResponse(Guid Id, string Name, string Status, FlowGraph Graph, int? PublishedVersion, DateTimeOffset? PublishedAt, FlowValidation Validation, DateTimeOffset UpdatedAt);
 
-public sealed record SettingsRequest(bool AiEnabled, BusinessHours? BusinessHours, string? FallbackText, int? FallbackCooldownMinutes);
+public sealed record SettingsRequest(bool AiEnabled, string? FallbackText, int? FallbackCooldownMinutes);
+
+/// <summary>Business hours are the workspace's (<c>GET/PUT /workspaces/{workspaceId}/business-hours</c>).</summary>
+public sealed record SettingsResponse(bool AiEnabled, string? FallbackText, int FallbackCooldownMinutes);
 
 internal static class AutomationEndpoints
 {
@@ -133,13 +136,16 @@ internal static class AutomationEndpoints
 
         root.MapGet("/settings", GetSettingsAsync)
             .RequireWorkspacePermission(Permissions.SettingsRead)
-            .Produces<SettingsView>();
+            .Produces<SettingsResponse>();
 
         root.MapPut("/settings", PutSettingsAsync)
             .RequireWorkspacePermission(Permissions.AutomationWrite)
-            .WithSummary("AI on or off, business hours (`sat`..`fri`: [\"09:00-18:00\"]), fallback message")
-            .Produces<SettingsView>()
+            .WithSummary("AI on or off, fallback message")
+            .WithDescription("The outside-business-hours trigger and flow conditions use the workspace's business hours (`/workspaces/{workspaceId}/business-hours`).")
+            .Produces<SettingsResponse>()
             .WithStandardProblems();
+
+        AutomationSandbox.Map(root);
     }
 
     private static RuleResponse ToResponse(AutomationRule r) =>
@@ -378,24 +384,15 @@ internal static class AutomationEndpoints
         return Results.Ok(ToResponse(flow));
     }
 
+    private static SettingsResponse ToResponse(AutomationSettings s) => new(s.AiEnabled, s.FallbackText, s.FallbackCooldownMinutes);
+
     private static async Task<IResult> GetSettingsAsync(Guid workspaceId, AutomationDbContext db, CancellationToken ct) =>
-        Results.Ok((await db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.WorkspaceId == workspaceId, ct) ?? AutomationSettings.Default(workspaceId)).ToView());
+        Results.Ok(ToResponse(await db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.WorkspaceId == workspaceId, ct) ?? AutomationSettings.Default(workspaceId)));
 
     private static async Task<IResult> PutSettingsAsync(
         Guid workspaceId, SettingsRequest request, AutomationDbContext db, ICacheInvalidator invalidator, AutomationCache cache, CancellationToken ct)
     {
-        var hours = request.BusinessHours ?? BusinessHours.AlwaysOpen;
         var errors = new List<(string, string)>();
-        if (string.IsNullOrWhiteSpace(hours.TimeZone) || !IsKnownZone(hours.TimeZone))
-        {
-            errors.Add(("businessHours.timeZone", "automation.time_zone_invalid"));
-        }
-
-        if (hours.Days is null || hours.Days.Any(d => !BusinessHours.DayKeys.Contains(d.Key) || d.Value is null || d.Value.Count > 4 || d.Value.Any(r => !BusinessHours.TryParseRange(r, out _, out _))))
-        {
-            errors.Add(("businessHours.days", "automation.hours_invalid"));
-        }
-
         if (request.FallbackText is { Length: > 1000 })
         {
             errors.Add(("fallbackText", "validation.text.length"));
@@ -419,26 +416,12 @@ internal static class AutomationEndpoints
         }
 
         settings.AiEnabled = request.AiEnabled;
-        settings.BusinessHours = hours with { Days = hours.Days!.ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal) };
         settings.FallbackText = string.IsNullOrWhiteSpace(request.FallbackText) ? null : request.FallbackText.Trim();
         settings.FallbackCooldownMinutes = request.FallbackCooldownMinutes ?? AutomationSettings.DefaultFallbackCooldownMinutes;
         invalidator.Enqueue(db, AutomationCacheTags.Workspace(workspaceId));
         await db.SaveChangesAsync(ct);
         await cache.InvalidateLocalAsync(workspaceId, ct);
-        return Results.Ok(settings.ToView());
-    }
-
-    private static bool IsKnownZone(string id)
-    {
-        try
-        {
-            TimeZoneInfo.FindSystemTimeZoneById(id);
-            return true;
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            return id == BusinessHours.DefaultTimeZone;
-        }
+        return Results.Ok(ToResponse(settings));
     }
 
     private static IResult? ValidateFlowRequest(FlowRequest request)

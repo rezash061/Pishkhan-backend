@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added (Phase 1, automation test runs, product images, one set of business hours, 2026-10-29)
+- `POST /workspaces/{workspaceId}/automation/test` dry-runs the rules against a sample DM or comment (`text`, `payload`, `source`, `kind`, optional `channelAccountId`, `mediaId`, `at`, `ruleId`, `contact`). It returns the outcome (`rule`, `outside_hours`, `product_details`, `ai`, `fallback`, `none`), the rule, the other rules that also matched, the steps with variables filled in, and the flow the rule starts, run to its first wait. Nothing is sent or stored, and cooldowns are ignored.
+- `POST /workspaces/{workspaceId}/automation/flows/{flowId}/test` runs a flow's draft (or `published`) with sample `answers`, turn by turn. Delays end at once, and tag and field actions apply to the conditions that follow. An invalid draft gets 422 with the validation result.
+- Product images one at a time: `POST /catalog/products/{productId}/images` (`fileId`, appended; adding one already there changes nothing; at most 10), `DELETE /catalog/products/{productId}/images/{fileId}`, and `PUT /catalog/products/{productId}/images/order` (`fileIds`, every image exactly once). Each returns the product and emits `catalog.product-changed.v1`.
+
+### Changed
+- Business hours have one source: the workspace's (`/workspaces/{workspaceId}/business-hours`, with closed dates). The outside-business-hours trigger and flow time conditions now read it. `automation/settings` no longer has `businessHours`, and its column is dropped (migration `AutomationUsesWorkspaceHours`). New workspaces start with the default shop hours (Saturday to Wednesday 9 to 21, Thursday 9 to 14), so an outside-hours rule now fires outside those hours unless the hours are changed.
+
 ### Added (Phase 1, user panel gaps, 2026-10-29)
 - Inbox: conversations carry `contact` (`id`, `displayName`, `username`) and, while handed off, `handoff` (`reason`, `suggestedReply`, `at`). Leaving `handed_off` (or a new inbound message reopening the conversation) clears it.
 - `GET /workspaces/{workspaceId}/conversations?q=` searches the customer's name, username, email and phone (national or +98 form).

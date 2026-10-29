@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Persian;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.Modules.Automation.Domain;

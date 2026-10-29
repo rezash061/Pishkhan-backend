@@ -13,6 +13,7 @@ using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Persian;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.Modules.Automation.Engine;

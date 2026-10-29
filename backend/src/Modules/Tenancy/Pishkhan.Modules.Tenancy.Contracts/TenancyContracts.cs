@@ -19,4 +19,7 @@ public interface IWorkspaceQueries
 {
     /// <summary>True when the workspace is suspended or being deleted (cached; cleared on workspace changes). Unknown workspaces count as suspended.</summary>
     Task<bool> IsSuspendedAsync(Guid workspaceId, CancellationToken cancellationToken);
+
+    /// <summary>The workspace's business hours (cached; cleared on workspace changes). Unknown workspaces get <see cref="BusinessHours.Default"/>.</summary>
+    Task<BusinessHours> GetBusinessHoursAsync(Guid workspaceId, CancellationToken cancellationToken);
 }
