@@ -7,6 +7,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Tenancy\Pishkhan.Modules.Tenancy\Pishkhan.Modules.Tenancy.csproj" />
     <ProjectReference Include="..\..\Modules\Backoffice\Pishkhan.Modules.Backoffice\Pishkhan.Modules.Backoffice.csproj" />
