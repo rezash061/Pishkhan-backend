@@ -24,6 +24,10 @@
     <Project Path="src/Modules/Catalog/Pishkhan.Modules.Catalog.Contracts/Pishkhan.Modules.Catalog.Contracts.csproj" />
     <Project Path="src/Modules/Catalog/Pishkhan.Modules.Catalog/Pishkhan.Modules.Catalog.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Audit/">
+    <Project Path="src/Modules/Audit/Pishkhan.Modules.Audit.Contracts/Pishkhan.Modules.Audit.Contracts.csproj" />
+    <Project Path="src/Modules/Audit/Pishkhan.Modules.Audit/Pishkhan.Modules.Audit.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Automation/">
     <Project Path="src/Modules/Automation/Pishkhan.Modules.Automation.Contracts/Pishkhan.Modules.Automation.Contracts.csproj" />
     <Project Path="src/Modules/Automation/Pishkhan.Modules.Automation/Pishkhan.Modules.Automation.csproj" />

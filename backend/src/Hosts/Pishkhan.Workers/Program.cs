@@ -31,7 +31,8 @@ services
     .AddConversationsModule(configuration)
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
-    .AddAgentModule(configuration);
+    .AddAgentModule(configuration)
+    .AddAuditModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
 services.AddPishkhanMessaging(configuration, "workers", m => m
@@ -45,7 +46,8 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAutomationOutboundConsumers()
     .AddAutomationPlatformConsumers()
     .AddCatalogConsumers()
-    .AddFilesConsumers());
+    .AddFilesConsumers()
+    .AddAuditConsumers());
 
 if (groups.IsEnabled("platform"))
 {

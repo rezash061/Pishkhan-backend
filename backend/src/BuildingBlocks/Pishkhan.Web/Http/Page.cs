@@ -35,3 +35,6 @@ public static class Cursor
         }
     }
 }
+
+/// <summary>One page of an offset-paginated list (back-office tables that show a total and page numbers). <see cref="Page"/> starts at 1.</summary>
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);

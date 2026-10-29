@@ -33,6 +33,7 @@ services
     .AddConversationsRealtime()
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
+    .AddAuditModule(configuration)
     .DecorateHandlers();
 services.AddPishkhanRealtime();
 services.AddPishkhanMessaging(configuration, "api", m => m
@@ -50,6 +51,7 @@ app.MapChannelsEndpoints();
 app.MapConversationsEndpoints();
 app.MapAutomationEndpoints();
 app.MapCatalogEndpoints();
+app.MapAuditEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
