@@ -8,6 +8,27 @@
 - The phone is encrypted, with a blind index: a repeat from the same phone and form within a day updates the earlier lead (and counts submissions) instead of adding a duplicate.
 - `GET /admin/v1/leads` (SuperAdmin, Support): newest first, filter `type`, `page`/`pageSize`, returns `{items, totalCount, page, pageSize}` with the phone in `09…` form.
 - Integration tests raise the per-IP auth limit (all tests sign in from one address).
+### Added (Phase 1, Audit log, 2026-10-29)
+- New Audit module (`audit` schema): append-only `audit.audit_entries`, range-partitioned by month on `occurred_at` (partitions made by the Migrator and the maintenance job).
+- Modules publish `audit.entry-recorded.v1` through their outbox, in the same transaction as the change. The sink (Workers platform group) is idempotent by entry id and fills in a user's display name or masked phone.
+- Snapshots (`before`, `after`) have passwords, tokens, secrets, TOTP and OTP codes, phone numbers, card numbers and Sheba redacted at any depth.
+- Audited now: staff sign-in, failed sign-in (with lockout), TOTP enrollment, step-up, logout and staff creation; workspace create, update and business hours; member invite, join, role change, removal; channel status changes (connect, reconnect, disconnect, reauth needed, deauthorized); Meta data deletion requests. A staff member impersonating a user is recorded as the staff member, on behalf of the user.
+- `GET /admin/v1/audit` (SuperAdmin, Support): filters `actor` (name or id), `action`, `entityType`, `workspaceId`, `from`, `to`; `page`/`pageSize` (max 100); returns `{items, totalCount, page, pageSize}`. Support sees only entries of a workspace.
+- `GET /api/v1/workspaces/{workspaceId}/audit` for the workspace owner (new permission `workspace.audit.read`, owner only). Staff actions show as actor `support`, without the staff member's name or address.
+
+### Fixed
+- Staff sign-in without a TOTP code (the panel's first step) no longer counts as a failed attempt; a wrong code still does.
+- README: the first staff account's role is `SuperAdmin` (role names are case-sensitive).
+
+### Added (Phase 1, BE-1.6 Catalog and storefront cards, 2026-10-29)
+- New Catalog module (`catalog` schema): categories, products (title, description, tags, status `draft`/`active`/`archived`, fixed price in Rial, images, link), variants (SKU unique per workspace, attributes such as color and size, own price or the product's, stock with `track`/`unlimited`), storefront card sets, imports.
+- Endpoints under `/workspaces/{ws}/catalog`: categories CRUD, products CRUD with Persian-normalized search, filters and cursor pagination, `GET /export`, `GET /import-template`, `POST /import` + `GET /imports/{id}`, storefront card sets CRUD and `/preview`.
+- Excel import/export with Persian headers (one row per variant, prices in Toman, Persian or Latin digits). Imports read a clean `import_sheet` file in the commerce group, match products by id then SKU, create missing categories, keep variant ids, and report bad rows without stopping the import.
+- Product images are Files uploads (`product_image`); only clean files get URLs, and cards use 3-day signed URLs that Instagram can fetch.
+- Automation: `send_cards` action (rules and flow action nodes) and flow storefront nodes with `cardSetId` send the set as a carousel built at send time from current prices and stock (active products only, at most 10, Instagram text limits). A card's button returns the product's details (prices per variant, stock) from the catalog.
+- Every product change emits `catalog.product-changed.v1` (for Knowledge, BE-1.4) and invalidates the workspace's card cache on all hosts.
+- Money in the API is `{ "amount": <Rial>, "currency": "IRR" }`.
+- Deferred: bulk price update and price-change batches (BE-2.6), formula pricing (Phase 3), the AI catalog tool (BE-1.4).
 
 ### Added (Phase 1, BE-1.3 Automation engine, 2026-10-29)
 - New Automation module (`automation` schema): rules, flows (draft and published versions), flow runs, comment records, backlog runs, per-rule daily stats, workspace settings (AI on or off, business hours, fallback message).

@@ -138,7 +138,7 @@ public static class RuleValidator
             }
 
             // A commenter has not opened a conversation: only the private reply (one per comment) may reach their DMs.
-            if (comment && a.Kind is ActionKinds.SendMessage or ActionKinds.StartFlow)
+            if (comment && a.Kind is ActionKinds.SendMessage or ActionKinds.SendCards or ActionKinds.StartFlow)
             {
                 yield return (field, "automation.action_needs_conversation");
             }
@@ -163,6 +163,9 @@ public static class RuleValidator
                         yield return (field + ".replies", "automation.replies_invalid");
                     }
 
+                    break;
+                case ActionKinds.SendCards when a.CardSetId is null:
+                    yield return (field + ".cardSetId", "automation.card_set_required");
                     break;
                 case ActionKinds.StartFlow when a.FlowId is null:
                     yield return (field + ".flowId", "automation.flow_required");

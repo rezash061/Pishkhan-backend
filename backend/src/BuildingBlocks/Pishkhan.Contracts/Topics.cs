@@ -33,6 +33,7 @@ public static class Topics
     public const string KnowledgeSourceChanged = "knowledge.source-changed.v1";
     public const string ProductChanged = "catalog.product-changed.v1";
     public const string PricesUpdated = "catalog.prices-updated.v1";
+    public const string CatalogImportRequested = "catalog.import-requested.v1";
     public const string OrderCreated = "orders.order-created.v1";
     public const string OrderStatusChanged = "orders.order-status-changed.v1";
     public const string PaymentConfirmed = "payments.payment-confirmed.v1";
@@ -74,6 +75,7 @@ public static class Topics
         new(KnowledgeSourceChanged, 12, Week, "workspace id"),
         new(ProductChanged, 12, Week, "workspace id"),
         new(PricesUpdated, 12, Week, "workspace id"),
+        new(CatalogImportRequested, 6, Week, "import id"),
         new(OrderCreated, 12, Week, "order id"),
         new(OrderStatusChanged, 12, Week, "order id"),
         new(PaymentConfirmed, 12, Week, "order id"),

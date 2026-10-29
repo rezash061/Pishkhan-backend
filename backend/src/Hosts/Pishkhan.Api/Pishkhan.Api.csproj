@@ -13,11 +13,13 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />
+    <ProjectReference Include="..\..\Modules\Audit\Pishkhan.Modules.Audit\Pishkhan.Modules.Audit.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Tenancy\Pishkhan.Modules.Tenancy\Pishkhan.Modules.Tenancy.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Pishkhan.Modules.Files\Pishkhan.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
     <ProjectReference Include="..\..\Modules\Conversations\Pishkhan.Modules.Conversations\Pishkhan.Modules.Conversations.csproj" />
     <ProjectReference Include="..\..\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Pishkhan.Modules.Catalog\Pishkhan.Modules.Catalog.csproj" />
   </ItemGroup>
 </Project>

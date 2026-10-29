@@ -10,6 +10,7 @@ using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Sms;
 using Pishkhan.Infrastructure.Storage;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Identity.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
@@ -109,6 +110,7 @@ internal sealed class MemberHandlers(
             return Error.Conflict("tenancy.last_owner");
         }
 
+        Audit("member.role_change", "membership", membership.UserId, new { membership.Role }, new { command.Role });
         membership.ChangeRole(command.Role);
         await SaveMembershipChangeAsync(membership.UserId, command.Role, removed: false, cancellationToken);
         var user = await users.GetAsync(membership.UserId, cancellationToken);
@@ -129,6 +131,7 @@ internal sealed class MemberHandlers(
         }
 
         db.Memberships.Remove(membership);
+        Audit(membership.UserId == caller.UserId ? "member.leave" : "member.remove", "membership", membership.UserId, new { membership.Role });
         await SaveMembershipChangeAsync(membership.UserId, null, removed: true, cancellationToken);
         return Unit.Value;
     }
@@ -146,6 +149,7 @@ internal sealed class MemberHandlers(
             caller.UserId,
             clock.UtcNow);
         db.Invitations.Add(invitation);
+        Audit("member.invite", "invitation", invitation.Id, after: new { invitation.Role, invitation.ExpiresAt });
         await db.SaveChangesAsync(cancellationToken);
 
         var workspaceName = await db.Workspaces.Where(w => w.Id == invitation.WorkspaceId).Select(w => w.Name).FirstAsync(cancellationToken);
@@ -173,10 +177,17 @@ internal sealed class MemberHandlers(
         if (!await db.Memberships.AnyAsync(m => m.UserId == caller.UserId, cancellationToken))
         {
             db.Memberships.Add(Membership.Create(invitation.WorkspaceId, caller.UserId, invitation.Role, clock.UtcNow));
+            Audit("member.join", "membership", caller.UserId, after: new { invitation.Role, InvitationId = invitation.Id });
         }
 
         await SaveMembershipChangeAsync(caller.UserId, invitation.Role, removed: false, cancellationToken);
         return new AcceptInvitationResponse(invitation.WorkspaceId, invitation.Role);
+    }
+
+    private void Audit(string action, string entityType, Guid entityId, object? before = null, object? after = null)
+    {
+        var entry = AuditEntries.Create(AuditActor.User(caller.UserId, caller.ActorStaffId, caller.IpAddress), action, entityType, entityId.ToString(), tenant.WorkspaceId, clock.UtcNow, before, after);
+        db.Publish(entry, entry.PartitionKey());
     }
 
     private async Task<bool> IsLastOwnerAsync(Membership membership, CancellationToken cancellationToken) =>

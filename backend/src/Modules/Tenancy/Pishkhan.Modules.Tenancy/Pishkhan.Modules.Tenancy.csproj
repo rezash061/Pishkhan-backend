@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Web\Pishkhan.Web.csproj" />
     <ProjectReference Include="..\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
     <ProjectReference Include="..\..\Identity\Pishkhan.Modules.Identity.Contracts\Pishkhan.Modules.Identity.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

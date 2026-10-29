@@ -9,6 +9,7 @@ using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Automation.Domain;
 using Pishkhan.Modules.Automation.Persistence;
+using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Persian;
@@ -18,13 +19,15 @@ namespace Pishkhan.Modules.Automation.Engine;
 
 /// <summary>
 /// Engine group, per inbound DM (backend plan 9.5), in this order: a flow run waiting for this customer's answer → DM rules (postback
-/// payloads, keywords, story replies and mentions, shares, welcome) by priority → the outside-business-hours rule → the AI agent (if
-/// enabled and not paused for the conversation) → the fallback message. The first that answers wins.
+/// payloads, keywords, story replies and mentions, shares, welcome) by priority → the outside-business-hours rule → a product card's
+/// button (the product's details from the catalog) → the AI agent (if enabled and not paused for the conversation) → the fallback
+/// message. The first that answers wins.
 /// </summary>
 internal sealed class InboundEngineHandler(
     AutomationDbContext db,
     ITenantContext tenant,
     IConversationQueries conversations,
+    ICatalogQueries catalog,
     AutomationCache cache,
     FlowEngine flows,
     IClock clock) : IdempotentHandler<InboundMessageReceived, AutomationDbContext>(db)
@@ -48,7 +51,7 @@ internal sealed class InboundEngineHandler(
             waiting.Received(message.MessageId, message.MessageCreatedAt);
             plan.RuleId = waiting.RuleId;
             await flows.AnswerAsync(waiting, message.Text, message.Payload, conversation, settings, plan, now, cancellationToken);
-            plan.Publish(Db);
+            await plan.PublishAsync(Db, catalog, cancellationToken);
             return;
         }
 
@@ -57,6 +60,13 @@ internal sealed class InboundEngineHandler(
         var fired = await FireFirstAsync(RuleEvaluator.DmCandidates(rules, dm), message, conversation, settings, plan, now, cancellationToken)
             || (!settings.BusinessHours.IsOpen(now)
                 && await FireFirstAsync(RuleEvaluator.OutsideHoursCandidates(rules, message.ChannelAccountId), message, conversation, settings, plan, now, cancellationToken));
+
+        if (!fired && CatalogPayloads.TryParseProduct(message.Payload, out var productId) && await catalog.GetProductAsync(productId, cancellationToken) is { Status: ProductStatuses.Active } product)
+        {
+            plan.Actions.Add(ConversationAction.Send(CardMessages.ProductDetails(product)));
+            plan.Handled = true;
+            fired = true;
+        }
 
         if (!fired && !conversation.AiPaused)
         {
@@ -71,7 +81,7 @@ internal sealed class InboundEngineHandler(
             }
         }
 
-        plan.Publish(Db);
+        await plan.PublishAsync(Db, catalog, cancellationToken);
     }
 
     private async Task<bool> FireFirstAsync(
@@ -316,6 +326,7 @@ internal sealed class CommentReplyHandler(AutomationDbContext db, IChannelMessag
 internal sealed class AutomationTimerHandler(
     AutomationDbContext db,
     IConversationQueries conversations,
+    ICatalogQueries catalog,
     AutomationCache cache,
     FlowEngine flows,
     IClock clock) : IdempotentHandler<TimerFired, AutomationDbContext>(db)
@@ -357,7 +368,7 @@ internal sealed class AutomationTimerHandler(
         var settings = await cache.SettingsAsync(run.WorkspaceId, ct);
         var plan = new EnginePlan(run.ChannelAccountId, run.ChannelKind, run.ExternalUserId, null, null) { RuleId = run.RuleId };
         await flows.TimerAsync(run, payload.NodeId, conversation, settings, plan, now, ct);
-        plan.Publish(Db);
+        await plan.PublishAsync(Db, catalog, ct);
     }
 }
 

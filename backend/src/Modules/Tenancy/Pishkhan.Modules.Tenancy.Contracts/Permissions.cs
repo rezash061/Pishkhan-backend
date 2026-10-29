@@ -23,11 +23,14 @@ public static class Permissions
     public const string AnalyticsRead = "workspace.analytics.read";
     public const string WorkspaceDelete = "workspace.delete";
 
+    /// <summary>The workspace's audit log. Owner only.</summary>
+    public const string AuditRead = "workspace.audit.read";
+
     public static readonly IReadOnlyList<string> All =
     [
         SettingsRead, SettingsWrite, MembersRead, MembersManage, BillingManage, ChannelsManage, InboxRead, InboxReply,
         AutomationWrite, AgentWrite, KnowledgeWrite, CatalogRead, CatalogWrite, CrmRead, CrmWrite, FilesUpload, FilesRead,
-        AnalyticsRead, WorkspaceDelete,
+        AnalyticsRead, WorkspaceDelete, AuditRead,
     ];
 }
 
@@ -43,7 +46,7 @@ public static class WorkspaceRoles
     private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> Sets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
     {
         [Owner] = Permissions.All.ToHashSet(StringComparer.Ordinal),
-        [Admin] = Permissions.All.Except([Permissions.BillingManage, Permissions.WorkspaceDelete]).ToHashSet(StringComparer.Ordinal),
+        [Admin] = Permissions.All.Except([Permissions.BillingManage, Permissions.WorkspaceDelete, Permissions.AuditRead]).ToHashSet(StringComparer.Ordinal),
         [Agent] = new HashSet<string>(StringComparer.Ordinal)
         {
             Permissions.SettingsRead, Permissions.InboxRead, Permissions.InboxReply, Permissions.CatalogRead, Permissions.CrmRead,

@@ -39,4 +39,10 @@ public interface IFileService
 
     /// <summary>The file if, and only if, it is clean. Never returns quarantined, infected or failed files.</summary>
     Task<CleanFile?> GetCleanAsync(Guid fileId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Signed URLs of the clean files among <paramref name="fileIds"/> (of the current workspace), valid for <paramref name="lifetime"/>.
+    /// Files that are not clean are left out. Used where a third party fetches the file, such as Instagram card images.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, Uri>> GetCleanUrlsAsync(IReadOnlyCollection<Guid> fileIds, TimeSpan lifetime, CancellationToken cancellationToken);
 }

@@ -113,10 +113,15 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Agent.Persistence.AgentDbContext>("agent");
         await Migrate<Modules.Automation.Persistence.AutomationDbContext>("automation");
         await Migrate<Modules.Content.Persistence.ContentDbContext>("content");
+        await Migrate<Modules.Catalog.Persistence.CatalogDbContext>("catalog");
+        await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();
-        await Partitioning.EnsureMonthlyPartitionsAsync(conn, "conversations.messages", DateTimeOffset.UtcNow.AddMonths(-1), 2);
+        foreach (var table in Partitioning.PartitionedTables)
+        {
+            await Partitioning.EnsureMonthlyPartitionsAsync(conn, table, DateTimeOffset.UtcNow.AddMonths(-1), 2);
+        }
     }
 
     private async Task Migrate<TContext>(string schema)

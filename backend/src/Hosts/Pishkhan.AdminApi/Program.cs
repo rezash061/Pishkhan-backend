@@ -2,6 +2,7 @@ using Pishkhan.Infrastructure.Application;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
+using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Backoffice;
 using Pishkhan.Modules.Content;
 using Pishkhan.Web.Auth;
@@ -17,7 +18,7 @@ var services = builder.Services;
 var configuration = builder.Configuration;
 services.AddPishkhanAuthentication(configuration, builder.Environment, AuthSchemes.Staff);
 services.AddPishkhanOpenApi(ApiDocuments.Admin);
-services.AddBackofficeModule(configuration).AddContentModule(configuration).DecorateHandlers();
+services.AddBackofficeModule(configuration).AddAuditModule(configuration).AddContentModule(configuration).DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
 
 var app = builder.Build();
@@ -26,6 +27,7 @@ app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
 app.MapJwks(AuthSchemes.Staff);
 app.MapBackofficeEndpoints();
 app.MapContentAdminEndpoints();
+app.MapAuditAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>

@@ -4,9 +4,12 @@ using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Agent;
+using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
+using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
+using Pishkhan.Modules.Identity;
 using Pishkhan.Modules.Tenancy;
 using Pishkhan.Modules.Files;
 using Pishkhan.Web.Hosting;
@@ -22,11 +25,14 @@ services.AddAuthentication();
 services.AddAuthorization();
 services
     .AddFilesModule(configuration)
+    .AddIdentityModule(configuration)
     .AddTenancyModule(configuration)
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)
     .AddAutomationModule(configuration)
-    .AddAgentModule(configuration);
+    .AddCatalogModule(configuration)
+    .AddAgentModule(configuration)
+    .AddAuditModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
 services.AddPishkhanMessaging(configuration, "workers", m => m
@@ -39,7 +45,9 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAutomationEngineConsumers()
     .AddAutomationOutboundConsumers()
     .AddAutomationPlatformConsumers()
-    .AddFilesConsumers());
+    .AddCatalogConsumers()
+    .AddFilesConsumers()
+    .AddAuditConsumers());
 
 if (groups.IsEnabled("platform"))
 {

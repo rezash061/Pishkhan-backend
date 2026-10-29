@@ -6,11 +6,11 @@ namespace Pishkhan.Infrastructure.Persistence;
 
 /// <summary>
 /// Monthly range partitions for high-volume tables (<c>conversations.messages</c>, <c>analytics.events</c>, <c>audit.audit_entries</c>).
-/// The parent table is created by a migration with <c>PARTITION BY RANGE (created_at)</c>; this helper creates partitions ahead.
+/// The parent table is created by a migration with <c>PARTITION BY RANGE</c> on its timestamp column; this helper creates partitions ahead.
 /// </summary>
 public static class Partitioning
 {
-    public static readonly IReadOnlyList<string> PartitionedTables = ["conversations.messages"];
+    public static readonly IReadOnlyList<string> PartitionedTables = ["conversations.messages", "audit.audit_entries"];
 
     public static async Task EnsureMonthlyPartitionsAsync(NpgsqlConnection connection, string qualifiedTable, DateTimeOffset from, int monthsAhead, CancellationToken cancellationToken = default)
     {

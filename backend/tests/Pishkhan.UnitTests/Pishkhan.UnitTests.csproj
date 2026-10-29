@@ -6,7 +6,9 @@
     <ProjectReference Include="..\..\src\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
     <ProjectReference Include="..\..\src\Modules\Conversations\Pishkhan.Modules.Conversations\Pishkhan.Modules.Conversations.csproj" />
     <ProjectReference Include="..\..\src\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Pishkhan.Modules.Catalog\Pishkhan.Modules.Catalog.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\Pishkhan.AI\Pishkhan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Audit\Pishkhan.Modules.Audit\Pishkhan.Modules.Audit.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
