@@ -1,60 +1,9 @@
-using System.Globalization;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.Modules.Automation.Domain;
 
-/// <summary>
-/// Opening hours per weekday (<c>sat</c> … <c>fri</c>), each a list of <c>"HH:mm-HH:mm"</c> ranges in <see cref="TimeZone"/>.
-/// No hours configured means always open, so outside-hours rules never fire.
-/// </summary>
-public sealed record BusinessHours(string TimeZone, IReadOnlyDictionary<string, IReadOnlyList<string>> Days)
-{
-    public const string DefaultTimeZone = "Asia/Tehran";
-
-    public static readonly BusinessHours AlwaysOpen = new(DefaultTimeZone, new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal));
-
-    public static readonly IReadOnlyList<string> DayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-    public bool IsConfigured => Days.Values.Any(r => r.Count > 0);
-
-    public bool IsOpen(DateTimeOffset now)
-    {
-        if (!IsConfigured)
-        {
-            return true;
-        }
-
-        var local = TimeZoneInfo.ConvertTime(now, Zone(TimeZone));
-        var day = DayKeys[(int)local.DayOfWeek];
-        var time = TimeOnly.FromTimeSpan(local.TimeOfDay);
-        return Days.TryGetValue(day, out var ranges) && ranges.Any(r => TryParseRange(r, out var from, out var to) && time >= from && time < to);
-    }
-
-    public static bool TryParseRange(string range, out TimeOnly from, out TimeOnly to)
-    {
-        from = to = default;
-        var parts = range.Split('-');
-        return parts.Length == 2
-            && TimeOnly.TryParseExact(parts[0].Trim(), "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out from)
-            && TimeOnly.TryParseExact(parts[1].Trim(), "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out to)
-            && to > from;
-    }
-
-    /// <summary>The zone, or Tehran's fixed +03:30 when the host has no tz database (Iran has not observed DST since 2022).</summary>
-    public static TimeZoneInfo Zone(string id)
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById(id);
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            return TimeZoneInfo.CreateCustomTimeZone(id, TimeSpan.FromMinutes(210), id, id);
-        }
-    }
-}
-
-/// <summary>Per-workspace engine settings: whether the AI answers, business hours, and the fallback message.</summary>
+/// <summary>Per-workspace engine settings: whether the AI answers, and the fallback message. Business hours are the workspace's (Tenancy).</summary>
 public sealed class AutomationSettings : ITenantOwned
 {
     public const int DefaultFallbackCooldownMinutes = 720;
@@ -63,8 +12,6 @@ public sealed class AutomationSettings : ITenantOwned
 
     /// <summary>The AI agent answers what no rule answered (BE-1.4 consumes the reply requests).</summary>
     public bool AiEnabled { get; set; }
-
-    public BusinessHours BusinessHours { get; set; } = BusinessHours.AlwaysOpen;
 
     /// <summary>Sent when nothing else answered (and the AI is off or paused), at most once per conversation per cooldown.</summary>
     public string? FallbackText { get; set; }
@@ -77,9 +24,10 @@ public sealed class AutomationSettings : ITenantOwned
 
     public static AutomationSettings Default(Guid workspaceId) => new() { WorkspaceId = workspaceId };
 
-    public SettingsView ToView() => new(AiEnabled, BusinessHours, FallbackText, FallbackCooldownMinutes);
+    public SettingsView ToView(BusinessHours hours) => new(AiEnabled, hours, FallbackText, FallbackCooldownMinutes);
 }
 
+/// <summary>What the engine runs with: the automation settings plus the workspace's business hours.</summary>
 public sealed record SettingsView(bool AiEnabled, BusinessHours BusinessHours, string? FallbackText, int FallbackCooldownMinutes);
 
 public static class CommentOutcomes

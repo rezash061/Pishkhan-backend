@@ -10,6 +10,7 @@ using Pishkhan.Modules.Automation.Persistence;
 using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Persian;
 
 namespace Pishkhan.Modules.Automation.Engine;
@@ -44,19 +45,24 @@ internal sealed class AutomationCache(HybridCache cache, IServiceScopeFactory sc
             [AutomationCacheTags.Workspace(workspaceId)],
             ct);
 
-    public async Task<SettingsView> SettingsAsync(Guid workspaceId, CancellationToken ct) =>
-        await cache.GetOrCreateAsync(
+    /// <summary>The automation settings with the workspace's business hours (Tenancy caches those and clears them when they change).</summary>
+    public async Task<SettingsView> SettingsAsync(Guid workspaceId, CancellationToken ct)
+    {
+        var row = await cache.GetOrCreateAsync(
             $"auto:{workspaceId:N}:settings",
             (scopes, workspaceId),
             static async (s, token) =>
             {
                 await using var scope = s.scopes.CreateAsyncScope();
-                var row = await Db(scope, s.workspaceId).Settings.AsNoTracking().FirstOrDefaultAsync(x => x.WorkspaceId == s.workspaceId, token);
-                return (row ?? AutomationSettings.Default(s.workspaceId)).ToView();
+                return await Db(scope, s.workspaceId).Settings.AsNoTracking().FirstOrDefaultAsync(x => x.WorkspaceId == s.workspaceId, token)
+                    ?? AutomationSettings.Default(s.workspaceId);
             },
             Entry,
             [AutomationCacheTags.Workspace(workspaceId)],
             ct);
+        await using var scope = scopes.CreateAsyncScope();
+        return row.ToView(await scope.ServiceProvider.GetRequiredService<IWorkspaceQueries>().GetBusinessHoursAsync(workspaceId, ct));
+    }
 
     private static AutomationDbContext Db(AsyncServiceScope scope, Guid workspaceId)
     {

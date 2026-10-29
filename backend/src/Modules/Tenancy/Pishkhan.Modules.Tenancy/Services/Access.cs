@@ -51,7 +51,7 @@ internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQuerie
             .ToListAsync(cancellationToken);
 }
 
-/// <summary>Workspace status for background workers (<c>ws:{ws}:status</c>, 5 minutes, tagged by workspace).</summary>
+/// <summary>Workspace status and business hours for other modules (<c>ws:{ws}:status</c>, <c>ws:{ws}:hours</c>, 5 minutes, tagged by workspace).</summary>
 internal sealed class WorkspaceQueries(TenancyDbContext db, HybridCache cache) : IWorkspaceQueries
 {
     private static readonly HybridCacheEntryOptions Entry = new() { Expiration = TimeSpan.FromMinutes(5), LocalCacheExpiration = TimeSpan.FromMinutes(1) };
@@ -71,4 +71,17 @@ internal sealed class WorkspaceQueries(TenancyDbContext db, HybridCache cache) :
             cancellationToken);
         return status is not WorkspaceStatus.Active;
     }
+
+    public async Task<BusinessHours> GetBusinessHoursAsync(Guid workspaceId, CancellationToken cancellationToken) =>
+        await cache.GetOrCreateAsync(
+            $"ws:{workspaceId:N}:hours",
+            (db, workspaceId),
+            static async (state, ct) => await state.db.Workspaces.AsNoTracking()
+                .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+                .Where(w => w.Id == state.workspaceId)
+                .Select(w => w.BusinessHours)
+                .FirstOrDefaultAsync(ct) ?? BusinessHours.Default,
+            Entry,
+            [CacheTags.Workspace(workspaceId)],
+            cancellationToken);
 }

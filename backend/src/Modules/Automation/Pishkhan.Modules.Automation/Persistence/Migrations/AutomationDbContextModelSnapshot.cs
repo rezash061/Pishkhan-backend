@@ -282,11 +282,6 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("ai_enabled");
 
-                    b.Property<string>("BusinessHours")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("business_hours");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

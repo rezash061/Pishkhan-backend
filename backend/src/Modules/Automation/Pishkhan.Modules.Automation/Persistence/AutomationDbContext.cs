@@ -100,7 +100,6 @@ public sealed class AutomationDbContext(DbContextOptions<AutomationDbContext> op
             b.ToTable("settings");
             b.HasKey(x => x.WorkspaceId);
             b.Property(x => x.FallbackText).HasMaxLength(1000);
-            Json(b.Property(x => x.BusinessHours));
         });
 
         modelBuilder.Entity<CommentEvent>(b =>

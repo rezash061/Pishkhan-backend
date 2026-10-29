@@ -37,6 +37,11 @@ public sealed record ProductRequest(
 public sealed record VariantResponse(Guid Id, string? Sku, IReadOnlyDictionary<string, string> Attributes, Money? Price, Money? EffectivePrice, int? Stock, string StockPolicy, bool InStock);
 
 /// <summary><c>url</c> is a 5-minute download URL, only once the image is clean; <c>status</c> is the scan status.</summary>
+public sealed record ProductImageRequest(Guid FileId);
+
+/// <summary>Every image of the product, in the new order.</summary>
+public sealed record ProductImageOrderRequest(IReadOnlyList<Guid>? FileIds);
+
 public sealed record ProductImageResponse(Guid FileId, string Status, string? Url);
 
 public sealed record ProductResponse(
@@ -118,6 +123,28 @@ internal static class CatalogEndpoints
             .RequireWorkspacePermission(Permissions.CatalogWrite)
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        root.MapPost("/products/{productId:guid}/images", AddImageAsync)
+            .RequireWorkspacePermission(Permissions.CatalogWrite)
+            .WithSummary("Add an image to the end of a product's images")
+            .WithDescription("`fileId` is a Files upload with purpose `product_image`. Adding an image the product already has changes nothing. At most 10 images.")
+            .Produces<ProductResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithStandardProblems();
+
+        root.MapDelete("/products/{productId:guid}/images/{fileId:guid}", RemoveImageAsync)
+            .RequireWorkspacePermission(Permissions.CatalogWrite)
+            .WithSummary("Remove an image from a product")
+            .Produces<ProductResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        root.MapPut("/products/{productId:guid}/images/order", ReorderImagesAsync)
+            .RequireWorkspacePermission(Permissions.CatalogWrite)
+            .WithSummary("Reorder a product's images")
+            .WithDescription("`fileIds` must list every image of the product exactly once; the first is the cover.")
+            .Produces<ProductResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithStandardProblems();
 
         root.MapGet("/export", ExportAsync)
             .RequireWorkspacePermission(Permissions.CatalogRead)
@@ -362,6 +389,51 @@ internal static class CatalogEndpoints
         await db.SaveChangesAsync(ct);
         await CatalogChanges.InvalidateLocalAsync(cache, workspaceId, ct);
         return Results.NoContent();
+    }
+
+    private static Task<IResult> AddImageAsync(
+        Guid workspaceId, Guid productId, ProductImageRequest request, CatalogDbContext db, ICacheInvalidator invalidator, HybridCache cache, IFileService files, IClock clock,
+        CancellationToken ct) =>
+        ChangeImagesAsync(workspaceId, productId, db, invalidator, cache, files, ct, product =>
+            request.FileId == Guid.Empty ? Invalid([("fileId", "catalog.image_required")])
+            : product.AddImage(request.FileId, clock.UtcNow) ? null
+            : Invalid([("fileId", "catalog.too_many_images")]));
+
+    private static Task<IResult> RemoveImageAsync(
+        Guid workspaceId, Guid productId, Guid fileId, CatalogDbContext db, ICacheInvalidator invalidator, HybridCache cache, IFileService files, IClock clock, CancellationToken ct) =>
+        ChangeImagesAsync(workspaceId, productId, db, invalidator, cache, files, ct, product =>
+            product.RemoveImage(fileId, clock.UtcNow) ? null : Error.NotFound().ToProblem());
+
+    private static Task<IResult> ReorderImagesAsync(
+        Guid workspaceId, Guid productId, ProductImageOrderRequest request, CatalogDbContext db, ICacheInvalidator invalidator, HybridCache cache, IFileService files, IClock clock,
+        CancellationToken ct) =>
+        ChangeImagesAsync(workspaceId, productId, db, invalidator, cache, files, ct, product =>
+            product.ReorderImages(request.FileIds ?? [], clock.UtcNow) ? null : Invalid([("fileIds", "catalog.images_mismatch")]));
+
+    /// <summary>Applies an image change (which returns a problem to refuse it); a real change emits <c>catalog.product-changed.v1</c> like any update.</summary>
+    private static async Task<IResult> ChangeImagesAsync(
+        Guid workspaceId, Guid productId, CatalogDbContext db, ICacheInvalidator invalidator, HybridCache cache, IFileService files, CancellationToken ct, Func<Product, IResult?> change)
+    {
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId, ct);
+        if (product is null)
+        {
+            return Error.NotFound().ToProblem();
+        }
+
+        var revision = product.Revision;
+        if (change(product) is { } refused)
+        {
+            return refused;
+        }
+
+        if (product.Revision != revision)
+        {
+            CatalogChanges.Product(db, invalidator, product, ProductChangeKinds.Updated);
+            await db.SaveChangesAsync(ct);
+            await CatalogChanges.InvalidateLocalAsync(cache, workspaceId, ct);
+        }
+
+        return Results.Ok((await ToResponsesAsync([product], files, ct))[0]);
     }
 
     private static ProductDefinition Definition(ProductRequest r) => new(

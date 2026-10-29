@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
 
 namespace Pishkhan.Modules.Tenancy.Persistence;

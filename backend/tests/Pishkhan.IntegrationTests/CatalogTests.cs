@@ -260,6 +260,39 @@ public sealed class CatalogTests(InfraFixture infra, ChannelsHost workers) : IAs
     }
 
     [Fact]
+    public async Task Product_images_are_added_removed_and_reordered_one_at_a_time()
+    {
+        var s = await SeedAsync();
+        var first = Guid.NewGuid();
+        var product = await PostAsync(s.Client, $"{s.Catalog}/products", new { title = "کیف چرم", price = new { amount = 5_000_000, currency = "IRR" }, imageFileIds = new[] { first } });
+        var images = $"{s.Catalog}/products/{product.GetProperty("id").GetGuid()}/images";
+        static Guid[] Ids(JsonElement p) => [.. p.GetProperty("images").EnumerateArray().Select(i => i.GetProperty("fileId").GetGuid())];
+
+        var second = Guid.NewGuid();
+        var third = Guid.NewGuid();
+        await PostAsync(s.Client, images, new { fileId = second }, HttpStatusCode.OK);
+        var added = await PostAsync(s.Client, images, new { fileId = third }, HttpStatusCode.OK);
+        Ids(added).ShouldBe([first, second, third]);
+        added.GetProperty("images")[0].GetProperty("status").GetString().ShouldBe("pending_scan");
+        Ids(await PostAsync(s.Client, images, new { fileId = second }, HttpStatusCode.OK)).ShouldBe([first, second, third]);
+
+        Ids(await SendAsync(s.Client, HttpMethod.Put, $"{images}/order", new { fileIds = new[] { third, first, second } }, HttpStatusCode.OK)).ShouldBe([third, first, second]);
+        var mismatch = await SendAsync(s.Client, HttpMethod.Put, $"{images}/order", new { fileIds = new[] { third, first } }, HttpStatusCode.BadRequest);
+        mismatch.GetProperty("errors").GetProperty("fileIds")[0].GetString().ShouldBe("catalog.images_mismatch");
+
+        Ids(await SendAsync(s.Client, HttpMethod.Delete, $"{images}/{first}", null, HttpStatusCode.OK)).ShouldBe([third, second]);
+        await SendAsync(s.Client, HttpMethod.Delete, $"{images}/{first}", null, HttpStatusCode.NotFound);
+
+        for (var i = 0; i < 8; i++)
+        {
+            await PostAsync(s.Client, images, new { fileId = Guid.NewGuid() }, HttpStatusCode.OK);
+        }
+
+        var full = await PostAsync(s.Client, images, new { fileId = Guid.NewGuid() }, HttpStatusCode.BadRequest);
+        full.GetProperty("errors").GetProperty("fileId")[0].GetString().ShouldBe("catalog.too_many_images");
+    }
+
+    [Fact]
     public async Task Excel_export_edited_and_imported_updates_creates_and_reports_bad_rows()
     {
         var s = await SeedAsync();

@@ -1,6 +1,7 @@
 using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Automation.Domain;
 using Pishkhan.Modules.Channels.Contracts;
+using Pishkhan.Modules.Tenancy.Contracts;
 
 namespace Pishkhan.UnitTests;
 
@@ -184,11 +185,12 @@ public class CommentEventTests
 
 public class BusinessHoursTests
 {
-    private static readonly BusinessHours Shop = new("Asia/Tehran", new Dictionary<string, IReadOnlyList<string>>
-    {
-        ["sat"] = ["09:00-13:00", "16:00-21:00"],
-        ["fri"] = [],
-    });
+    private static readonly BusinessHours Shop = new(
+        [
+            new(DayOfWeek.Saturday, [new TimeRange(new TimeOnly(9, 0), new TimeOnly(13, 0)), new TimeRange(new TimeOnly(16, 0), new TimeOnly(21, 0))]),
+            new(DayOfWeek.Friday, []),
+        ],
+        [new DateOnly(2026, 11, 7)]);
 
     [Theory]
     // 2026-10-31 is a Saturday. Tehran is UTC+03:30.
@@ -197,11 +199,12 @@ public class BusinessHoursTests
     [InlineData("2026-10-31T17:00:00Z", true)] // 20:30
     [InlineData("2026-10-31T17:31:00Z", false)] // 21:01
     [InlineData("2026-11-06T08:00:00Z", false)] // Friday, closed
+    [InlineData("2026-11-07T06:00:00Z", false)] // Saturday 09:30, but a closed date
     public void Opening_hours_are_local_to_the_workspace(string utc, bool open) =>
         Shop.IsOpen(DateTimeOffset.Parse(utc, System.Globalization.CultureInfo.InvariantCulture)).ShouldBe(open);
 
     [Fact]
-    public void No_hours_means_always_open() => BusinessHours.AlwaysOpen.IsOpen(DateTimeOffset.UtcNow).ShouldBeTrue();
+    public void Always_open_is_open_at_any_time() => BusinessHours.AlwaysOpen.IsOpen(DateTimeOffset.UtcNow).ShouldBeTrue();
 }
 
 public class TemplateRendererTests
