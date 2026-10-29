@@ -38,6 +38,7 @@ services.AddModuleDbContext<ConversationsDbContext>(ConversationsDbContext.Schem
 services.AddModuleDbContext<AgentDbContext>(AgentDbContext.SchemaName);
 services.AddModuleDbContext<AutomationDbContext>(AutomationDbContext.SchemaName);
 services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.SchemaName);
+services.AddModuleDbContext<AuditDbContext>(AuditDbContext.SchemaName);
 // Staff provisioning reuses the Backoffice handlers, which need the staff token setup.
 services.AddRouting();
 services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
@@ -84,6 +85,7 @@ static async Task MigrateAsync(IServiceProvider services, IConfiguration configu
     [
         typeof(PlatformDbContext), typeof(IdentityDbContext), typeof(TenancyDbContext), typeof(BackofficeDbContext),
         typeof(FilesDbContext), typeof(ChannelsDbContext), typeof(ConversationsDbContext), typeof(AgentDbContext), typeof(AutomationDbContext), typeof(CatalogDbContext),
+        typeof(AuditDbContext),
     ];
     await using (var scope = services.CreateAsyncScope())
     {

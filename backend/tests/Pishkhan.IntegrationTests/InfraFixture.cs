@@ -113,6 +113,7 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Agent.Persistence.AgentDbContext>("agent");
         await Migrate<Modules.Automation.Persistence.AutomationDbContext>("automation");
         await Migrate<Modules.Catalog.Persistence.CatalogDbContext>("catalog");
+        await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();

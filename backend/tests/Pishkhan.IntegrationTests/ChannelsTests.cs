@@ -28,6 +28,7 @@ using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
 using Pishkhan.Modules.Files;
+using Pishkhan.Modules.Identity;
 using Pishkhan.Modules.Tenancy;
 
 namespace Pishkhan.IntegrationTests;
@@ -108,7 +109,7 @@ internal sealed class CleanScanner : IAntivirusScanner
 }
 
 /// <summary>
-/// A worker-like host: Channels, Conversations, Automation, Files and Catalog modules, their consumers, the outbox relay and timers,
+/// A worker-like host: Channels, Conversations, Automation, Files, Catalog, Identity and Audit modules, their consumers, the outbox relay and timers,
 /// Instagram and the virus scanner faked.
 /// </summary>
 public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
@@ -128,7 +129,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         });
         builder.AddPishkhanPlatform("it-channels");
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
-            .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration);
+            .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration)
+            .AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration);
         builder.Services.AddSingleton<IAntivirusScanner, CleanScanner>();
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
@@ -142,7 +144,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             .AddAutomationOutboundConsumers()
             .AddAutomationPlatformConsumers()
             .AddFilesConsumers()
-            .AddCatalogConsumers());
+            .AddCatalogConsumers()
+            .AddAuditConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
         builder.Services.AddHostedService<TimerDispatcher>();
         Host = builder.Build();

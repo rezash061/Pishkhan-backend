@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (Phase 1, Audit log, 2026-10-29)
+- New Audit module (`audit` schema): append-only `audit.audit_entries`, range-partitioned by month on `occurred_at` (partitions made by the Migrator and the maintenance job).
+- Modules publish `audit.entry-recorded.v1` through their outbox, in the same transaction as the change. The sink (Workers platform group) is idempotent by entry id and fills in a user's display name or masked phone.
+- Snapshots (`before`, `after`) have passwords, tokens, secrets, TOTP and OTP codes, phone numbers, card numbers and Sheba redacted at any depth.
+- Audited now: staff sign-in, failed sign-in (with lockout), TOTP enrollment, step-up, logout and staff creation; workspace create, update and business hours; member invite, join, role change, removal; channel status changes (connect, reconnect, disconnect, reauth needed, deauthorized); Meta data deletion requests. A staff member impersonating a user is recorded as the staff member, on behalf of the user.
+- `GET /admin/v1/audit` (SuperAdmin, Support): filters `actor` (name or id), `action`, `entityType`, `workspaceId`, `from`, `to`; `page`/`pageSize` (max 100); returns `{items, totalCount, page, pageSize}`. Support sees only entries of a workspace.
+- `GET /api/v1/workspaces/{workspaceId}/audit` for the workspace owner (new permission `workspace.audit.read`, owner only). Staff actions show as actor `support`, without the staff member's name or address.
+
+### Fixed
+- Staff sign-in without a TOTP code (the panel's first step) no longer counts as a failed attempt; a wrong code still does.
+- README: the first staff account's role is `SuperAdmin` (role names are case-sensitive).
+
 ### Added (Phase 1, BE-1.6 Catalog and storefront cards, 2026-10-29)
 - New Catalog module (`catalog` schema): categories, products (title, description, tags, status `draft`/`active`/`archived`, fixed price in Rial, images, link), variants (SKU unique per workspace, attributes such as color and size, own price or the product's, stock with `track`/`unlimited`), storefront card sets, imports.
 - Endpoints under `/workspaces/{ws}/catalog`: categories CRUD, products CRUD with Persian-normalized search, filters and cursor pagination, `GET /export`, `GET /import-template`, `POST /import` + `GET /imports/{id}`, storefront card sets CRUD and `/preview`.
