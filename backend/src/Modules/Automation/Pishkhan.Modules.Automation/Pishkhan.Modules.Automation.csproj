@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\Channels\Pishkhan.Modules.Channels.Contracts\Pishkhan.Modules.Channels.Contracts.csproj" />
     <ProjectReference Include="..\..\Conversations\Pishkhan.Modules.Conversations.Contracts\Pishkhan.Modules.Conversations.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Catalog\Pishkhan.Modules.Catalog.Contracts\Pishkhan.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />

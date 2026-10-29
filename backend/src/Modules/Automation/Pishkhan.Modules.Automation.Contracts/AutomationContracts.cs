@@ -71,6 +71,9 @@ public static class ActionKinds
 
     /// <summary>A public reply under the comment, picked at random from the rule's list so replies do not look like spam.</summary>
     public const string PublicReply = "public_reply";
+
+    /// <summary>A carousel of a storefront card set (Catalog), built from current prices and stock when sent.</summary>
+    public const string SendCards = "send_cards";
     public const string StartFlow = "start_flow";
     public const string AddTag = "add_tag";
     public const string RemoveTag = "remove_tag";
@@ -87,7 +90,7 @@ public static class ActionKinds
 
     public static readonly IReadOnlySet<string> Available = new HashSet<string>(StringComparer.Ordinal)
     {
-        SendMessage, PrivateReply, PublicReply, StartFlow, AddTag, RemoveTag, SetField, Handoff, PauseAi, NotifyTeam,
+        SendMessage, SendCards, PrivateReply, PublicReply, StartFlow, AddTag, RemoveTag, SetField, Handoff, PauseAi, NotifyTeam,
     };
 
     public static readonly IReadOnlySet<string> Later = new HashSet<string>(StringComparer.Ordinal) { ScheduleFollowUp, CapturePhone };

@@ -43,6 +43,9 @@ public sealed record RuleAction
 
     public Guid? FlowId { get; init; }
 
+    /// <summary>send_cards: the storefront card set.</summary>
+    public Guid? CardSetId { get; init; }
+
     public string? Tag { get; init; }
 
     public string? Field { get; init; }

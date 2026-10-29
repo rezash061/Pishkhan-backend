@@ -68,6 +68,17 @@ public static class OpenApiSetup
 
                     return Task.CompletedTask;
                 });
+                o.AddDocumentTransformer((document, _, _) =>
+                {
+                    // Currency has its own JSON converter (the code as a string), which the schema generator cannot see.
+                    if (document.Components?.Schemas?.TryGetValue(nameof(SharedKernel.Currency), out var currency) == true && currency is OpenApiSchema schema)
+                    {
+                        schema.Type = JsonSchemaType.String;
+                        schema.Enum = [JsonValue.Create("IRR")];
+                    }
+
+                    return Task.CompletedTask;
+                });
                 o.AddOperationTransformer((operation, context, _) =>
                 {
                     var metadata = context.Description.ActionDescriptor.EndpointMetadata;
