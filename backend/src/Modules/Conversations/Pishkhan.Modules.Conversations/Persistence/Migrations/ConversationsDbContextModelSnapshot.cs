@@ -335,6 +335,20 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("external_user_id");
 
+                    b.Property<DateTimeOffset?>("HandedOffAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handed_off_at");
+
+                    b.Property<string>("HandoffReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("handoff_reason");
+
+                    b.Property<string>("HandoffSuggestedReply")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("handoff_suggested_reply");
+
                     b.Property<DateTimeOffset?>("LastInboundAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_inbound_at");

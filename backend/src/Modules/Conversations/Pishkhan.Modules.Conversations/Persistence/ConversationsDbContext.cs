@@ -69,6 +69,8 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.Property(x => x.ExternalUserId).HasMaxLength(100);
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.LastMessagePreview).HasMaxLength(120);
+            b.Property(x => x.HandoffReason).HasMaxLength(Conversation.MaxHandoffReason);
+            b.Property(x => x.HandoffSuggestedReply).HasMaxLength(Conversation.MaxSuggestedReply);
 
             // One conversation per customer per channel account; it reopens instead of forking.
             b.HasIndex(x => new { x.ChannelAccountId, x.ContactId }).IsUnique();

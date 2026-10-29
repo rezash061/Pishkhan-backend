@@ -106,9 +106,11 @@ public sealed class InstagramWebhookParser : IChannelWebhookParser
             }
 
             string? storyId = null;
+            string? storyUrl = null;
             if (message.TryGetProperty("reply_to", out var replyTo) && replyTo.TryGetProperty("story", out var story))
             {
                 storyId = String(story, "id");
+                storyUrl = String(story, "url");
             }
 
             var quickReply = message.TryGetProperty("quick_reply", out var qr) ? String(qr, "payload") : null;
@@ -119,7 +121,7 @@ public sealed class InstagramWebhookParser : IChannelWebhookParser
                 : attachments.Count > 0 ? InboundKinds.Attachment
                 : quickReply is not null ? InboundKinds.QuickReply
                 : InboundKinds.Text;
-            return new InboundChannelMessage(sender, recipient, mid, sentAt, kind, text, attachments, storyId, quickReply, Bool(message, "is_echo"));
+            return new InboundChannelMessage(sender, recipient, mid, sentAt, kind, text, attachments, storyId, quickReply, Bool(message, "is_echo"), storyUrl);
         }
 
         if (item.TryGetProperty("postback", out var postback) && postback.ValueKind == JsonValueKind.Object)

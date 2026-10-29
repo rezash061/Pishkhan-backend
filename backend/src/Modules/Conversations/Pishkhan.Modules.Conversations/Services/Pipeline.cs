@@ -70,7 +70,9 @@ internal sealed class InstagramIngestHandler(
 
             var (conversation, isNew) = await FindOrOpenConversationAsync(account, inbound.SenderExternalId, now, cancellationToken);
             var normalized = inbound.Text is null ? null : PersianNormalizer.Normalize(inbound.Text);
-            var attachments = inbound.Attachments.Count == 0 ? null : JsonSerializer.Serialize(inbound.Attachments, EnvelopeJson.Options);
+            // The story a customer replied to is kept with the attachments, so the inbox can show what they answered.
+            IReadOnlyList<InboundAttachment> media = inbound.ReplyToStoryId is null ? inbound.Attachments : [.. inbound.Attachments, new InboundAttachment("story_reply", inbound.ReplyToStoryUrl)];
+            var attachments = media.Count == 0 ? null : JsonSerializer.Serialize(media, EnvelopeJson.Options);
             var stored = Message.Inbound(account.WorkspaceId, conversation.Id, inbound.Kind, Truncate(inbound.Text), Truncate(normalized), inbound.ExternalMessageId, attachments, now);
             Db.Messages.Add(stored);
             Db.ExternalMessageKeys.Add(new ExternalMessageKey { ChannelAccountId = account.Id, ExternalId = inbound.ExternalMessageId, MessageId = stored.Id, CreatedAt = now });

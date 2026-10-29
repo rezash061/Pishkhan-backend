@@ -28,7 +28,10 @@ internal static class TestEnvironment
 /// <summary>One PostgreSQL, Redis and Kafka for the whole test run, migrated like production by the Migrator's steps.</summary>
 public sealed class InfraFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg18").WithDatabase("pishkhan").WithUsername("pishkhan").WithPassword("pishkhan").Build();
+    // Every test class starts its own Api host (and some an admin host) next to the shared workers, each with its own pools; the default
+    // 100 connections run out once the suite grows.
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg18").WithDatabase("pishkhan").WithUsername("pishkhan").WithPassword("pishkhan")
+        .WithCommand("-c", "max_connections=400").Build();
     private readonly RedisContainer _redis = new RedisBuilder("redis:8-alpine").Build();
     private readonly KafkaContainer _kafka = new KafkaBuilder("apache/kafka:4.1.0").Build();
 

@@ -23,6 +23,9 @@ public static class WebHostExtensions
         var services = builder.Services;
         services.AddPishkhanProblemDetails();
         services.AddPishkhanRateLimiting(builder.Configuration);
+
+        // Numbers are numbers: no quoted numbers in requests, and the OpenAPI documents type them as plain integers.
+        services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict);
         services.Configure<ForwardedHeadersOptions>(o =>
         {
             // The edge proxy (backend plan 3.7) is the only hop; trust its X-Forwarded-* headers.

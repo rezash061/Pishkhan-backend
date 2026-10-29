@@ -1,8 +1,10 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Pishkhan.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
@@ -19,14 +21,27 @@ namespace Pishkhan.Modules.Conversations.Features;
 /// <summary>
 /// A conversation in the inbox. <c>windowExpiresAt</c> ends normal replies; until <c>humanAgentUntil</c> a team member can still reply
 /// (sent with Meta's HUMAN_AGENT tag); after that the composer is closed until the customer writes again.
+/// While <c>status</c> is handed_off, <c>handoff</c> says why and may carry a reply the AI drafted for the person taking over.
 /// </summary>
 public sealed record ConversationResponse(
-    Guid Id, Guid ChannelAccountId, string ChannelKind, Guid ContactId, string Status, Guid? AssigneeId, bool AiPaused,
-    DateTimeOffset? LastInboundAt, DateTimeOffset? LastOutboundAt, DateTimeOffset? WindowExpiresAt, DateTimeOffset? HumanAgentUntil, int UnreadCount, string? LastMessagePreview);
+    Guid Id, Guid ChannelAccountId, string ChannelKind, Guid ContactId, ConversationContact Contact, string Status, Guid? AssigneeId, bool AiPaused,
+    DateTimeOffset? LastInboundAt, DateTimeOffset? LastOutboundAt, DateTimeOffset? WindowExpiresAt, DateTimeOffset? HumanAgentUntil, int UnreadCount, string? LastMessagePreview,
+    HandoffInfo? Handoff);
+
+/// <summary>Who the customer is. Instagram gives the username on comments and the profile fetch; it can be null for a first DM.</summary>
+public sealed record ConversationContact(Guid Id, string? DisplayName, string? Username);
+
+public sealed record HandoffInfo(string Reason, string? SuggestedReply, DateTimeOffset? At);
+
+/// <summary>
+/// A media item on a message: an image, video, audio, file, a shared post or reel, a story mention, or the story a customer replied to
+/// (<c>story_reply</c>). Instagram's URLs expire after a while; an expired one should show a placeholder.
+/// </summary>
+public sealed record MessageAttachment(string Type, string? Url);
 
 public sealed record MessageResponse(
     Guid Id, DateTimeOffset CreatedAt, string Direction, string Kind, string? Text, string Status, string? ErrorCode, string? HandledBy,
-    Guid? SentBy, string? Tag, DateTimeOffset? SentAt, DateTimeOffset? ReadAt);
+    Guid? SentBy, string? Tag, DateTimeOffset? SentAt, DateTimeOffset? ReadAt, IReadOnlyList<MessageAttachment> Attachments);
 
 public sealed record QuickReplyOption(string Title, string Payload);
 
@@ -60,7 +75,7 @@ internal static class ConversationEndpoints
         ws.MapGet("/", ListAsync)
             .RequireWorkspacePermission(Permissions.InboxRead)
             .WithSummary("Conversations, most recent customer message first")
-            .WithDescription("Filters: `status`, `assignee` (`me`, `none` or a user id), `channelAccountId`, `unread=true`. Keyset pagination: pass `cursor` from the previous page.")
+            .WithDescription("Filters: `status`, `assignee` (`me`, `none` or a user id), `channelAccountId`, `unread=true`, `q` (customer name or username, or a phone or email the customer gave). Keyset pagination: pass `cursor` from the previous page.")
             .Produces<Page<ConversationResponse>>();
 
         ws.MapGet("/{conversationId:guid}", GetAsync)
@@ -150,15 +165,29 @@ internal static class ConversationEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    internal static ConversationResponse ToResponse(Conversation c) => new(
-        c.Id, c.ChannelAccountId, c.ChannelKind, c.ContactId, c.Status, c.AssigneeId, c.AiPaused, c.LastInboundAt, c.LastOutboundAt,
-        c.WindowExpiresAt, c.LastInboundAt + Conversation.HumanAgentWindow, c.UnreadCount, c.LastMessagePreview);
+    internal static ConversationResponse ToResponse(Conversation c, Contact? contact) => new(
+        c.Id, c.ChannelAccountId, c.ChannelKind, c.ContactId, new ConversationContact(c.ContactId, contact?.DisplayName, contact?.Username), c.Status, c.AssigneeId,
+        c.AiPaused, c.LastInboundAt, c.LastOutboundAt, c.WindowExpiresAt, c.LastInboundAt + Conversation.HumanAgentWindow, c.UnreadCount, c.LastMessagePreview,
+        c.HandoffReason is { } reason ? new HandoffInfo(reason, c.HandoffSuggestedReply, c.HandedOffAt) : null);
 
     internal static MessageResponse ToResponse(Message m) =>
-        new(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.Status, m.ErrorCode, m.HandledBy, m.SentBy, m.Tag, m.SentAt, m.ReadAt);
+        new(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.Status, m.ErrorCode, m.HandledBy, m.SentBy, m.Tag, m.SentAt, m.ReadAt, Attachments(m));
+
+    internal static IReadOnlyList<MessageAttachment> Attachments(Message m)
+    {
+        if (m.AttachmentsJson is { } inbound)
+        {
+            return JsonSerializer.Deserialize<List<InboundAttachment>>(inbound, EnvelopeJson.Options)?.Select(a => new MessageAttachment(a.Type, a.Url)).ToList() ?? [];
+        }
+
+        return m.ContentJson is not null && m.ToContent(null).Attachment is { } outbound ? [new MessageAttachment(outbound.Type, outbound.Url.ToString())] : [];
+    }
+
+    private static async Task<ConversationResponse> WithContactAsync(ConversationsDbContext db, Conversation c, CancellationToken ct) =>
+        ToResponse(c, await db.Contacts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == c.ContactId, ct));
 
     private static async Task<IResult> ListAsync(
-        Guid workspaceId, string? status, string? assignee, Guid? channelAccountId, bool? unread, string? cursor, int? limit,
+        Guid workspaceId, string? status, string? assignee, Guid? channelAccountId, bool? unread, string? q, string? cursor, int? limit,
         ConversationsDbContext db, ICurrentUser caller, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 30, 1, MaxPageSize);
@@ -198,6 +227,29 @@ internal static class ConversationEndpoints
             query = query.Where(c => c.UnreadCount > 0);
         }
 
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            if (q.Length > 100)
+            {
+                return Invalid("q", "validation.too_long");
+            }
+
+            var text = q.Trim().TrimStart('@');
+            var pattern = "%" + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+            var phone = PhoneNumber.TryParse(text, out var parsed) ? parsed.Value : (PhoneNumber?)null;
+            var national = phone?.National ?? string.Empty;
+            var e164 = phone?.E164 ?? string.Empty;
+
+            // Fields (phone, email collected by flows) live in jsonb, which the EF model maps through a converter, so this part is SQL.
+            var matches = db.Database.SqlQuery<Guid>($"""
+                SELECT id AS "Value" FROM conversations.contacts
+                WHERE workspace_id = {workspaceId}
+                  AND (display_name ILIKE {pattern} OR username ILIKE {pattern} OR fields->>'email' ILIKE {pattern}
+                       OR (fields->>'phone') IN ({national}, {e164}))
+                """);
+            query = query.Where(c => matches.Contains(c.ContactId));
+        }
+
         if (Cursor.TryRead(cursor, out var at, out var id))
         {
             query = query.Where(c => EF.Functions.LessThan(ValueTuple.Create(c.LastInboundAt, c.Id), ValueTuple.Create((DateTimeOffset?)at, id)));
@@ -205,13 +257,16 @@ internal static class ConversationEndpoints
 
         var rows = await query.OrderByDescending(c => c.LastInboundAt).ThenByDescending(c => c.Id).Take(take + 1).ToListAsync(ct);
         var next = rows.Count > take ? Cursor.Write(rows[take - 1].LastInboundAt ?? default, rows[take - 1].Id) : null;
-        return Results.Ok(new Page<ConversationResponse>([.. rows.Take(take).Select(ToResponse)], next));
+        var page = rows.Take(take).ToList();
+        var contactIds = page.Select(c => c.ContactId).Distinct().ToList();
+        var contacts = await db.Contacts.AsNoTracking().Where(x => contactIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        return Results.Ok(new Page<ConversationResponse>([.. page.Select(c => ToResponse(c, contacts.GetValueOrDefault(c.ContactId)))], next));
     }
 
     private static async Task<IResult> GetAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, CancellationToken ct)
     {
         var c = await db.Conversations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == conversationId, ct);
-        return c is null ? Error.NotFound().ToProblem() : Results.Ok(ToResponse(c));
+        return c is null ? Error.NotFound().ToProblem() : Results.Ok(await WithContactAsync(db, c, ct));
     }
 
     private static async Task<IResult> MessagesAsync(Guid workspaceId, Guid conversationId, string? cursor, int? limit, ConversationsDbContext db, CancellationToken ct)
@@ -282,10 +337,11 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(ToResponse(conversation));
+        return Results.Ok(await WithContactAsync(db, conversation, ct));
     }
 
-    private static async Task<IResult> ChangeStatusAsync(Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, ICurrentUser caller, IInboxNotifier notifier, CancellationToken ct)
+    private static async Task<IResult> ChangeStatusAsync(
+        Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, ICurrentUser caller, IInboxNotifier notifier, IClock clock, CancellationToken ct)
     {
         if (!ConversationStatuses.All.Contains(request.Status))
         {
@@ -298,17 +354,19 @@ internal static class ConversationEndpoints
             return Error.NotFound().ToProblem();
         }
 
-        if (!conversation.ChangeStatus(request.Status))
-        {
-            return Results.Ok(ToResponse(conversation));
-        }
-
         // A handoff reaches the panel through the handoff event (realtime and, later, notifications); other changes are pushed here.
         var handedOff = request.Status == ConversationStatuses.HandedOff;
+        var changed = handedOff
+            ? conversation.HandOff(string.IsNullOrWhiteSpace(request.Reason) ? "manual" : request.Reason.Trim(), null, clock.UtcNow)
+            : conversation.ChangeStatus(request.Status);
+        if (!changed)
+        {
+            return Results.Ok(await WithContactAsync(db, conversation, ct));
+        }
+
         if (handedOff)
         {
-            conversation.SetAiPaused(true);
-            db.Publish(new HandoffRequested(conversation.Id, string.IsNullOrWhiteSpace(request.Reason) ? "manual" : request.Reason.Trim(), caller.UserId, null), conversation.Id.ToString());
+            db.Publish(new HandoffRequested(conversation.Id, conversation.HandoffReason!, caller.UserId, null), conversation.Id.ToString());
         }
 
         await db.SaveChangesAsync(ct);
@@ -317,7 +375,7 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(ToResponse(conversation));
+        return Results.Ok(await WithContactAsync(db, conversation, ct));
     }
 
     private static async Task<IResult> AiPauseAsync(Guid workspaceId, Guid conversationId, AiPauseRequest request, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)
@@ -334,7 +392,7 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(ToResponse(conversation));
+        return Results.Ok(await WithContactAsync(db, conversation, ct));
     }
 
     private static async Task<IResult> MarkReadAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)

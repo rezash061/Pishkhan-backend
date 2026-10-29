@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Pishkhan.Infrastructure.Sms;
 
 namespace Pishkhan.IntegrationTests;
@@ -12,6 +14,33 @@ namespace Pishkhan.IntegrationTests;
 /// <summary>The Api host in memory against the shared containers.</summary>
 public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Program>
 {
+    private bool _created;
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        _created = true;
+        return base.CreateHost(builder);
+    }
+
+    /// <summary>
+    /// The bus starts in the background. Stopping a host whose bus is still starting leaves its Kafka consumers running on a disposed
+    /// container: they keep their partitions in the shared groups and fault every message, so a short test class would starve the next one.
+    /// </summary>
+    public override async ValueTask DisposeAsync()
+    {
+        if (_created)
+        {
+            var bus = Services.GetRequiredService<IBusControl>();
+            var deadline = DateTime.UtcNow.AddSeconds(60);
+            while (bus.CheckHealth().Status != BusHealthStatus.Healthy && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(100);
+            }
+        }
+
+        await base.DisposeAsync();
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
