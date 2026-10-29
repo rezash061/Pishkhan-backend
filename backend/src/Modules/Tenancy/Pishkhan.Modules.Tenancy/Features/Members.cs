@@ -38,6 +38,13 @@ public sealed record RemoveMemberCommand(Guid UserId);
 
 public sealed record AcceptInvitationCommand(string Token);
 
+/// <summary>An invitation that is still pending and not expired. The phone is masked.</summary>
+public sealed record PendingInvitationResponse(Guid Id, string Role, string Phone, Guid InvitedBy, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt);
+
+public sealed record ListInvitationsQuery;
+
+public sealed record RevokeInvitationCommand(Guid InvitationId);
+
 public sealed class TenancyOptions
 {
     public const string Section = "Tenancy";
@@ -74,7 +81,9 @@ internal sealed class MemberHandlers(
     ICommandHandler<ChangeRoleCommand, MemberResponse>,
     ICommandHandler<RemoveMemberCommand, Unit>,
     ICommandHandler<InviteRequest, InvitationResponse>,
-    ICommandHandler<AcceptInvitationCommand, AcceptInvitationResponse>
+    ICommandHandler<AcceptInvitationCommand, AcceptInvitationResponse>,
+    IQueryHandler<ListInvitationsQuery, IReadOnlyList<PendingInvitationResponse>>,
+    ICommandHandler<RevokeInvitationCommand, Unit>
 {
     private const string PhonePurpose = "tenancy.invitation.phone";
 
@@ -182,6 +191,29 @@ internal sealed class MemberHandlers(
 
         await SaveMembershipChangeAsync(caller.UserId, invitation.Role, removed: false, cancellationToken);
         return new AcceptInvitationResponse(invitation.WorkspaceId, invitation.Role);
+    }
+
+    public async Task<Result<IReadOnlyList<PendingInvitationResponse>>> HandleAsync(ListInvitationsQuery query, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var pending = await db.Invitations.AsNoTracking().Where(i => i.Status == InvitationStatus.Pending && i.ExpiresAt > now)
+            .OrderByDescending(i => i.CreatedAt).Take(200).ToListAsync(cancellationToken);
+        return pending.Select(i => new PendingInvitationResponse(
+            i.Id, i.Role, PhoneNumber.Parse(secrets.Unprotect(i.PhoneEnc, PhonePurpose)).Masked, i.InvitedBy, i.CreatedAt, i.ExpiresAt)).ToList();
+    }
+
+    public async Task<Result<Unit>> HandleAsync(RevokeInvitationCommand command, CancellationToken cancellationToken)
+    {
+        var invitation = await db.Invitations.FirstOrDefaultAsync(i => i.Id == command.InvitationId && i.Status == InvitationStatus.Pending, cancellationToken);
+        if (invitation is null)
+        {
+            return Error.NotFound();
+        }
+
+        invitation.Revoke();
+        Audit("member.invitation_revoke", "invitation", invitation.Id, before: new { invitation.Role });
+        await db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
     }
 
     private void Audit(string action, string entityType, Guid entityId, object? before = null, object? after = null)

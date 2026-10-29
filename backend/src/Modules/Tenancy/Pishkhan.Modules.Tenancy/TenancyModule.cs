@@ -106,6 +106,19 @@ public static class TenancyModule
             .WithStandardProblems()
             .WithExamples(new InviteRequest("09120005678", WorkspaceRoles.Agent));
 
+        ws.MapGet("/invitations", (IQueryHandler<ListInvitationsQuery, IReadOnlyList<PendingInvitationResponse>> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new ListInvitationsQuery(), ct), r => Results.Ok(r)))
+            .RequireWorkspacePermission(Permissions.MembersManage)
+            .WithSummary("Pending invitations (not yet accepted or expired), newest first")
+            .Produces<IReadOnlyList<PendingInvitationResponse>>();
+
+        ws.MapDelete("/invitations/{invitationId:guid}", (Guid invitationId, ICommandHandler<RevokeInvitationCommand, Unit> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new RevokeInvitationCommand(invitationId), ct), _ => Results.NoContent()))
+            .RequireWorkspacePermission(Permissions.MembersManage)
+            .WithSummary("Revoke a pending invitation; its link stops working")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         api.MapPost("/invitations/{token}/accept", (string token, ICommandHandler<AcceptInvitationCommand, AcceptInvitationResponse> handler, CancellationToken ct) =>
                 Send(handler.HandleAsync(new AcceptInvitationCommand(token), ct), r => Results.Ok(r)))
             .WithTags("Workspaces")
