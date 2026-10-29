@@ -12,6 +12,13 @@
 - OpenAPI: route values read by filters (for example `{workspaceId}`) are now declared as path parameters, and numbers are plain `integer`/`number` (the API no longer accepts numbers as strings).
 - Integration tests: a test host is disposed only after its bus has started, so a short test class no longer leaves Kafka consumers behind that swallow the next class's events.
 
+### Added (Phase 1, BE-1.13 part 1: website leads, 2026-10-29)
+- New Content module (`content` schema), starting with leads from the website's waitlist and contact forms.
+- `POST /api/v1/public/leads` (public, rate-limited per IP): `type` (`waitlist` | `contact`), `phone`, optional `name`, `instagramHandle`, `vertical`, `monthlyDms`, `message`, `utm` (`utm_*` and `ref` keys), and a solved ALTCHA challenge (single use). Same rules as the site's form: the waitlist needs the Instagram page, the contact form a name and a message. Returns 201 `{status: "received"}`.
+- The phone is encrypted, with a blind index: a repeat from the same phone and form within a day updates the earlier lead (and counts submissions) instead of adding a duplicate.
+- `GET /admin/v1/leads` (SuperAdmin, Support): newest first, filter `type`, `page`/`pageSize`, returns `{items, totalCount, page, pageSize}` with the phone in `09…` form.
+- Integration tests raise the per-IP auth limit (all tests sign in from one address).
+
 ### Added (Phase 1, Audit log, 2026-10-29)
 - New Audit module (`audit` schema): append-only `audit.audit_entries`, range-partitioned by month on `occurred_at` (partitions made by the Migrator and the maintenance job).
 - Modules publish `audit.entry-recorded.v1` through their outbox, in the same transaction as the change. The sink (Workers platform group) is idempotent by entry id and fills in a user's display name or masked phone.

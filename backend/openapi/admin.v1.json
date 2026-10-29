@@ -326,6 +326,76 @@
         ]
       }
     },
+    "/admin/v1/leads": {
+      "get": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Website leads, newest first (SuperAdmin, Support)",
+        "parameters": [
+          {
+            "name": "Type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfLeadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/audit": {
       "get": {
         "tags": [
@@ -561,6 +631,83 @@
         }
       },
       "JsonElement": { },
+      "LeadResponse": {
+        "required": [
+          "id",
+          "type",
+          "phone",
+          "name",
+          "instagramHandle",
+          "vertical",
+          "monthlyDms",
+          "message",
+          "utm",
+          "submissions",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instagramHandle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vertical": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "monthlyDms": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "utm": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "submissions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "PagedResultOfAuditEntryResponse": {
         "required": [
           "items",
@@ -574,6 +721,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AuditEntryResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfLeadResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadResponse"
             }
           },
           "totalCount": {
@@ -835,6 +1011,9 @@
     },
     {
       "name": "Staff"
+    },
+    {
+      "name": "Leads"
     },
     {
       "name": "Audit"

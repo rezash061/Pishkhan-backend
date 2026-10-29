@@ -65,6 +65,57 @@
           }
         }
       }
+    },
+    "/api/v1/public/leads": {
+      "post": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Waitlist or contact form submission from the website",
+        "description": "Needs a solved ALTCHA challenge (single use). A repeat from the same phone within a day updates the earlier lead. Validation problems list fields under `errors`; a bad ALTCHA is `errors.altcha`.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadAccepted"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -117,6 +168,84 @@
           }
         }
       },
+      "LeadAccepted": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "LeadRequest": {
+        "required": [
+          "type",
+          "phone",
+          "name",
+          "instagramHandle",
+          "vertical",
+          "monthlyDms",
+          "message",
+          "utm",
+          "altcha"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instagramHandle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vertical": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "monthlyDms": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "utm": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "altcha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -161,6 +290,9 @@
     },
     {
       "name": "Meta callbacks"
+    },
+    {
+      "name": "Website"
     }
   ]
 }

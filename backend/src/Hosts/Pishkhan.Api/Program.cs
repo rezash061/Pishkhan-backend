@@ -7,6 +7,7 @@ using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
+using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Files;
 using Pishkhan.Modules.Identity;
@@ -32,6 +33,7 @@ services
     .AddConversationsModule(configuration)
     .AddConversationsRealtime()
     .AddAutomationModule(configuration)
+    .AddContentModule(configuration)
     .AddCatalogModule(configuration)
     .AddAuditModule(configuration)
     .DecorateHandlers();
@@ -50,6 +52,7 @@ app.MapFilesEndpoints();
 app.MapChannelsEndpoints();
 app.MapConversationsEndpoints();
 app.MapAutomationEndpoints();
+app.MapContentEndpoints();
 app.MapCatalogEndpoints();
 app.MapAuditEndpoints();
 
