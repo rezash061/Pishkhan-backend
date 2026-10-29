@@ -11,6 +11,7 @@ using Pishkhan.Infrastructure.Application;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Storage;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Backoffice.Contracts;
 using Pishkhan.Modules.Backoffice.Domain;
 using Pishkhan.Modules.Backoffice.Persistence;
@@ -114,19 +115,21 @@ internal sealed class StaffAuthHandlers(
         if (staff is null)
         {
             Hasher.HashPassword(null!, command.Password); // equalize timing
+            Audit(new AuditActor(AuditActorTypes.Staff, null, Clip(command.Username.Trim()), caller.IpAddress), "staff.login_failed", "staff", null, reason: "auth.login.invalid_credentials");
+            await db.SaveChangesAsync(cancellationToken);
             return Error.Unauthorized("auth.login.invalid_credentials");
         }
 
         if (staff.Status != StaffStatus.Active || staff.IsLocked(now))
         {
+            Audit(Actor(staff), "staff.login_failed", "staff", staff.Id, reason: "auth.login.locked");
+            await db.SaveChangesAsync(cancellationToken);
             return Error.Unauthorized("auth.login.locked");
         }
 
         if (Hasher.VerifyHashedPassword(staff, staff.PasswordHash, command.Password) == PasswordVerificationResult.Failed)
         {
-            staff.RecordFailure(now);
-            await db.SaveChangesAsync(cancellationToken);
-            return Error.Unauthorized("auth.login.invalid_credentials");
+            return await FailAsync(staff, "staff.login_failed", "auth.login.invalid_credentials", cancellationToken);
         }
 
         if (!staff.TotpEnabled)
@@ -140,15 +143,19 @@ internal sealed class StaffAuthHandlers(
             return new StaffLoginResponse("totp_enrollment_required", EnrollmentToken: enrollmentToken, TotpSecret: Totp.ToBase32(secret), OtpAuthUri: Totp.ProvisioningUri("Pishkhan Admin", staff.Username, secret));
         }
 
+        // The panel signs in in two steps: password first, then the code. A missing code is that first step, not a failed attempt.
+        if (string.IsNullOrEmpty(command.TotpCode))
+        {
+            return Error.Unauthorized("auth.totp.required");
+        }
+
         if (!VerifyTotp(staff, command.TotpCode, now))
         {
-            staff.RecordFailure(now);
-            await db.SaveChangesAsync(cancellationToken);
-            return Error.Unauthorized(string.IsNullOrEmpty(command.TotpCode) ? "auth.totp.required" : "auth.totp.invalid");
+            return await FailAsync(staff, "staff.login_failed", "auth.totp.invalid", cancellationToken);
         }
 
         staff.RecordSuccess();
-        return await StartSessionAsync(staff, cancellationToken);
+        return await StartSessionAsync(staff, "staff.login", cancellationToken);
     }
 
     public async Task<Result<StaffLoginResponse>> HandleAsync(TotpEnrollRequest command, CancellationToken cancellationToken)
@@ -168,7 +175,8 @@ internal sealed class StaffAuthHandlers(
         }
 
         staff.EnableTotp(step);
-        return await StartSessionAsync(staff, cancellationToken);
+        Audit(Actor(staff), "staff.totp_enrolled", "staff", staff.Id);
+        return await StartSessionAsync(staff, "staff.login", cancellationToken);
     }
 
     public async Task<Result<StaffLoginResponse>> HandleAsync(StaffRefreshRequest command, CancellationToken cancellationToken)
@@ -207,6 +215,8 @@ internal sealed class StaffAuthHandlers(
     public async Task<Result<Unit>> HandleAsync(StaffLogoutCommand command, CancellationToken cancellationToken)
     {
         await RevokeFamilyAsync(caller.SessionId, "logout", cancellationToken);
+        Audit(await CallerActorAsync(cancellationToken), "staff.logout", "staff_session", caller.SessionId);
+        await db.SaveChangesAsync(cancellationToken);
         return Unit.Value;
     }
 
@@ -215,11 +225,11 @@ internal sealed class StaffAuthHandlers(
         var staff = await db.StaffUsers.FirstAsync(s => s.Id == caller.UserId, cancellationToken);
         if (Hasher.VerifyHashedPassword(staff, staff.PasswordHash, command.Password) == PasswordVerificationResult.Failed || !VerifyTotp(staff, command.TotpCode, clock.UtcNow))
         {
-            staff.RecordFailure(clock.UtcNow);
-            await db.SaveChangesAsync(cancellationToken);
+            await FailAsync(staff, "staff.step_up_failed", "auth.step_up.invalid", cancellationToken);
             return Error.Unauthorized("auth.step_up.invalid");
         }
 
+        Audit(Actor(staff), "staff.step_up", "staff_session", caller.SessionId);
         await db.SaveChangesAsync(cancellationToken);
         var token = tokens.CreateAccessToken(AuthSchemes.Staff, staff.Id, caller.SessionId, Claims(staff, stepUp: true), options.Value.StepUpLifetime);
         return new StepUpResponse(token.Token, token.ExpiresAt);
@@ -241,15 +251,19 @@ internal sealed class StaffAuthHandlers(
             return Error.Conflict("backoffice.staff.username_taken");
         }
 
-        var id = await CreateAsync(command.Username, command.Password, command.Roles, cancellationToken);
+        var id = await CreateAsync(command.Username, command.Password, command.Roles, await CallerActorAsync(cancellationToken), cancellationToken);
         return ToSummary(await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == id, cancellationToken));
     }
 
-    public async Task<Guid> CreateAsync(string username, string password, IReadOnlyList<string> roles, CancellationToken cancellationToken)
+    public Task<Guid> CreateAsync(string username, string password, IReadOnlyList<string> roles, CancellationToken cancellationToken) =>
+        CreateAsync(username, password, roles, AuditActor.System, cancellationToken);
+
+    private async Task<Guid> CreateAsync(string username, string password, IReadOnlyList<string> roles, AuditActor actor, CancellationToken cancellationToken)
     {
         var staff = StaffUser.Create(username, string.Empty, roles, clock.UtcNow);
         staff.SetPasswordHash(Hasher.HashPassword(staff, password));
         db.StaffUsers.Add(staff);
+        Audit(actor, "staff.create", "staff", staff.Id, after: new { staff.Username, staff.Roles });
         await db.SaveChangesAsync(cancellationToken);
         return staff.Id;
     }
@@ -265,12 +279,23 @@ internal sealed class StaffAuthHandlers(
         return Totp.Verify(secret, code, now, out var step) && staff.AcceptTotpStep(step);
     }
 
-    private async Task<StaffLoginResponse> StartSessionAsync(StaffUser staff, CancellationToken cancellationToken)
+    /// <summary>Counts a failed attempt (5 lock the account for 15 minutes) and audits it.</summary>
+    private async Task<Result<StaffLoginResponse>> FailAsync(StaffUser staff, string action, string code, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        staff.RecordFailure(now);
+        Audit(Actor(staff), action, "staff", staff.Id, reason: staff.IsLocked(now) ? code + "; auth.login.locked" : code);
+        await db.SaveChangesAsync(cancellationToken);
+        return Error.Unauthorized(code);
+    }
+
+    private async Task<StaffLoginResponse> StartSessionAsync(StaffUser staff, string action, CancellationToken cancellationToken)
     {
         var o = options.Value;
         var refresh = Base64Url.Encode(RandomNumberGenerator.GetBytes(32));
         var session = StaffSession.Start(staff.Id, Hash(refresh), o.IdleTimeout, o.AbsoluteTimeout, caller.IpAddress, caller.UserAgent, clock.UtcNow);
         db.StaffSessions.Add(session);
+        Audit(Actor(staff), action, "staff_session", session.FamilyId);
         await db.SaveChangesAsync(cancellationToken);
         return Issue(staff, session, refresh, stepUp: false);
     }
@@ -302,6 +327,23 @@ internal sealed class StaffAuthHandlers(
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now).SetProperty(x => x.RevokedReason, reason).SetProperty(x => x.UpdatedAt, now), cancellationToken);
         await revocations.RevokeAsync(AuthSchemes.Staff, familyId.ToString(), tokens.AccessTokenLifetime(AuthSchemes.Staff) + TimeSpan.FromMinutes(1), cancellationToken);
     }
+
+    private AuditActor Actor(StaffUser staff) => AuditActor.Staff(staff.Id, staff.Username, caller.IpAddress);
+
+    private async Task<AuditActor> CallerActorAsync(CancellationToken cancellationToken)
+    {
+        var username = await db.StaffUsers.AsNoTracking().Where(s => s.Id == caller.UserId).Select(s => s.Username).FirstOrDefaultAsync(cancellationToken);
+        return AuditActor.Staff(caller.UserId, username, caller.IpAddress);
+    }
+
+    /// <summary>Staff actions are platform-level entries (no workspace). Written by the next SaveChanges, with the change itself.</summary>
+    private void Audit(AuditActor actor, string action, string entityType, Guid? entityId, object? after = null, string? reason = null)
+    {
+        var entry = AuditEntries.Create(actor, action, entityType, entityId?.ToString(), null, clock.UtcNow, after: after, reason: reason);
+        db.Publish(entry, entry.PartitionKey(), workspaceId: null);
+    }
+
+    private static string Clip(string value) => value.Length <= 100 ? value : value[..100];
 
     private static StaffSummary ToSummary(StaffUser s) => new(s.Id, s.Username, s.Roles, s.Status.ToString().ToLowerInvariant(), s.TotpEnabled, s.CreatedAt);
 

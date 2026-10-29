@@ -12,6 +12,7 @@ using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Instagram;
@@ -146,6 +147,7 @@ internal static class ChannelEndpoints
 
         tenant.SetWorkspace(parsed.WorkspaceId);
         var ct = http.RequestAborted;
+        var actor = AuditActor.User(parsed.UserId, null, http.Connection.RemoteIpAddress?.ToString());
         try
         {
             var shortLived = await instagram.ExchangeCodeAsync(code, ct);
@@ -171,11 +173,11 @@ internal static class ChannelEndpoints
             {
                 account = ChannelAccount.ConnectInstagram(parsed.WorkspaceId, profile.UserId, profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions, parsed.UserId, now);
                 db.Accounts.Add(account);
-                db.PublishStatus(account);
+                db.PublishStatus(account, actor);
             }
             else if (account.Reconnect(profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions, now))
             {
-                db.PublishStatus(account);
+                db.PublishStatus(account, actor);
             }
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Instagram account {ExternalId} connected to workspace {WorkspaceId}", profile.UserId, parsed.WorkspaceId);
@@ -220,7 +222,8 @@ internal static class ChannelEndpoints
             page.NextCursor));
     }
 
-    private static async Task<IResult> DisconnectAsync(Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, IClock clock, ILoggerFactory loggers, CancellationToken ct)
+    private static async Task<IResult> DisconnectAsync(
+        Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, ICurrentUser caller, IClock clock, ILoggerFactory loggers, CancellationToken ct)
     {
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == channelId && a.Status != ChannelStatuses.Disconnected, ct);
         if (account is null)
@@ -243,7 +246,7 @@ internal static class ChannelEndpoints
 
         if (account.Disconnect("disconnected_by_user", clock.UtcNow))
         {
-            db.PublishStatus(account);
+            db.PublishStatus(account, AuditActor.User(caller.UserId, caller.ActorStaffId, caller.IpAddress));
         }
 
         await db.SaveChangesAsync(ct);

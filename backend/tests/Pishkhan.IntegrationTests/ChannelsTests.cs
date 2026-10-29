@@ -14,6 +14,7 @@ using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Timers;
+using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Channels.Contracts;
@@ -24,6 +25,7 @@ using Pishkhan.Modules.Channels.Services;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Identity;
 using Pishkhan.Modules.Tenancy;
 
 namespace Pishkhan.IntegrationTests;
@@ -111,7 +113,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         });
         builder.AddPishkhanPlatform("it-channels");
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
-            .AddAutomationModule(builder.Configuration);
+            .AddAutomationModule(builder.Configuration).AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration);
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
             .AddCacheInvalidation()
@@ -122,7 +124,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             .AddChannelsPlatformConsumers()
             .AddAutomationEngineConsumers()
             .AddAutomationOutboundConsumers()
-            .AddAutomationPlatformConsumers());
+            .AddAutomationPlatformConsumers()
+            .AddAuditConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
         builder.Services.AddHostedService<TimerDispatcher>();
         Host = builder.Build();

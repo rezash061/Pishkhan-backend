@@ -33,7 +33,7 @@ dotnet run --project src/Hosts/Pishkhan.AdminApi   # http://localhost:5081
 ```
 
 In Development, OTP codes are not sent by SMS: read them from `GET /dev/sms`. Dev JWT keys are generated under `~/.pishkhan/keys`.
-First staff account: `dotnet run --project src/Hosts/Pishkhan.Migrator -- create-staff <username> <password> super_admin`.
+First staff account: `dotnet run --project src/Hosts/Pishkhan.Migrator -- create-staff <username> <password> SuperAdmin`. Roles: SuperAdmin, Support, Finance, ContentEditor, AIOps (case-sensitive).
 
 Instagram needs a Meta app (development mode). Put its values in user secrets, never in files:
 

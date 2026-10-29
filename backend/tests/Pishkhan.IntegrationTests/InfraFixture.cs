@@ -54,6 +54,8 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Kafka:CreateTopicsIfMissing"] = "true",
             ["Kafka:PartitionsOverride"] = "3",
             ["Kafka:ReplicationFactor"] = "1",
+            // Every test signs users and staff in from one address; the production limit (20 an hour per IP) would trip mid-run.
+            ["RateLimits:AuthPerHour"] = "1000",
             ["Storage:Provider"] = "filesystem",
             ["Storage:RootPath"] = StorageRoot,
             ["Secrets:ActiveKeyId"] = "it",
@@ -110,10 +112,14 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Conversations.Persistence.ConversationsDbContext>("conversations");
         await Migrate<Modules.Agent.Persistence.AgentDbContext>("agent");
         await Migrate<Modules.Automation.Persistence.AutomationDbContext>("automation");
+        await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();
-        await Partitioning.EnsureMonthlyPartitionsAsync(conn, "conversations.messages", DateTimeOffset.UtcNow.AddMonths(-1), 2);
+        foreach (var table in Partitioning.PartitionedTables)
+        {
+            await Partitioning.EnsureMonthlyPartitionsAsync(conn, table, DateTimeOffset.UtcNow.AddMonths(-1), 2);
+        }
     }
 
     private async Task Migrate<TContext>(string schema)
