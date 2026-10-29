@@ -79,6 +79,9 @@ public sealed record FlowNode
     /// <summary>message, storefront (cards) and question (the prompt).</summary>
     public OutboundContent? Message { get; init; }
 
+    /// <summary>storefront: a Catalog card set, sent with current prices and stock (instead of cards written into the node).</summary>
+    public Guid? CardSetId { get; init; }
+
     public string? AnswerType { get; init; }
 
     public IReadOnlyList<string>? Choices { get; init; }
@@ -228,6 +231,8 @@ public static partial class FlowValidator
                     yield return code;
                 }
 
+                break;
+            case FlowNodeTypes.Storefront when node.CardSetId is not null:
                 break;
             case FlowNodeTypes.Storefront:
                 if (node.Message?.Cards is not { Count: >= 1 and <= 10 })
@@ -589,6 +594,8 @@ public abstract record FlowEffect
 {
     public sealed record Send(OutboundContent Content) : FlowEffect;
 
+    public sealed record SendCards(Guid CardSetId) : FlowEffect;
+
     public sealed record Act(IReadOnlyList<RuleAction> Actions) : FlowEffect;
 
     public sealed record Timer(string NodeId, DateTimeOffset DueAt) : FlowEffect;
@@ -687,6 +694,10 @@ public static class FlowRunner
             var values = WithVariables(context, run);
             switch (node.Type)
             {
+                case FlowNodeTypes.Storefront when node.CardSetId is { } cardSetId:
+                    effects.Add(new FlowEffect.SendCards(cardSetId));
+                    current = graph.Next(node.Id, FlowHandles.Next);
+                    break;
                 case FlowNodeTypes.Message:
                 case FlowNodeTypes.Storefront:
                     effects.Add(new FlowEffect.Send(TemplateRenderer.Render(node.Message!, values)));

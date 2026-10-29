@@ -75,6 +75,17 @@ internal sealed class FileIntake(FilesDbContext db, IObjectStorage storage, IClo
         return file is null ? null : new CleanFile(file.Id, file.WorkspaceId, file.Purpose, file.ContentTypeDetected, file.Size, file.Bucket, file.StorageKey);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, Uri>> GetCleanUrlsAsync(IReadOnlyCollection<Guid> fileIds, TimeSpan lifetime, CancellationToken cancellationToken)
+    {
+        if (fileIds.Count == 0)
+        {
+            return new Dictionary<Guid, Uri>();
+        }
+
+        var files = await db.Files.AsNoTracking().Where(f => fileIds.Contains(f.Id) && f.Status == FileStatuses.Clean).ToListAsync(cancellationToken);
+        return files.ToDictionary(f => f.Id, f => storage.GetSignedUrl(f.Bucket, f.StorageKey, lifetime));
+    }
+
     private static string Normalize(string contentType) => contentType.Split(';')[0].Trim().ToLowerInvariant() switch
     {
         "image/jpg" or "image/pjpeg" => "image/jpeg",

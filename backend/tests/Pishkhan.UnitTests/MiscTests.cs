@@ -1,6 +1,7 @@
 using Pishkhan.Infrastructure.Telemetry;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Features;
+using Pishkhan.Web.Http;
 
 namespace Pishkhan.UnitTests;
 

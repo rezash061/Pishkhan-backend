@@ -12,10 +12,12 @@ using Pishkhan.Infrastructure.Hosting;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Infrastructure.Antivirus;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
+using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
@@ -25,7 +27,7 @@ using Pishkhan.Modules.Channels.Services;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
-using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Files;
 using Pishkhan.Modules.Tenancy;
 
 namespace Pishkhan.IntegrationTests;
@@ -95,7 +97,20 @@ internal sealed class FakeInstagram : HttpMessageHandler
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 }
 
-/// <summary>A worker-like host: Channels, Conversations and Automation modules, their consumers, the outbox relay and timers, Instagram faked.</summary>
+/// <summary>Every upload is clean: there is no clamd in the test containers.</summary>
+internal sealed class CleanScanner : IAntivirusScanner
+{
+    public Task<ScanResult> ScanAsync(Stream content, CancellationToken cancellationToken = default) => Task.FromResult(new ScanResult(ScanVerdict.Clean, null, "fake"));
+
+    public Task<string?> GetVersionAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>("fake");
+
+    public Task<bool> PingAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+}
+
+/// <summary>
+/// A worker-like host: Channels, Conversations, Automation, Files and Catalog modules, their consumers, the outbox relay and timers,
+/// Instagram and the virus scanner faked.
+/// </summary>
 public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
 {
     public IHost Host { get; private set; } = null!;
@@ -113,7 +128,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         });
         builder.AddPishkhanPlatform("it-channels");
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
-            .AddAutomationModule(builder.Configuration).AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration);
+            .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration);
+        builder.Services.AddSingleton<IAntivirusScanner, CleanScanner>();
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
             .AddCacheInvalidation()
@@ -125,7 +141,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             .AddAutomationEngineConsumers()
             .AddAutomationOutboundConsumers()
             .AddAutomationPlatformConsumers()
-            .AddAuditConsumers());
+            .AddFilesConsumers()
+            .AddCatalogConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
         builder.Services.AddHostedService<TimerDispatcher>();
         Host = builder.Build();
