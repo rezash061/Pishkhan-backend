@@ -18,6 +18,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Instagram;
 using Pishkhan.Modules.Channels.Persistence;
+using Pishkhan.Modules.Channels.Services;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Http;
 using Pishkhan.Web.OpenApi;
@@ -191,7 +192,7 @@ internal static class MetaCallbacks
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    private static async Task<IResult> DeauthorizeAsync(HttpContext http, ChannelsDbContext db, ITenantContext tenant, IOptions<InstagramOptions> options, ILoggerFactory loggers)
+    private static async Task<IResult> DeauthorizeAsync(HttpContext http, ChannelsDbContext db, ITenantContext tenant, IOptions<InstagramOptions> options, IClock clock, ILoggerFactory loggers)
     {
         var form = await http.Request.ReadFormAsync(http.RequestAborted);
         if (InstagramSignatures.ParseSignedRequest(form["signed_request"], options.Value.AppSecret) is not { } payload
@@ -206,8 +207,10 @@ internal static class MetaCallbacks
             .ToListAsync(http.RequestAborted);
         foreach (var account in accounts)
         {
-            account.Disconnect();
-            db.Publish(new ChannelStatusChanged(account.Id, account.WorkspaceId, account.Status, "deauthorized"), account.Id.ToString(), account.WorkspaceId);
+            if (account.Disconnect("deauthorized", clock.UtcNow))
+            {
+                db.PublishStatus(account);
+            }
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
@@ -234,6 +237,7 @@ internal static class MetaCallbacks
             UpdatedAt = now,
         };
         db.DataDeletionRequests.Add(request);
+        db.Publish(new DataDeletionRequested(request.Id, ChannelKinds.Instagram, externalId), request.Id.ToString());
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.Json(
             new DataDeletionResponse(new Uri($"{options.Value.DataDeletionStatusUrl}?code={request.ConfirmationCode}"), request.ConfirmationCode),

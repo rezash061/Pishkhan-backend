@@ -221,11 +221,20 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("kind");
 
+                    b.Property<string>("LastRefreshError")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_refresh_error");
+
                     b.Property<string>("RateProfile")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("rate_profile");
+
+                    b.Property<int>("RefreshFailures")
+                        .HasColumnType("integer")
+                        .HasColumnName("refresh_failures");
 
                     b.PrimitiveCollection<List<string>>("Scopes")
                         .IsRequired()
@@ -238,6 +247,15 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("status");
 
+                    b.Property<DateTimeOffset?>("StatusChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_changed_at");
+
+                    b.Property<string>("StatusReason")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("status_reason");
+
                     b.Property<string>("TokenEnc")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
@@ -246,6 +264,10 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                     b.Property<DateTimeOffset?>("TokenExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("token_expires_at");
+
+                    b.Property<DateTimeOffset?>("TokenRefreshedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("token_refreshed_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -269,6 +291,10 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_channel_accounts");
 
+                    b.HasIndex("TokenExpiresAt")
+                        .HasDatabaseName("ix_channel_accounts_token_expires_at")
+                        .HasFilter("status IN ('active', 'token_expiring')");
+
                     b.HasIndex("Kind", "ExternalId")
                         .IsUnique()
                         .HasDatabaseName("ix_channel_accounts_kind_external_id")
@@ -286,6 +312,11 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.PrimitiveCollection<List<string>>("CompletedModules")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("completed_modules");
+
                     b.Property<string>("ConfirmationCode")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -301,6 +332,10 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("external_user_id");
+
+                    b.Property<int>("ItemsDeleted")
+                        .HasColumnType("integer")
+                        .HasColumnName("items_deleted");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -319,7 +354,36 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_data_deletion_requests_confirmation_code");
 
+                    b.HasIndex("ExternalUserId")
+                        .HasDatabaseName("ix_data_deletion_requests_external_user_id");
+
                     b.ToTable("data_deletion_requests", "channels");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Channels.Domain.RateProfileOverride", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Values")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("values");
+
+                    b.HasKey("Name")
+                        .HasName("pk_rate_profiles");
+
+                    b.ToTable("rate_profiles", "channels");
                 });
 #pragma warning restore 612, 618
         }

@@ -1478,6 +1478,101 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/channels/{channelId}/media": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "Recent posts and reels of an Instagram account, newest first",
+        "description": "For post-specific rules. `cursor` comes from the previous page; `limit` is 1 to 50 (default 25). Read live from Instagram.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfMediaResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/channels/{channelId}": {
       "delete": {
         "tags": [
@@ -1777,6 +1872,7 @@
           "username",
           "displayName",
           "status",
+          "statusReason",
           "tokenExpiresAt",
           "createdAt"
         ],
@@ -1806,6 +1902,12 @@
           },
           "status": {
             "type": "string"
+          },
+          "statusReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "tokenExpiresAt": {
             "type": [
@@ -2117,6 +2219,60 @@
           }
         }
       },
+      "MediaResponse": {
+        "required": [
+          "id",
+          "caption",
+          "mediaType",
+          "mediaUrl",
+          "thumbnailUrl",
+          "permalink",
+          "timestamp"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caption": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "mediaUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "thumbnailUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "permalink": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "timestamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "MemberResponse": {
         "required": [
           "userId",
@@ -2257,6 +2413,27 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConversationResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PageOfMediaResponse": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaResponse"
             }
           },
           "nextCursor": {
