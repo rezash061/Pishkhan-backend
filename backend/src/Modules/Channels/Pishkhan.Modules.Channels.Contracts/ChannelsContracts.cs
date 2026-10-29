@@ -41,7 +41,8 @@ public sealed record InboundChannelMessage(
     IReadOnlyList<InboundAttachment> Attachments,
     string? ReplyToStoryId,
     string? Postback,
-    bool IsEcho);
+    bool IsEcho,
+    string? ReplyToStoryUrl = null);
 
 public sealed record InboundAttachment(string Type, string? Url);
 

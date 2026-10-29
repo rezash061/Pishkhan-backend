@@ -86,10 +86,9 @@ internal sealed class ConversationActionsHandler(ConversationsDbContext db, ITen
                     conversation.SetAiPaused(true);
                     break;
                 case ConversationActionKinds.Handoff:
-                    if (conversation.ChangeStatus(ConversationStatuses.HandedOff))
+                    if (conversation.HandOff(action.Reason ?? "automation", null, now))
                     {
-                        conversation.SetAiPaused(true);
-                        Db.Publish(new HandoffRequested(conversation.Id, action.Reason ?? "automation", null, null), conversation.Id.ToString());
+                        Db.Publish(new HandoffRequested(conversation.Id, conversation.HandoffReason!, null, null), conversation.Id.ToString());
                     }
 
                     break;

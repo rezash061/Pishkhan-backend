@@ -24,7 +24,7 @@ public static class ApiDocuments
 /// <summary>Request and response examples (with Persian data) attached to an endpoint.</summary>
 public sealed record OpenApiExampleMetadata(object? Request, object? Response);
 
-public static class OpenApiSetup
+public static partial class OpenApiSetup
 {
     private static readonly System.Text.Json.JsonSerializerOptions ExampleJson = new(System.Text.Json.JsonSerializerDefaults.Web)
     {
@@ -81,6 +81,7 @@ public static class OpenApiSetup
                 });
                 o.AddOperationTransformer((operation, context, _) =>
                 {
+                    DeclareRouteParameters(operation, context);
                     var metadata = context.Description.ActionDescriptor.EndpointMetadata;
                     if (metadata.OfType<IAuthorizeData>().Any() && !metadata.OfType<IAllowAnonymous>().Any())
                     {
@@ -133,6 +134,41 @@ public static class OpenApiSetup
 
         return services;
     }
+
+    /// <summary>
+    /// Route values read by filters (for example <c>{workspaceId}</c> in <c>RequireWorkspacePermission</c>) are not handler parameters, so the
+    /// generator leaves them out. Every template parameter is a required path parameter; a <c>guid</c> constraint makes it a uuid.
+    /// </summary>
+    private static void DeclareRouteParameters(OpenApiOperation operation, OpenApiOperationTransformerContext context)
+    {
+        var template = context.Description.ActionDescriptor.AttributeRouteInfo?.Template ?? context.Description.RelativePath;
+        if (template is null)
+        {
+            return;
+        }
+
+        foreach (System.Text.RegularExpressions.Match match in RouteParameter().Matches(template))
+        {
+            var name = match.Groups["name"].Value;
+            if (operation.Parameters?.Any(p => p.In == ParameterLocation.Path && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                continue;
+            }
+
+            var isGuid = match.Groups["constraints"].Value.Contains("guid", StringComparison.OrdinalIgnoreCase);
+            operation.Parameters ??= [];
+            operation.Parameters.Add(new OpenApiParameter
+            {
+                Name = name,
+                In = ParameterLocation.Path,
+                Required = true,
+                Schema = isGuid ? new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" } : new OpenApiSchema { Type = JsonSchemaType.String },
+            });
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\{(?<name>[A-Za-z_][A-Za-z0-9_]*)(?<constraints>(:[^}?=]+)*)\??\}")]
+    private static partial System.Text.RegularExpressions.Regex RouteParameter();
 
     public static TBuilder WithExamples<TBuilder>(this TBuilder builder, object? request, object? response = null)
         where TBuilder : IEndpointConventionBuilder

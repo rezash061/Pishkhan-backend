@@ -28,7 +28,10 @@ internal static class TestEnvironment
 /// <summary>One PostgreSQL, Redis and Kafka for the whole test run, migrated like production by the Migrator's steps.</summary>
 public sealed class InfraFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg18").WithDatabase("pishkhan").WithUsername("pishkhan").WithPassword("pishkhan").Build();
+    // Every test class starts its own Api host (and some an admin host) next to the shared workers, each with its own pools; the default
+    // 100 connections run out once the suite grows.
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("pgvector/pgvector:pg18").WithDatabase("pishkhan").WithUsername("pishkhan").WithPassword("pishkhan")
+        .WithCommand("-c", "max_connections=400").Build();
     private readonly RedisContainer _redis = new RedisBuilder("redis:8-alpine").Build();
     private readonly KafkaContainer _kafka = new KafkaBuilder("apache/kafka:4.1.0").Build();
 
@@ -54,8 +57,9 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Kafka:CreateTopicsIfMissing"] = "true",
             ["Kafka:PartitionsOverride"] = "3",
             ["Kafka:ReplicationFactor"] = "1",
-            // Every test signs users and staff in from one address; the production limit (20 an hour per IP) would trip mid-run.
+            // Every test signs users and staff in from one address; the production limits (20 an hour per IP, for requests and for OTPs) would trip mid-run.
             ["RateLimits:AuthPerHour"] = "1000",
+            ["Identity:OtpPerIpPerHour"] = "1000",
             ["Storage:Provider"] = "filesystem",
             ["Storage:RootPath"] = StorageRoot,
             ["Secrets:ActiveKeyId"] = "it",

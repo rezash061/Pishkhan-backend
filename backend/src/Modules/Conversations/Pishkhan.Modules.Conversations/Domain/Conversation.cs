@@ -142,6 +142,17 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
 
     public string? LastMessagePreview { get; private set; }
 
+    /// <summary>Why the conversation was handed to a person (set while <see cref="Status"/> is handed_off).</summary>
+    public string? HandoffReason { get; private set; }
+
+    /// <summary>A reply the AI drafted for the person taking over, if any.</summary>
+    public string? HandoffSuggestedReply { get; private set; }
+
+    public DateTimeOffset? HandedOffAt { get; private set; }
+
+    public const int MaxHandoffReason = 200;
+    public const int MaxSuggestedReply = 1000;
+
     public static Conversation Open(Guid workspaceId, Guid channelAccountId, string channelKind, Guid contactId, string externalUserId, DateTimeOffset now) => new()
     {
         Id = Uuid.NewV7(now),
@@ -168,7 +179,7 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
         return true;
     }
 
-    /// <summary>Changes the status. Returns false for an unknown status or no change.</summary>
+    /// <summary>Changes the status. Returns false for an unknown status or no change. Use <see cref="HandOff"/> to hand off.</summary>
     public bool ChangeStatus(string status)
     {
         if (!ConversationStatuses.All.Contains(status) || Status == status)
@@ -177,6 +188,29 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
         }
 
         Status = status;
+        if (status != ConversationStatuses.HandedOff)
+        {
+            HandoffReason = null;
+            HandoffSuggestedReply = null;
+            HandedOffAt = null;
+        }
+
+        return true;
+    }
+
+    /// <summary>Hands the conversation to a person and pauses the AI. Returns false if it is already handed off.</summary>
+    public bool HandOff(string reason, string? suggestedReply, DateTimeOffset now)
+    {
+        if (Status == ConversationStatuses.HandedOff)
+        {
+            return false;
+        }
+
+        Status = ConversationStatuses.HandedOff;
+        AiPaused = true;
+        HandoffReason = reason.Length <= MaxHandoffReason ? reason : reason[..MaxHandoffReason];
+        HandoffSuggestedReply = suggestedReply is null || suggestedReply.Length <= MaxSuggestedReply ? suggestedReply : suggestedReply[..MaxSuggestedReply];
+        HandedOffAt = now;
         return true;
     }
 
@@ -201,7 +235,7 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
 
         if (Status == ConversationStatuses.Closed)
         {
-            Status = ConversationStatuses.Open;
+            ChangeStatus(ConversationStatuses.Open);
         }
 
         UnreadCount++;
