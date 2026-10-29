@@ -250,6 +250,20 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("Fields")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("fields")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.PrimitiveCollection<List<string>>("Tags")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("tags")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -271,6 +285,11 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_contacts");
+
+                    b.HasIndex("Tags")
+                        .HasDatabaseName("ix_contacts_tags");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Tags"), "gin");
 
                     b.HasIndex("WorkspaceId")
                         .HasDatabaseName("ix_contacts_workspace_id");
@@ -460,6 +479,10 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                     b.Property<string>("AttachmentsJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("attachments_json");
+
+                    b.Property<Guid?>("AutomationRuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("automation_rule_id");
 
                     b.Property<string>("ContentJson")
                         .HasColumnType("jsonb")

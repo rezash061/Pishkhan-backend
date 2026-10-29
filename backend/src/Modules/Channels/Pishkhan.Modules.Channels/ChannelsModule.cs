@@ -25,6 +25,8 @@ public static class ChannelsModule
         services.AddScoped<InstagramAccountGateway>();
         services.AddScoped<IChannelMessageSender, ChannelMessageSender>();
         services.AddScoped<IChannelProfileReader, ChannelProfileReader>();
+        services.AddScoped<IChannelMediaReader, ChannelMediaReader>();
+        services.AddScoped<IChannelPacing, ChannelPacingProvider>();
         services.AddScoped<InstagramTokenRefresher>();
         services.AddSingleton<IChannelWebhookParser, InstagramWebhookParser>();
         return services;

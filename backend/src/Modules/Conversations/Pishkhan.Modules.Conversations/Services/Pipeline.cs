@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
@@ -67,7 +68,7 @@ internal sealed class InstagramIngestHandler(
                 continue;
             }
 
-            var conversation = await FindOrOpenConversationAsync(account, inbound.SenderExternalId, now, cancellationToken);
+            var (conversation, isNew) = await FindOrOpenConversationAsync(account, inbound.SenderExternalId, now, cancellationToken);
             var normalized = inbound.Text is null ? null : PersianNormalizer.Normalize(inbound.Text);
             var attachments = inbound.Attachments.Count == 0 ? null : JsonSerializer.Serialize(inbound.Attachments, EnvelopeJson.Options);
             var stored = Message.Inbound(account.WorkspaceId, conversation.Id, inbound.Kind, Truncate(inbound.Text), Truncate(normalized), inbound.ExternalMessageId, attachments, now);
@@ -76,8 +77,25 @@ internal sealed class InstagramIngestHandler(
             conversation.RecordInbound(inbound.SentAt, inbound.Text ?? $"[{inbound.Kind}]");
 
             Db.Publish(
-                new InboundMessageReceived(conversation.Id, stored.Id, stored.CreatedAt, account.Id, account.Kind, conversation.ContactId, stored.Kind, stored.Text, stored.NormalizedText, inbound.Attachments.Count),
+                new InboundMessageReceived(
+                    conversation.Id, stored.Id, stored.CreatedAt, account.Id, account.Kind, conversation.ContactId, stored.Kind, stored.Text, stored.NormalizedText,
+                    inbound.Attachments.Count, inbound.Postback, inbound.ReplyToStoryId, inbound.SenderExternalId, isNew),
                 conversation.Id.ToString());
+        }
+
+        // Comments are not conversation messages: Automation decides what to do with them (private reply, public reply, tags).
+        foreach (var comment in parser.ParseInstagramComments(message.Entry))
+        {
+            if (comment.FromExternalId == account.ExternalId)
+            {
+                continue;
+            }
+
+            Db.Publish(
+                new InboundCommentReceived(
+                    account.Id, account.Kind, comment.Kind, comment.CommentId, comment.MediaId, comment.ParentCommentId, comment.FromExternalId, comment.FromUsername,
+                    Truncate(comment.Text), Truncate(comment.Text is null ? null : PersianNormalizer.Normalize(comment.Text)), comment.CreatedAt, CommentSources.Webhook),
+                comment.MediaId);
         }
     }
 
@@ -104,28 +122,8 @@ internal sealed class InstagramIngestHandler(
         }
     }
 
-    private async Task<Conversation> FindOrOpenConversationAsync(ChannelAccountInfo account, string externalUserId, DateTimeOffset now, CancellationToken ct)
-    {
-        var identity = await Db.ChannelIdentities.FirstOrDefaultAsync(i => i.ChannelAccountId == account.Id && i.ExternalUserId == externalUserId, ct)
-            ?? Db.ChannelIdentities.Local.FirstOrDefault(i => i.ChannelAccountId == account.Id && i.ExternalUserId == externalUserId);
-        if (identity is null)
-        {
-            var contact = Contact.Create(account.WorkspaceId, null, null, now);
-            identity = ChannelIdentity.Create(account.WorkspaceId, contact.Id, account.Id, externalUserId, now);
-            Db.Contacts.Add(contact);
-            Db.ChannelIdentities.Add(identity);
-        }
-
-        var conversation = Db.Conversations.Local.FirstOrDefault(c => c.ChannelAccountId == account.Id && c.ContactId == identity.ContactId)
-            ?? await Db.Conversations.FirstOrDefaultAsync(c => c.ChannelAccountId == account.Id && c.ContactId == identity.ContactId, ct);
-        if (conversation is null)
-        {
-            conversation = Conversation.Open(account.WorkspaceId, account.Id, account.Kind, identity.ContactId, externalUserId, now);
-            Db.Conversations.Add(conversation);
-        }
-
-        return conversation;
-    }
+    private Task<(Conversation Conversation, bool IsNew)> FindOrOpenConversationAsync(ChannelAccountInfo account, string externalUserId, DateTimeOffset now, CancellationToken ct) =>
+        ConversationLookup.FindOrOpenAsync(Db, account.WorkspaceId, account.Id, account.Kind, externalUserId, now, ct);
 
     private static string? Truncate(string? s) => s is { Length: > 4000 } ? s[..4000] : s;
 }
@@ -184,12 +182,15 @@ internal sealed record OutboundDecision(bool Allowed, string? Tag, string? Error
 
 /// <summary>
 /// Outbound group: workspace and policy checks, one private reply per comment, then the channel adapter, then <see cref="OutboundMessageCompleted"/>.
-/// A retryable failure throws so the consumer retries with backoff (the transaction, including the private reply key, rolls back); anything else marks the message failed.
+/// When the account's rate limit refuses the send, the message waits in a timer until the bucket refills (a viral post can queue thousands);
+/// another retryable failure throws so the consumer retries with backoff (the transaction rolls back); anything else marks the message failed.
 /// </summary>
 internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMessageSender sender, IWorkspaceQueries workspaces, IClock clock, ILogger<OutboundSendHandler> logger)
     : IdempotentHandler<OutboundMessageRequested, ConversationsDbContext>(db)
 {
     public const int MaxAttempts = 6;
+    public const int MaxDeferrals = 100;
+    public const string DeferredTimerKind = "conversations.outbound-deferred";
 
     protected override async Task HandleOnceAsync(OutboundMessageRequested message, EventEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -216,10 +217,11 @@ internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMes
 
         if (stored.ReplyToCommentId is { } commentId)
         {
+            // A deferred private reply finds its own key: the claim belongs to this message, not to another reply.
             var claimed = await Db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO conversations.private_reply_keys (channel_account_id, comment_id, message_id, created_at) VALUES ({conversation.ChannelAccountId}, {commentId}, {stored.Id}, {now}) ON CONFLICT DO NOTHING",
                 cancellationToken);
-            if (claimed == 0)
+            if (claimed == 0 && !await Db.PrivateReplyKeys.AnyAsync(k => k.ChannelAccountId == conversation.ChannelAccountId && k.CommentId == commentId && k.MessageId == stored.Id, cancellationToken))
             {
                 Fail(stored, conversation, "comment.private_reply_exists");
                 return;
@@ -242,6 +244,14 @@ internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMes
             return;
         }
 
+        if (result.IsRateLimited && message.Deferrals < MaxDeferrals)
+        {
+            // Spread the waiting messages over the next second so they do not all hit the refilled bucket at once.
+            var wait = (result.RetryAfter ?? TimeSpan.FromSeconds(1)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000));
+            TimerScheduler.Schedule(Db, DeferredTimerKind, now + wait, message with { Deferrals = message.Deferrals + 1 }, $"outbound:{stored.Id:N}:{message.Deferrals + 1}", conversation.WorkspaceId);
+            return;
+        }
+
         if (result.Retryable)
         {
             throw new OutboundRetryException(result.ErrorCode ?? "channel.transient");
@@ -255,6 +265,21 @@ internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMes
     {
         stored.MarkFailed(code);
         Db.Publish(new OutboundMessageCompleted(conversation.Id, stored.Id, MessageStatuses.Failed, null, code), conversation.Id.ToString());
+    }
+}
+
+/// <summary>Outbound group: a rate-limited send whose wait is over goes back to the outbound topic.</summary>
+internal sealed class OutboundDeferredHandler(ConversationsDbContext db) : IdempotentHandler<TimerFired, ConversationsDbContext>(db)
+{
+    protected override Task HandleOnceAsync(TimerFired message, EventEnvelope envelope, CancellationToken cancellationToken)
+    {
+        if (message.Kind == OutboundSendHandler.DeferredTimerKind)
+        {
+            var request = message.Payload.Deserialize<OutboundMessageRequested>(EnvelopeJson.Options)!;
+            Db.Publish(request, request.ConversationId.ToString());
+        }
+
+        return Task.CompletedTask;
     }
 }
 

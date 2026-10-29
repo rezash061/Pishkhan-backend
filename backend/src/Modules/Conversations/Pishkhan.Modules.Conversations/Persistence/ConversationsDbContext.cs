@@ -1,4 +1,7 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Pishkhan.Contracts;
 using Microsoft.EntityFrameworkCore.Design;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
@@ -36,7 +39,16 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.DisplayName).HasMaxLength(200);
             b.Property(x => x.Username).HasMaxLength(100);
+            b.Property(x => x.Tags).HasDefaultValueSql("'{}'");
+            b.Property(x => x.Fields).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").HasConversion(
+                v => JsonSerializer.Serialize(v, EnvelopeJson.Options),
+                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, EnvelopeJson.Options) ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                new ValueComparer<Dictionary<string, string>>(
+                    (a, b) => a!.Count == b!.Count && !a.Except(b).Any(),
+                    v => v.Aggregate(0, (h, kv) => HashCode.Combine(h, kv.Key.GetHashCode(StringComparison.Ordinal), kv.Value.GetHashCode(StringComparison.Ordinal))),
+                    v => new Dictionary<string, string>(v, StringComparer.Ordinal)));
             b.HasIndex(x => x.WorkspaceId);
+            b.HasIndex(x => x.Tags).HasMethod("gin");
             b.Ignore(x => x.DomainEvents);
         });
 

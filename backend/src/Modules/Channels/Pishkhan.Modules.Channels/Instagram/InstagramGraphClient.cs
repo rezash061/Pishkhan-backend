@@ -127,21 +127,54 @@ public sealed class InstagramGraphClient(HttpClient http, IOptions<InstagramOpti
         using var response = await http.SendAsync(request, ct);
         var body = await ReadAsync(response, ct);
         var items = body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
-            ? data.EnumerateArray().Select(m => new InstagramMedia(
-                ReadId(m, "id"),
-                Str(m, "caption"),
-                Str(m, "media_type") ?? "UNKNOWN",
-                Str(m, "media_url"),
-                Str(m, "thumbnail_url"),
-                Str(m, "permalink"),
-                Str(m, "timestamp") is { } ts && DateTimeOffset.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null)).ToList()
+            ? data.EnumerateArray().Select(ReadMedia).ToList()
             : [];
-
-        // A next cursor without a "next" link means this was the last page.
-        var next = body.TryGetProperty("paging", out var paging) && paging.TryGetProperty("next", out _)
-            && paging.TryGetProperty("cursors", out var cursors) && cursors.TryGetProperty("after", out var a) ? a.GetString() : null;
-        return new InstagramMediaPage(items, next);
+        return new InstagramMediaPage(items, NextCursor(body));
     }
+
+    public async Task<InstagramMedia> GetMediaAsync(string token, string mediaId, CancellationToken ct)
+    {
+        using var request = Authorized(HttpMethod.Get, $"{O.GraphBaseUrl}/{O.ApiVersion}/{Uri.EscapeDataString(mediaId)}?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp", token);
+        using var response = await http.SendAsync(request, ct);
+        return ReadMedia(await ReadAsync(response, ct));
+    }
+
+    /// <summary>One page of a media's top-level comments.</summary>
+    public async Task<InstagramCommentPage> ListCommentsAsync(string token, string mediaId, string? after, CancellationToken ct)
+    {
+        var url = $"{O.GraphBaseUrl}/{O.ApiVersion}/{Uri.EscapeDataString(mediaId)}/comments?fields=id,text,timestamp,username,from,parent_id&limit=50"
+            + (string.IsNullOrEmpty(after) ? string.Empty : $"&after={Uri.EscapeDataString(after)}");
+        using var request = Authorized(HttpMethod.Get, url, token);
+        using var response = await http.SendAsync(request, ct);
+        var body = await ReadAsync(response, ct);
+        var items = body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
+            ? data.EnumerateArray().Select(c => new InstagramComment(
+                ReadId(c, "id"),
+                Str(c, "text"),
+                c.TryGetProperty("from", out var from) && from.ValueKind == JsonValueKind.Object && from.TryGetProperty("id", out _) ? ReadId(from, "id") : null,
+                Str(c, "username") ?? (c.TryGetProperty("from", out var f) && f.ValueKind == JsonValueKind.Object ? Str(f, "username") : null),
+                Str(c, "parent_id"),
+                Timestamp(c))).ToList()
+            : [];
+        return new InstagramCommentPage(items, NextCursor(body));
+    }
+
+    private static InstagramMedia ReadMedia(JsonElement m) => new(
+        ReadId(m, "id"),
+        Str(m, "caption"),
+        Str(m, "media_type") ?? "UNKNOWN",
+        Str(m, "media_url"),
+        Str(m, "thumbnail_url"),
+        Str(m, "permalink"),
+        Timestamp(m));
+
+    private static DateTimeOffset? Timestamp(JsonElement element) =>
+        Str(element, "timestamp") is { } ts && DateTimeOffset.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null;
+
+    // A next cursor without a "next" link means this was the last page.
+    private static string? NextCursor(JsonElement body) =>
+        body.TryGetProperty("paging", out var paging) && paging.TryGetProperty("next", out _)
+            && paging.TryGetProperty("cursors", out var cursors) && cursors.TryGetProperty("after", out var a) ? a.GetString() : null;
 
     private static string? Str(JsonElement element, string name) =>
         element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
@@ -199,6 +232,10 @@ public sealed record InstagramUserProfile(string UserId, string? Name, string? U
 public sealed record InstagramMedia(string Id, string? Caption, string MediaType, string? MediaUrl, string? ThumbnailUrl, string? Permalink, DateTimeOffset? Timestamp);
 
 public sealed record InstagramMediaPage(IReadOnlyList<InstagramMedia> Items, string? NextCursor);
+
+public sealed record InstagramComment(string Id, string? Text, string? FromId, string? Username, string? ParentId, DateTimeOffset? Timestamp);
+
+public sealed record InstagramCommentPage(IReadOnlyList<InstagramComment> Items, string? NextCursor);
 
 /// <summary>A Graph API error. <see cref="Kind"/> drives retry and status decisions.</summary>
 public sealed class InstagramApiException(HttpStatusCode status, int? code, int? subcode, string? message)

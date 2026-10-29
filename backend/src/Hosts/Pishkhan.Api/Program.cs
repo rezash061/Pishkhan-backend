@@ -3,6 +3,7 @@ using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Sms;
+using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Files;
@@ -28,6 +29,7 @@ services
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)
     .AddConversationsRealtime()
+    .AddAutomationModule(configuration)
     .DecorateHandlers();
 services.AddPishkhanRealtime();
 services.AddPishkhanMessaging(configuration, "api", m => m
@@ -43,6 +45,7 @@ app.MapTenancyEndpoints();
 app.MapFilesEndpoints();
 app.MapChannelsEndpoints();
 app.MapConversationsEndpoints();
+app.MapAutomationEndpoints();
 
 if (app.Environment.IsDevelopment())
 {

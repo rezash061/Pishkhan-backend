@@ -19,6 +19,58 @@ public sealed class Contact : AggregateRoot<Guid>, ITenantOwned
 
     public string? Username { get; private set; }
 
+    public const int MaxTags = 50;
+    public const int MaxFields = 50;
+
+    /// <summary>Labels set by the team or by automation (CRM segments use them from BE-1.7 on).</summary>
+    public List<string> Tags { get; private set; } = [];
+
+    /// <summary>Custom fields (answers collected by flows, values set by rules).</summary>
+    public Dictionary<string, string> Fields { get; private set; } = new(StringComparer.Ordinal);
+
+    public bool AddTag(string tag)
+    {
+        if (Tags.Contains(tag, StringComparer.Ordinal) || Tags.Count >= MaxTags)
+        {
+            return false;
+        }
+
+        Tags = [.. Tags, tag];
+        return true;
+    }
+
+    public bool RemoveTag(string tag)
+    {
+        if (!Tags.Contains(tag, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        Tags = [.. Tags.Where(t => t != tag)];
+        return true;
+    }
+
+    public bool SetField(string key, string value)
+    {
+        if (!Fields.ContainsKey(key) && Fields.Count >= MaxFields)
+        {
+            return false;
+        }
+
+        // A new instance, so EF sees the jsonb column change.
+        Fields = new Dictionary<string, string>(Fields, StringComparer.Ordinal) { [key] = value };
+        return true;
+    }
+
+    /// <summary>Fills in the username the first time a channel tells us (a comment carries it; a DM does not).</summary>
+    public void LearnUsername(string? username)
+    {
+        if (Username is null && !string.IsNullOrWhiteSpace(username))
+        {
+            Username = username.Length <= 100 ? username : username[..100];
+        }
+    }
+
     public static Contact Create(Guid workspaceId, string? displayName, string? username, DateTimeOffset now) => new()
     {
         Id = Uuid.NewV7(now),
@@ -215,6 +267,9 @@ public sealed class Message : ITenantOwned
 
     public string? HandledBy { get; init; }
 
+    /// <summary>The automation rule that produced this message (outbound) or answered it (inbound).</summary>
+    public Guid? AutomationRuleId { get; init; }
+
     public Guid? SentBy { get; init; }
 
     public DateTimeOffset? SentAt { get; private set; }
@@ -237,7 +292,7 @@ public sealed class Message : ITenantOwned
         QueueOutbound(workspaceId, conversationId, new OutboundContent(text), handledBy, sentBy, now);
 
     /// <summary>Queues an outbound message. <see cref="Text"/> holds the text or a short summary for the inbox list and search.</summary>
-    public static Message QueueOutbound(Guid workspaceId, Guid conversationId, OutboundContent content, string handledBy, Guid? sentBy, DateTimeOffset now, string? replyToCommentId = null)
+    public static Message QueueOutbound(Guid workspaceId, Guid conversationId, OutboundContent content, string handledBy, Guid? sentBy, DateTimeOffset now, string? replyToCommentId = null, Guid? ruleId = null)
     {
         var plain = content is { Attachment: null, QuickReplies: null or { Count: 0 }, Buttons: null or { Count: 0 }, Cards: null or { Count: 0 } };
         return new Message
@@ -254,6 +309,7 @@ public sealed class Message : ITenantOwned
             HandledBy = handledBy,
             SentBy = sentBy,
             ReplyToCommentId = replyToCommentId,
+            AutomationRuleId = ruleId,
         };
     }
 

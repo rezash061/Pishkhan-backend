@@ -170,7 +170,7 @@ public sealed record RateBucketValues(int Capacity, double RefillPerSecond);
 public sealed class DataDeletionRequest
 {
     /// <summary>Modules that hold customer data and must confirm deletion. Grows with CRM, Orders and Payments.</summary>
-    public static readonly IReadOnlyList<string> RequiredModules = ["conversations"];
+    public static readonly IReadOnlyList<string> RequiredModules = ["conversations", "automation"];
 
     public Guid Id { get; set; }
 
