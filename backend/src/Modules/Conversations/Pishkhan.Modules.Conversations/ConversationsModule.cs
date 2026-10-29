@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Channels.Contracts;
@@ -19,6 +20,7 @@ public static class ConversationsModule
     {
         services.AddModuleDbContext<ConversationsDbContext>(ConversationsDbContext.SchemaName);
         services.AddOptions<SpikeOptions>().Bind(configuration.GetSection(SpikeOptions.Section));
+        services.AddScoped<IConversationQueries, ConversationQueries>();
         return services;
     }
 
@@ -29,12 +31,15 @@ public static class ConversationsModule
     public static MessagingBuilder AddConversationsPlatformConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<DataDeletionRequested, ConversationsDataDeletionHandler>("platform");
 
-    public static MessagingBuilder AddConversationsEngineConsumers(this MessagingBuilder messaging) =>
-        messaging.AddConsumer<InboundMessageReceived, EchoReplyHandler>("engine");
+    /// <summary>Engine group: applies automation decisions; the M0 echo replies stay behind <c>Spike:EchoReplies</c>.</summary>
+    public static MessagingBuilder AddConversationsEngineConsumers(this MessagingBuilder messaging) => messaging
+        .AddConsumer<InboundMessageReceived, EchoReplyHandler>("engine")
+        .AddConsumer<ConversationActionsRequested, ConversationActionsHandler>("engine");
 
-    public static MessagingBuilder AddConversationsOutboundConsumers(this MessagingBuilder messaging) =>
-        messaging.AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
-            "outbound", new RetryPolicy(OutboundSendHandler.MaxAttempts, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(60)));
+    public static MessagingBuilder AddConversationsOutboundConsumers(this MessagingBuilder messaging) => messaging
+        .AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
+            "outbound", new RetryPolicy(OutboundSendHandler.MaxAttempts, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(60)))
+        .AddConsumer<TimerFired, OutboundDeferredHandler>("outbound");
 
     /// <summary>Api host: SignalR inbox (call after <c>AddPishkhanRealtime</c>).</summary>
     public static IServiceCollection AddConversationsRealtime(this IServiceCollection services)

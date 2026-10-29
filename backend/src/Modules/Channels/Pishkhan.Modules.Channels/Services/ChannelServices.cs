@@ -34,6 +34,12 @@ internal sealed class ChannelDirectory(ChannelsDbContext db) : IChannelDirectory
             .Where(a => a.Kind == kind && a.ExternalId == externalId && a.Status != ChannelStatuses.Disconnected)
             .Select(a => new ChannelAccountInfo(a.Id, a.WorkspaceId, a.Kind, a.ExternalId, a.Username, a.Status))
             .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<ChannelAccountInfo?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Accounts.AsNoTracking()
+            .Where(a => a.Id == id)
+            .Select(a => new ChannelAccountInfo(a.Id, a.WorkspaceId, a.Kind, a.ExternalId, a.Username, a.Status))
+            .FirstOrDefaultAsync(cancellationToken);
 }
 
 /// <summary>Resolves a rate profile: an admin override in <c>channels.rate_profiles</c>, else configuration. Overrides are cached for a minute.</summary>
@@ -99,7 +105,7 @@ internal sealed class InstagramAccountGateway(
         var decision = await buckets.TryTakeAsync($"ig:{account.Id:N}:{family}", bucket.Capacity, bucket.RefillPerSecond);
         if (!decision.Allowed)
         {
-            return GatewayResult<T>.Failed("channel.rate_limited", retryable: true, decision.RetryAfter);
+            return GatewayResult<T>.Failed(ChannelErrors.RateLimited, retryable: true, decision.RetryAfter);
         }
 
         try
@@ -144,7 +150,7 @@ internal sealed class ChannelMessageSender(InstagramAccountGateway gateway, Inst
         var family = recipient.CommentId is null ? RateFamilies.Send : RateFamilies.PrivateReply;
         var body = InstagramMessageBuilder.Build(recipient, content);
         var result = await gateway.CallAsync(channelAccountId, family, token => instagram.SendAsync(token, body, cancellationToken), cancellationToken);
-        return result.Success ? SendResult.Sent(result.Value) : SendResult.Failed(result.ErrorCode!, result.Retryable);
+        return result.Success ? SendResult.Sent(result.Value) : SendResult.Failed(result.ErrorCode!, result.Retryable, result.RetryAfter);
     }
 
     public async Task<SendResult> ReplyToCommentAsync(Guid channelAccountId, string commentId, string text, CancellationToken cancellationToken)
@@ -155,7 +161,7 @@ internal sealed class ChannelMessageSender(InstagramAccountGateway gateway, Inst
         }
 
         var result = await gateway.CallAsync(channelAccountId, RateFamilies.CommentReply, token => instagram.ReplyToCommentAsync(token, commentId, text, cancellationToken), cancellationToken);
-        return result.Success ? SendResult.Sent(result.Value) : SendResult.Failed(result.ErrorCode!, result.Retryable);
+        return result.Success ? SendResult.Sent(result.Value) : SendResult.Failed(result.ErrorCode!, result.Retryable, result.RetryAfter);
     }
 }
 
@@ -173,4 +179,50 @@ internal sealed class ChannelProfileReader(InstagramAccountGateway gateway, Inst
     }
 
     internal static Uri? ToUri(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) ? uri : null;
+}
+
+internal sealed class ChannelMediaReader(InstagramAccountGateway gateway, InstagramGraphClient instagram) : IChannelMediaReader
+{
+    public async Task<ChannelReadResult<ChannelMedia>> GetMediaAsync(Guid channelAccountId, string mediaId, CancellationToken cancellationToken)
+    {
+        var result = await gateway.CallAsync(channelAccountId, RateFamilies.Read, token => instagram.GetMediaAsync(token, mediaId, cancellationToken), cancellationToken);
+        if (result.Value is not { } m)
+        {
+            return ChannelReadResult<ChannelMedia>.Failed(result.ErrorCode ?? "channel.unavailable", result.Retryable);
+        }
+
+        return ChannelReadResult<ChannelMedia>.Ok(new ChannelMedia(
+            m.Id, m.Caption, m.MediaType, ChannelProfileReader.ToUri(m.MediaUrl), ChannelProfileReader.ToUri(m.ThumbnailUrl), ChannelProfileReader.ToUri(m.Permalink), m.Timestamp));
+    }
+
+    public async Task<ChannelReadResult<ChannelCommentPage>> ListCommentsAsync(Guid channelAccountId, string mediaId, string? after, CancellationToken cancellationToken)
+    {
+        var result = await gateway.CallAsync(channelAccountId, RateFamilies.Read, token => instagram.ListCommentsAsync(token, mediaId, after, cancellationToken), cancellationToken);
+        if (result.Value is not { } page)
+        {
+            return ChannelReadResult<ChannelCommentPage>.Failed(result.ErrorCode ?? "channel.unavailable", result.Retryable);
+        }
+
+        return ChannelReadResult<ChannelCommentPage>.Ok(new ChannelCommentPage(
+            [.. page.Items.Select(c => new ChannelComment(c.Id, c.Text, c.FromId, c.Username, c.ParentId, c.Timestamp))], page.NextCursor));
+    }
+}
+
+/// <summary>
+/// Spacing that keeps a stream of calls inside the account's token buckets: one refill interval plus 10% headroom, so other traffic
+/// and clock skew between replicas do not drain the bucket.
+/// </summary>
+internal sealed class ChannelPacingProvider(ChannelsDbContext db, RateProfileProvider profiles) : IChannelPacing
+{
+    private const double Headroom = 1.1;
+
+    public async Task<ChannelPacing> GetAsync(Guid channelAccountId, CancellationToken cancellationToken)
+    {
+        using var system = db.Tenant.BeginSystemScope();
+        var name = await db.Accounts.AsNoTracking().Where(a => a.Id == channelAccountId).Select(a => a.RateProfile).FirstOrDefaultAsync(cancellationToken);
+        var profile = await profiles.GetAsync(name ?? RateProfile.Default, cancellationToken);
+        return new ChannelPacing(Interval(profile.Send), Interval(profile.PrivateReply), Interval(profile.CommentReply));
+    }
+
+    private static TimeSpan Interval(RateBucket bucket) => TimeSpan.FromSeconds(Headroom / Math.Max(bucket.RefillPerSecond, 0.001));
 }

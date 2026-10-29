@@ -12,6 +12,9 @@ using Pishkhan.Infrastructure.Hosting;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Infrastructure.Caching;
+using Pishkhan.Infrastructure.Timers;
+using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
@@ -33,12 +36,47 @@ internal sealed class FakeInstagram : HttpMessageHandler
 {
     public static ConcurrentQueue<string> Sent { get; } = new();
 
+    /// <summary>Every send with the time it reached "Instagram", for pacing checks.</summary>
+    public static ConcurrentQueue<(DateTimeOffset At, string Body)> SentLog { get; } = new();
+
+    /// <summary>Public comment replies: (comment id, text).</summary>
+    public static ConcurrentQueue<(string CommentId, string Text)> PublicReplies { get; } = new();
+
+    /// <summary>Existing comments per media id, served newest first by <c>GET /{media}/comments</c> in pages of 50.</summary>
+    public static ConcurrentDictionary<string, IReadOnlyList<(string Id, string From, string Text, DateTimeOffset At)>> Comments { get; } = new();
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/me/messages", StringComparison.Ordinal))
+        var path = request.RequestUri!.AbsolutePath;
+        if (request.Method == HttpMethod.Post && path.EndsWith("/me/messages", StringComparison.Ordinal))
         {
-            Sent.Enqueue(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var sent = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Sent.Enqueue(sent);
+            SentLog.Enqueue((DateTimeOffset.UtcNow, sent));
             return Json(HttpStatusCode.OK, $$"""{"recipient_id":"x","message_id":"mid.{{Guid.NewGuid():N}}"}""");
+        }
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (request.Method == HttpMethod.Post && segments is [_, var commentId, "replies"])
+        {
+            var form = HttpUtility.ParseQueryString(await request.Content!.ReadAsStringAsync(cancellationToken));
+            PublicReplies.Enqueue((commentId, form["message"] ?? string.Empty));
+            return Json(HttpStatusCode.OK, $$"""{"id":"reply_{{Guid.NewGuid():N}}"}""");
+        }
+
+        if (request.Method == HttpMethod.Get && segments is [_, var mediaId, "comments"])
+        {
+            var all = Comments.GetValueOrDefault(mediaId) ?? [];
+            var after = int.TryParse(HttpUtility.ParseQueryString(request.RequestUri.Query)["after"], out var a) ? a : 0;
+            var page = all.Skip(after).Take(50).Select(c => $$$"""{"id":"{{{c.Id}}}","text":"{{{c.Text}}}","timestamp":"{{{c.At:yyyy-MM-ddTHH:mm:ssK}}}","from":{"id":"{{{c.From}}}","username":"u{{{c.From}}}"}}""");
+            var next = after + 50 < all.Count ? $$""","paging":{"cursors":{"after":"{{after + 50}}"},"next":"https://graph/next"}""" : string.Empty;
+            return Json(HttpStatusCode.OK, $$$"""{"data":[{{{string.Join(',', page)}}}]{{{next}}}}""");
+        }
+
+        if (request.Method == HttpMethod.Get && segments is [_, var id] && id != "me" && (request.RequestUri.Query.Contains("media_type", StringComparison.Ordinal)))
+        {
+            // Every post is "just published", so next-post rules bind to it.
+            return Json(HttpStatusCode.OK, $$"""{"id":"{{id}}","media_type":"IMAGE","timestamp":"{{DateTimeOffset.UtcNow:yyyy-MM-ddTHH:mm:ssK}}"}""");
         }
 
         var token = HttpUtility.ParseQueryString(request.RequestUri!.Query)["access_token"] ?? string.Empty;
@@ -55,7 +93,7 @@ internal sealed class FakeInstagram : HttpMessageHandler
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 }
 
-/// <summary>A worker-like host: Channels and Conversations modules, the platform consumers and the outbox relay, Instagram faked.</summary>
+/// <summary>A worker-like host: Channels, Conversations and Automation modules, their consumers, the outbox relay and timers, Instagram faked.</summary>
 public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
 {
     public IHost Host { get; private set; } = null!;
@@ -63,17 +101,30 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
+        // A separate source: values set through the indexer are lost when AddPishkhanPlatform inserts its json sources.
         builder.Configuration.AddInMemoryCollection(infra.Settings);
-        builder.Configuration["Outbox:IdleDelay"] = "00:00:00.100";
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Outbox:IdleDelay"] = "00:00:00.100",
+            ["Spike:EchoReplies"] = "false",
+            ["Timers:IdleDelay"] = "00:00:00.100",
+        });
         builder.AddPishkhanPlatform("it-channels");
-        builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration);
+        builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
+            .AddAutomationModule(builder.Configuration);
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
+            .AddCacheInvalidation()
             .AddConversationsIngestConsumers()
+            .AddConversationsEngineConsumers()
             .AddConversationsOutboundConsumers()
             .AddConversationsPlatformConsumers()
-            .AddChannelsPlatformConsumers());
+            .AddChannelsPlatformConsumers()
+            .AddAutomationEngineConsumers()
+            .AddAutomationOutboundConsumers()
+            .AddAutomationPlatformConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
+        builder.Services.AddHostedService<TimerDispatcher>();
         Host = builder.Build();
         await Host.StartAsync();
     }
@@ -206,7 +257,7 @@ public sealed class ChannelsTests(ChannelsHost channels)
             done = await scope.ServiceProvider.GetRequiredService<ChannelsDbContext>().DataDeletionRequests.AsNoTracking().SingleAsync(r => r.Id == requestId, Ct);
         }
 
-        done.CompletedModules.ShouldBe(["conversations"]);
+        done.CompletedModules.ShouldBe(["conversations", "automation"], ignoreOrder: true);
         done.ItemsDeleted.ShouldBe(5); // key, message, conversation, identity, contact
 
         await using (var scope = Services.CreateAsyncScope())

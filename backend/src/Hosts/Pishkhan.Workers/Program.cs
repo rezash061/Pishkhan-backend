@@ -4,6 +4,7 @@ using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Agent;
+using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Tenancy;
@@ -24,6 +25,7 @@ services
     .AddTenancyModule(configuration)
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)
+    .AddAutomationModule(configuration)
     .AddAgentModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
@@ -34,6 +36,9 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddConversationsOutboundConsumers()
     .AddConversationsPlatformConsumers()
     .AddChannelsPlatformConsumers()
+    .AddAutomationEngineConsumers()
+    .AddAutomationOutboundConsumers()
+    .AddAutomationPlatformConsumers()
     .AddFilesConsumers());
 
 if (groups.IsEnabled("platform"))

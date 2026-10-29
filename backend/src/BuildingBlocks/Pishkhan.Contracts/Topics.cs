@@ -23,6 +23,11 @@ public static class Topics
     public const string OutboundMessageRequested = "conversations.outbound-message-requested.v1";
     public const string OutboundMessageCompleted = "conversations.outbound-message-completed.v1";
     public const string HandoffRequested = "conversations.handoff-requested.v1";
+    public const string ConversationActionsRequested = "conversations.actions-requested.v1";
+    public const string RulesChanged = "automation.rules-changed.v1";
+    public const string FlowPublished = "automation.flow-published.v1";
+    public const string CommentReplyRequested = "automation.comment-reply-requested.v1";
+    public const string BacklogPageRequested = "automation.backlog-page-requested.v1";
     public const string FileScanRequested = "files.scan-requested.v1";
     public const string FileScanCompleted = "files.scan-completed.v1";
     public const string KnowledgeSourceChanged = "knowledge.source-changed.v1";
@@ -59,6 +64,11 @@ public static class Topics
         new(OutboundMessageRequested, 48, Week, "conversation id"),
         new(OutboundMessageCompleted, 48, Week, "conversation id"),
         new(HandoffRequested, 12, Week, "conversation id"),
+        new(ConversationActionsRequested, 48, Week, "channel account and customer"),
+        new(RulesChanged, 6, Week, "workspace id"),
+        new(FlowPublished, 6, Week, "flow id"),
+        new(CommentReplyRequested, 24, Week, "instagram media id"),
+        new(BacklogPageRequested, 6, Week, "backlog run id"),
         new(FileScanRequested, 12, Week, "file id"),
         new(FileScanCompleted, 12, Week, "file id"),
         new(KnowledgeSourceChanged, 12, Week, "workspace id"),

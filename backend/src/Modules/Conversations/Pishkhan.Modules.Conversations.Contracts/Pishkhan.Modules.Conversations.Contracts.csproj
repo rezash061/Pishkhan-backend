@@ -3,5 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.SharedKernel\Pishkhan.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Contracts\Pishkhan.Contracts.csproj" />
+    <ProjectReference Include="..\..\Channels\Pishkhan.Modules.Channels.Contracts\Pishkhan.Modules.Channels.Contracts.csproj" />
   </ItemGroup>
 </Project>

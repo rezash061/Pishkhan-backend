@@ -92,9 +92,11 @@ public class ChannelStatusMachineTests
 
         request.ModuleCompleted("conversations", 7, Now).ShouldBeTrue();
         request.ModuleCompleted("conversations", 7, Now).ShouldBeFalse();
+        request.Status.ShouldBe(DataDeletionStatuses.Processing);
 
+        request.ModuleCompleted("automation", 2, Now).ShouldBeTrue();
         request.Status.ShouldBe(DataDeletionStatuses.Completed);
-        request.ItemsDeleted.ShouldBe(7);
+        request.ItemsDeleted.ShouldBe(9);
     }
 }
 

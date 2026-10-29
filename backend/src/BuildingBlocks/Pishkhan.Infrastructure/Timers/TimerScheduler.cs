@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Dapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -41,8 +42,11 @@ public static class TimerScheduler
 /// Fires due timers: locks a batch with <c>FOR UPDATE SKIP LOCKED</c> (safe with many replicas), writes a <see cref="TimerFired"/>
 /// outbox row for each and marks them fired, in one transaction. Handlers re-check their conditions at fire time.
 /// </summary>
-public sealed class TimerDispatcher(NpgsqlDataSource dataSource, ILogger<TimerDispatcher> logger) : BackgroundService
+public sealed class TimerDispatcher(NpgsqlDataSource dataSource, IConfiguration configuration, ILogger<TimerDispatcher> logger) : BackgroundService
 {
+    /// <summary>Pause when nothing is due (<c>Timers:IdleDelay</c>). Bounds how late a timer fires; paced comment replies are about a second apart.</summary>
+    private readonly TimeSpan _idleDelay = configuration.GetValue("Timers:IdleDelay", TimeSpan.FromMilliseconds(500));
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -52,7 +56,7 @@ public sealed class TimerDispatcher(NpgsqlDataSource dataSource, ILogger<TimerDi
                 var fired = await DispatchDueAsync(500, stoppingToken);
                 if (fired == 0)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                    await Task.Delay(_idleDelay, stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

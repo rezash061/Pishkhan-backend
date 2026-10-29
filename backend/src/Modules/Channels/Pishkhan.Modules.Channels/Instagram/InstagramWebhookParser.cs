@@ -10,6 +10,52 @@ namespace Pishkhan.Modules.Channels.Instagram;
 /// </summary>
 public sealed class InstagramWebhookParser : IChannelWebhookParser
 {
+    // Attachment types of a post or reel the customer shared into the conversation.
+    private static readonly HashSet<string> SharedTypes = new(StringComparer.Ordinal) { "share", "ig_post", "ig_reel", "reel" };
+
+    public IReadOnlyList<InboundChannelComment> ParseInstagramComments(JsonElement entry)
+    {
+        if (!entry.TryGetProperty("changes", out var changes) || changes.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var entryTime = entry.TryGetProperty("time", out var t) && t.ValueKind == JsonValueKind.Number
+            ? DateTimeOffset.FromUnixTimeSeconds(t.GetInt64())
+            : DateTimeOffset.UtcNow;
+        var result = new List<InboundChannelComment>();
+        foreach (var change in changes.EnumerateArray())
+        {
+            var kind = String(change, "field") switch
+            {
+                "comments" => CommentKinds.Comment,
+                "live_comments" => CommentKinds.LiveComment,
+                _ => null,
+            };
+            if (kind is null || !change.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var id = String(value, "id");
+            var from = IdOf(value, "from");
+            var media = value.TryGetProperty("media", out var m) && m.ValueKind == JsonValueKind.Object ? m : default;
+            var mediaId = media.ValueKind == JsonValueKind.Object ? String(media, "id") : null;
+            if (id is null || from is null || mediaId is null)
+            {
+                continue;
+            }
+
+            var username = value.TryGetProperty("from", out var f) ? String(f, "username") : null;
+            var createdAt = String(value, "timestamp") is { } ts && long.TryParse(ts, CultureInfo.InvariantCulture, out var unix)
+                ? DateTimeOffset.FromUnixTimeSeconds(unix)
+                : entryTime;
+            result.Add(new InboundChannelComment(kind, id, mediaId, String(media, "media_product_type"), String(value, "parent_id"), from, username, String(value, "text"), createdAt));
+        }
+
+        return result;
+    }
+
     public IReadOnlyList<InboundChannelMessage> ParseInstagramEntry(JsonElement entry)
     {
         if (!entry.TryGetProperty("messaging", out var messaging) || messaging.ValueKind != JsonValueKind.Array)
@@ -67,7 +113,12 @@ public sealed class InstagramWebhookParser : IChannelWebhookParser
 
             var quickReply = message.TryGetProperty("quick_reply", out var qr) ? String(qr, "payload") : null;
             var text = String(message, "text");
-            var kind = storyId is not null ? InboundKinds.StoryReply : attachments.Count > 0 ? InboundKinds.Attachment : quickReply is not null ? InboundKinds.QuickReply : InboundKinds.Text;
+            var kind = storyId is not null ? InboundKinds.StoryReply
+                : attachments.Any(a => a.Type == "story_mention") ? InboundKinds.StoryMention
+                : attachments.Any(a => SharedTypes.Contains(a.Type)) ? InboundKinds.Share
+                : attachments.Count > 0 ? InboundKinds.Attachment
+                : quickReply is not null ? InboundKinds.QuickReply
+                : InboundKinds.Text;
             return new InboundChannelMessage(sender, recipient, mid, sentAt, kind, text, attachments, storyId, quickReply, Bool(message, "is_echo"));
         }
 

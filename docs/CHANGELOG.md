@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.3 Automation engine, 2026-10-29)
+- New Automation module (`automation` schema): rules, flows (draft and published versions), flow runs, comment records, backlog runs, per-rule daily stats, workspace settings (AI on or off, business hours, fallback message).
+- Triggers: DM keyword (exact, contains, any-of, safe `*`/`|` patterns), comment keyword, every comment on a post, story reply, story mention, live comment, post share, new conversation (welcome), postback and quick reply payloads, outside business hours. Comment rules cover all posts, one post, or the next post (bound on its first comment).
+- Persian matching: Arabic ي/ك, Persian and Arabic-Indic digits, kashida, punctuation, emoji, and spaces versus half-spaces (ZWNJ) are all ignored when comparing keywords.
+- Actions: send message (text, quick replies, buttons, cards, media, with `{{contact.first_name|fallback}}` style variables), private reply, public reply (random from a list), start flow, add or remove tag, set field, hand off, pause AI, notify team.
+- Evaluation order per DM: waiting flow run → rules by priority (then specificity, then age) → outside-hours rule → AI reply request (`conversations.reply-requested.v1`, consumed from BE-1.4) → fallback message with a cooldown. The inbound message records `handled_by` and the rule id.
+- Flows: question (text, number, phone, choice with retries), condition (tag, field, variable, business hours), delay, message, storefront cards, action, AI hand-off, end. Validated server-side (unknown nodes, bad edges, loops without a wait); a delay that ends after the 24-hour window closed expires the run instead of sending.
+- Comments: ingest now parses `comments` and `live_comments` webhooks; each comment is processed once (`automation.comment_events`), private replies are limited to one per comment and to Meta's 7-day age, and both private and public replies are paced per channel account from its rate profile.
+- Backlog: `POST /rules/{id}/backlog-run` pages through a post's existing comments (also ones that arrived before the rule) and answers them with the same dedupe and pacing.
+- Outbound: a send refused by the account's rate limit now waits in a timer until the bucket refills, instead of failing after six retries.
+- Contacts carry tags and custom fields (until the CRM module, BE-1.7).
+- Meta data deletion also clears the customer's comment records and flow runs.
+- Load test: 2,000 comments on one post (plus 500 redelivered) got exactly 2,000 private replies, paced within the rate profile.
+- Deferred: follow-gate node and follow-up timers (BE-1.8), form-completed trigger and form submissions (BE-1.7), catalog-driven storefront cards (BE-1.6), order-status trigger and phone capture (Phase 2).
+
 ### Added (Phase 1, BE-1.5 Live inbox, 2026-10-29)
 - SignalR hub `/hubs/inbox` (realtime token only) with `JoinWorkspace` / `JoinConversation`; membership and `inbox.read` checked on every join.
 - Redis backplane on the state instance, so events reach clients on every Api replica.
