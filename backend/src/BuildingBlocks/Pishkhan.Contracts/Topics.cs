@@ -45,7 +45,7 @@ public static class Topics
 
     public static string Dlq(string consumerGroup) => consumerGroup + ".dlq";
 
-    public static readonly IReadOnlyList<string> ConsumerGroups = ["ingest", "engine", "ai", "outbound", "media", "commerce", "platform"];
+    public static readonly IReadOnlyList<string> ConsumerGroups = ["ingest", "engine", "ai", "outbound", "media", "commerce", "platform", "realtime"];
 
     public static readonly IReadOnlyList<TopicDefinition> All =
     [

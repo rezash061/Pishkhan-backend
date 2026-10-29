@@ -6,7 +6,7 @@ namespace Pishkhan.Modules.Channels.Instagram;
 
 /// <summary>
 /// Turns one webhook <c>entry</c> into normalized messages. Unknown shapes are skipped, never thrown on:
-/// Meta adds fields and event types without notice. Reads, reactions and deletions are ignored in the spike.
+/// Meta adds fields and event types without notice. Reactions and deletions are ignored for now.
 /// </summary>
 public sealed class InstagramWebhookParser : IChannelWebhookParser
 {
@@ -67,14 +67,19 @@ public sealed class InstagramWebhookParser : IChannelWebhookParser
 
             var quickReply = message.TryGetProperty("quick_reply", out var qr) ? String(qr, "payload") : null;
             var text = String(message, "text");
-            var kind = storyId is not null ? "story_reply" : attachments.Count > 0 ? "attachment" : quickReply is not null ? "quick_reply" : "text";
+            var kind = storyId is not null ? InboundKinds.StoryReply : attachments.Count > 0 ? InboundKinds.Attachment : quickReply is not null ? InboundKinds.QuickReply : InboundKinds.Text;
             return new InboundChannelMessage(sender, recipient, mid, sentAt, kind, text, attachments, storyId, quickReply, Bool(message, "is_echo"));
         }
 
         if (item.TryGetProperty("postback", out var postback) && postback.ValueKind == JsonValueKind.Object)
         {
             var mid = String(postback, "mid") ?? $"postback:{sender}:{sentAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture)}";
-            return new InboundChannelMessage(sender, recipient, mid, sentAt, "postback", String(postback, "title"), [], null, String(postback, "payload"), false);
+            return new InboundChannelMessage(sender, recipient, mid, sentAt, InboundKinds.Postback, String(postback, "title"), [], null, String(postback, "payload"), false);
+        }
+
+        if (item.TryGetProperty("read", out var read) && read.ValueKind == JsonValueKind.Object && String(read, "mid") is { } readMid)
+        {
+            return new InboundChannelMessage(sender, recipient, readMid, sentAt, InboundKinds.Read, null, [], null, null, false);
         }
 
         return null;

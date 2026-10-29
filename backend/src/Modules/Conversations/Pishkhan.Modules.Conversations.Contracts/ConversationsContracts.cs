@@ -8,6 +8,8 @@ public static class ConversationStatuses
     public const string Pending = "pending";
     public const string HandedOff = "handed_off";
     public const string Closed = "closed";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Open, Pending, HandedOff, Closed };
 }
 
 public static class MessageDirections
@@ -21,6 +23,7 @@ public static class MessageStatuses
     public const string Received = "received";
     public const string Queued = "queued";
     public const string Sent = "sent";
+    public const string Read = "read";
     public const string Failed = "failed";
 }
 
@@ -51,3 +54,11 @@ public sealed record OutboundMessageRequested(Guid ConversationId, Guid MessageI
 
 [IntegrationEvent(Topics.OutboundMessageCompleted)]
 public sealed record OutboundMessageCompleted(Guid ConversationId, Guid MessageId, string Status, string? ExternalId, string? ErrorCode) : IIntegrationEvent;
+
+/// <summary>The customer read our messages up to and including <see cref="UpToMessageId"/> (same topic as completions, keyed by conversation).</summary>
+[IntegrationEvent(Topics.OutboundMessageCompleted, Type = "conversations.messages-read")]
+public sealed record MessagesRead(Guid ConversationId, Guid UpToMessageId, DateTimeOffset ReadAt, int Count) : IIntegrationEvent;
+
+/// <summary>A conversation needs a person: the AI or a rule gave up, or a team member handed it off. Notifications and realtime consume it.</summary>
+[IntegrationEvent(Topics.HandoffRequested)]
+public sealed record HandoffRequested(Guid ConversationId, string Reason, Guid? RequestedBy, string? SuggestedReply) : IIntegrationEvent;

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Web;
@@ -20,14 +21,26 @@ using Pishkhan.Modules.Channels.Services;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Tenancy;
 
 namespace Pishkhan.IntegrationTests;
 
-/// <summary>Answers Instagram token refreshes by the token in the query string: tok-ok refreshes, tok-revoked is code 190, tok-down is a 500.</summary>
+/// <summary>
+/// Fake Graph API. Sends (<c>POST /me/messages</c>) succeed and are recorded; token refreshes answer by the token in the query string:
+/// tok-ok refreshes, tok-revoked is code 190, tok-down is a 500.
+/// </summary>
 internal sealed class FakeInstagram : HttpMessageHandler
 {
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    public static ConcurrentQueue<string> Sent { get; } = new();
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/me/messages", StringComparison.Ordinal))
+        {
+            Sent.Enqueue(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return Json(HttpStatusCode.OK, $$"""{"recipient_id":"x","message_id":"mid.{{Guid.NewGuid():N}}"}""");
+        }
+
         var token = HttpUtility.ParseQueryString(request.RequestUri!.Query)["access_token"] ?? string.Empty;
         var (status, body) = token switch
         {
@@ -35,8 +48,11 @@ internal sealed class FakeInstagram : HttpMessageHandler
             _ when token.StartsWith("tok-revoked", StringComparison.Ordinal) => (HttpStatusCode.BadRequest, """{"error":{"message":"Error validating access token","type":"OAuthException","code":190}}"""),
             _ => (HttpStatusCode.InternalServerError, """{"error":{"message":"Please retry","code":2}}"""),
         };
-        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+        return Json(status, body);
     }
+
+    private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
+        new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 }
 
 /// <summary>A worker-like host: Channels and Conversations modules, the platform consumers and the outbox relay, Instagram faked.</summary>
@@ -50,9 +66,11 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         builder.Configuration.AddInMemoryCollection(infra.Settings);
         builder.Configuration["Outbox:IdleDelay"] = "00:00:00.100";
         builder.AddPishkhanPlatform("it-channels");
-        builder.Services.AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration);
+        builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration);
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
+            .AddConversationsIngestConsumers()
+            .AddConversationsOutboundConsumers()
             .AddConversationsPlatformConsumers()
             .AddChannelsPlatformConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
@@ -67,7 +85,14 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
     }
 }
 
-public sealed class ChannelsTests(ChannelsHost channels) : IClassFixture<ChannelsHost>
+[CollectionDefinition(Name)]
+public sealed class WorkersCollection : ICollectionFixture<ChannelsHost>
+{
+    public const string Name = "workers";
+}
+
+[Collection(WorkersCollection.Name)]
+public sealed class ChannelsTests(ChannelsHost channels)
 {
     private IServiceProvider Services => channels.Host.Services;
 

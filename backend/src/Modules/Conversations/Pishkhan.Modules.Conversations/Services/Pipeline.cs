@@ -9,6 +9,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 
@@ -55,6 +56,12 @@ internal sealed class InstagramIngestHandler(
                 continue;
             }
 
+            if (inbound.Kind == InboundKinds.Read)
+            {
+                await MarkReadAsync(account.Id, inbound.ExternalMessageId, inbound.SentAt, cancellationToken);
+                continue;
+            }
+
             if (await Db.ExternalMessageKeys.AnyAsync(k => k.ChannelAccountId == account.Id && k.ExternalId == inbound.ExternalMessageId, cancellationToken))
             {
                 continue;
@@ -71,6 +78,29 @@ internal sealed class InstagramIngestHandler(
             Db.Publish(
                 new InboundMessageReceived(conversation.Id, stored.Id, stored.CreatedAt, account.Id, account.Kind, conversation.ContactId, stored.Kind, stored.Text, stored.NormalizedText, inbound.Attachments.Count),
                 conversation.Id.ToString());
+        }
+    }
+
+    /// <summary>A read receipt names our latest message the customer saw; everything we sent before it is read too.</summary>
+    private async Task MarkReadAsync(Guid accountId, string externalMessageId, DateTimeOffset readAt, CancellationToken ct)
+    {
+        var key = await Db.ExternalMessageKeys.AsNoTracking().FirstOrDefaultAsync(k => k.ChannelAccountId == accountId && k.ExternalId == externalMessageId, ct);
+        var target = key is null ? null : await Db.Messages.AsNoTracking()
+            .Where(m => m.Id == key.MessageId && m.Direction == MessageDirections.Outbound)
+            .Select(m => new { m.Id, m.ConversationId, m.CreatedAt })
+            .FirstOrDefaultAsync(ct);
+        if (target is null)
+        {
+            return;
+        }
+
+        var count = await Db.Messages
+            .Where(m => m.ConversationId == target.ConversationId && m.Direction == MessageDirections.Outbound
+                && m.Status == MessageStatuses.Sent && m.CreatedAt <= target.CreatedAt)
+            .ExecuteUpdateAsync(u => u.SetProperty(m => m.Status, MessageStatuses.Read).SetProperty(m => m.ReadAt, readAt).SetProperty(m => m.UpdatedAt, clock.UtcNow), ct);
+        if (count > 0)
+        {
+            Db.Publish(new MessagesRead(target.ConversationId, target.Id, readAt, count), target.ConversationId.ToString());
         }
     }
 
@@ -124,11 +154,39 @@ internal sealed class EchoReplyHandler(ConversationsDbContext db, IOptionsMonito
     }
 }
 
+/// <summary>Outbound policy (backend plan 9.4, Meta platform policy). Decides whether a queued message may go out, and with which tag.</summary>
+internal static class OutboundPolicy
+{
+    public static OutboundDecision Check(Conversation conversation, Message message, DateTimeOffset now)
+    {
+        // A private reply answers a comment, not a DM thread: the 24-hour window does not apply (the comment's age limit is the producer's check).
+        if (message.ReplyToCommentId is not null || conversation.IsWindowOpen(now))
+        {
+            return OutboundDecision.Allow(null);
+        }
+
+        // HUMAN_AGENT is only for a person replying from the panel, within 7 days of the customer's last message.
+        if (message is { HandledBy: HandledBy.Human, SentBy: not null } && conversation.IsHumanAgentWindowOpen(now))
+        {
+            return OutboundDecision.Allow(MessageTags.HumanAgent);
+        }
+
+        return OutboundDecision.Reject("conversation.window_closed");
+    }
+}
+
+internal sealed record OutboundDecision(bool Allowed, string? Tag, string? ErrorCode)
+{
+    public static OutboundDecision Allow(string? tag) => new(true, tag, null);
+
+    public static OutboundDecision Reject(string code) => new(false, null, code);
+}
+
 /// <summary>
-/// Outbound group: policy checks, then the channel adapter, then <see cref="OutboundMessageCompleted"/>.
-/// A retryable failure throws so the consumer retries with backoff; anything else marks the message failed.
+/// Outbound group: workspace and policy checks, one private reply per comment, then the channel adapter, then <see cref="OutboundMessageCompleted"/>.
+/// A retryable failure throws so the consumer retries with backoff (the transaction, including the private reply key, rolls back); anything else marks the message failed.
 /// </summary>
-internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMessageSender sender, IClock clock, ILogger<OutboundSendHandler> logger)
+internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMessageSender sender, IWorkspaceQueries workspaces, IClock clock, ILogger<OutboundSendHandler> logger)
     : IdempotentHandler<OutboundMessageRequested, ConversationsDbContext>(db)
 {
     public const int MaxAttempts = 6;
@@ -143,17 +201,43 @@ internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMes
 
         var conversation = await Db.Conversations.FirstAsync(c => c.Id == message.ConversationId, cancellationToken);
         var now = clock.UtcNow;
-        if (!conversation.IsWindowOpen(now))
+        if (await workspaces.IsSuspendedAsync(conversation.WorkspaceId, cancellationToken))
         {
-            Fail(stored, conversation, "conversation.window_closed");
+            Fail(stored, conversation, "workspace.suspended");
             return;
         }
 
-        var result = await sender.SendAsync(conversation.ChannelAccountId, OutboundRecipient.User(conversation.ExternalUserId), new OutboundContent(stored.Text), cancellationToken);
+        var decision = OutboundPolicy.Check(conversation, stored, now);
+        if (!decision.Allowed)
+        {
+            Fail(stored, conversation, decision.ErrorCode!);
+            return;
+        }
+
+        if (stored.ReplyToCommentId is { } commentId)
+        {
+            var claimed = await Db.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO conversations.private_reply_keys (channel_account_id, comment_id, message_id, created_at) VALUES ({conversation.ChannelAccountId}, {commentId}, {stored.Id}, {now}) ON CONFLICT DO NOTHING",
+                cancellationToken);
+            if (claimed == 0)
+            {
+                Fail(stored, conversation, "comment.private_reply_exists");
+                return;
+            }
+        }
+
+        var recipient = stored.ReplyToCommentId is { } c ? OutboundRecipient.Comment(c) : OutboundRecipient.User(conversation.ExternalUserId);
+        var result = await sender.SendAsync(conversation.ChannelAccountId, recipient, stored.ToContent(decision.Tag), cancellationToken);
         if (result.Success)
         {
-            stored.MarkSent(result.ExternalMessageId, now);
+            stored.MarkSent(result.ExternalMessageId, decision.Tag, now);
             conversation.RecordOutbound(now, stored.Text);
+            if (result.ExternalMessageId is { } mid)
+            {
+                // Read receipts and echoes name our message by Meta's id.
+                Db.ExternalMessageKeys.Add(new ExternalMessageKey { ChannelAccountId = conversation.ChannelAccountId, ExternalId = mid, MessageId = stored.Id, CreatedAt = now });
+            }
+
             Db.Publish(new OutboundMessageCompleted(conversation.Id, stored.Id, MessageStatuses.Sent, result.ExternalMessageId, null), conversation.Id.ToString());
             return;
         }

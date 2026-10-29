@@ -81,7 +81,7 @@ public class InstagramWebhookParserTests
 
         var messages = _parser.ParseInstagramEntry(entry);
 
-        messages.Select(m => (m.ExternalMessageId, m.Kind)).ShouldBe([("m1", "text"), ("m2", "attachment"), ("m3", "story_reply"), ("m4", "postback"), ("m5", "text")]);
+        messages.Select(m => (m.ExternalMessageId, m.Kind)).ShouldBe([("m1", "text"), ("m2", "attachment"), ("m3", "story_reply"), ("m4", "postback"), ("m5", "text"), ("m1", "read")]);
         messages[1].Attachments.Single().Url.ShouldBe("https://scontent.cdninstagram.com/x.jpg");
         messages[2].ReplyToStoryId.ShouldBe("s1");
         messages[3].Postback.ShouldBe("BUY_1");

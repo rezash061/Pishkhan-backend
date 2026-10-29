@@ -6,6 +6,7 @@ using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
+using Pishkhan.Modules.Tenancy;
 using Pishkhan.Modules.Files;
 using Pishkhan.Web.Hosting;
 
@@ -20,6 +21,7 @@ services.AddAuthentication();
 services.AddAuthorization();
 services
     .AddFilesModule(configuration)
+    .AddTenancyModule(configuration)
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)
     .AddAgentModule(configuration);

@@ -364,10 +364,62 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_conversations_channel_account_id_contact_id");
 
+                    b.HasIndex("WorkspaceId", "LastInboundAt")
+                        .HasDatabaseName("ix_conversations_unread")
+                        .HasFilter("unread_count > 0");
+
+                    b.HasIndex("WorkspaceId", "AssigneeId", "LastInboundAt")
+                        .HasDatabaseName("ix_conversations_workspace_id_assignee_id_last_inbound_at");
+
+                    b.HasIndex("WorkspaceId", "LastInboundAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_conversations_workspace_id_last_inbound_at_id");
+
                     b.HasIndex("WorkspaceId", "Status", "LastInboundAt")
                         .HasDatabaseName("ix_conversations_workspace_id_status_last_inbound_at");
 
                     b.ToTable("conversations", "conversations");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.ConversationNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_conversation_notes");
+
+                    b.HasIndex("ConversationId", "CreatedAt")
+                        .HasDatabaseName("ix_conversation_notes_conversation_id_created_at");
+
+                    b.ToTable("conversation_notes", "conversations");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.ExternalMessageKey", b =>
@@ -409,6 +461,10 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("attachments_json");
 
+                    b.Property<string>("ContentJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content_json");
+
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
@@ -449,6 +505,15 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("normalized_text");
 
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<string>("ReplyToCommentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reply_to_comment_id");
+
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sent_at");
@@ -462,6 +527,11 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
+
+                    b.Property<string>("Tag")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tag");
 
                     b.Property<string>("Text")
                         .HasMaxLength(4000)
@@ -483,6 +553,71 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasDatabaseName("ix_messages_conversation_id_created_at_id");
 
                     b.ToTable("messages", "conversations");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.PrivateReplyKey", b =>
+                {
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channel_account_id");
+
+                    b.Property<string>("CommentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("comment_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.HasKey("ChannelAccountId", "CommentId")
+                        .HasName("pk_private_reply_keys");
+
+                    b.ToTable("private_reply_keys", "conversations");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.QuickReplyTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Shortcut")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("shortcut");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_quick_replies");
+
+                    b.HasIndex("WorkspaceId", "Shortcut")
+                        .IsUnique()
+                        .HasDatabaseName("ix_quick_replies_workspace_id_shortcut");
+
+                    b.ToTable("quick_replies", "conversations");
                 });
 #pragma warning restore 612, 618
         }
