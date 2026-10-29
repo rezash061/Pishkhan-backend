@@ -7,7 +7,10 @@ using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Automation.Domain;
 using Pishkhan.Modules.Automation.Persistence;
+using Pishkhan.Modules.Catalog.Contracts;
+using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Persian;
 
 namespace Pishkhan.Modules.Automation.Engine;
 
@@ -168,12 +171,64 @@ internal sealed class EnginePlan(Guid channelAccountId, string channelKind, stri
 
     public string Key => ConversationActionsRequested.Key(channelAccountId, externalUserId);
 
-    public void Publish(AutomationDbContext db)
+    /// <summary>Card sets to send, by the position their message takes among <see cref="Actions"/>; filled in by <see cref="PublishAsync"/>.</summary>
+    private readonly List<(int Position, Guid CardSetId)> _cards = [];
+
+    public void AddCards(Guid cardSetId) => _cards.Add((Actions.Count + _cards.Count, cardSetId));
+
+    /// <summary>Builds the pending carousels from the catalog's current prices and stock, then publishes the plan.</summary>
+    public async Task PublishAsync(AutomationDbContext db, ICatalogQueries catalog, CancellationToken ct)
     {
+        foreach (var (position, cardSetId) in _cards)
+        {
+            var set = await catalog.GetCardSetAsync(cardSetId, ct);
+            var content = set is { Cards.Count: > 0 } ? CardMessages.ToContent(set) : null;
+            if (content is not null)
+            {
+                Actions.Insert(Math.Min(position, Actions.Count), ConversationAction.Send(content));
+            }
+        }
+
+        _cards.Clear();
         if (Actions.Count > 0 || (Handled && inboundMessageId is not null))
         {
             db.Publish(ToEvent(), Key);
         }
+    }
+}
+
+/// <summary>Catalog content as channel messages.</summary>
+internal static class CardMessages
+{
+    public static OutboundContent ToContent(StorefrontCardSetContent set) => new(
+        null,
+        Cards: [.. set.Cards.Select(c => new MessageCard(
+            c.Title, c.Subtitle, c.ImageUrl, c.LinkUrl,
+            c.LinkUrl is { } link ? [MessageButton.Postback(c.ButtonTitle, c.Payload), MessageButton.Link("مشاهده در سایت", link)] : [MessageButton.Postback(c.ButtonTitle, c.Payload)]))]);
+
+    /// <summary>The reply to a card's button: name, description, price per variant and stock, from the catalog (never from the AI).</summary>
+    public static OutboundContent ProductDetails(ProductSummary p)
+    {
+        var lines = new List<string> { p.Title };
+        if (p.Description is { Length: > 0 } description)
+        {
+            lines.Add(description.Length <= 300 ? description : description[..299] + "…");
+        }
+
+        var priced = p.Variants.Where(v => v.Attributes.Count > 0).ToList();
+        if (priced.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.AddRange(priced.Take(10).Select(v =>
+                $"• {string.Join("، ", v.Attributes.Select(a => $"{a.Key}: {a.Value}"))}: {PersianMoney.FormatToman(v.Price)}{(v.InStock ? string.Empty : " (ناموجود)")}"));
+        }
+        else if (p.MinPrice is { } price)
+        {
+            lines.Add("قیمت: " + PersianMoney.FormatToman(price) + (p.InStock ? string.Empty : " (ناموجود)"));
+        }
+
+        var buttons = p.LinkUrl is { } link ? new[] { MessageButton.Link("مشاهده در سایت", link) } : null;
+        return new OutboundContent(string.Join('\n', lines).Trim(), Buttons: buttons);
     }
 }
 
@@ -190,6 +245,9 @@ internal static class ActionPlanner
             {
                 case ActionKinds.SendMessage when action.Message is { } message:
                     plan.Actions.Add(ConversationAction.Send(TemplateRenderer.Render(message, values)));
+                    break;
+                case ActionKinds.SendCards when action.CardSetId is { } cardSetId:
+                    plan.AddCards(cardSetId);
                     break;
                 case ActionKinds.AddTag:
                     plan.Actions.Add(new ConversationAction(ConversationActionKinds.AddTag, Tag: action.Tag));
@@ -286,6 +344,9 @@ internal sealed class FlowEngine(AutomationDbContext db)
             {
                 case FlowEffect.Send send:
                     plan.Actions.Add(ConversationAction.Send(send.Content));
+                    break;
+                case FlowEffect.SendCards cards:
+                    plan.AddCards(cards.CardSetId);
                     break;
                 case FlowEffect.Act act:
                     ActionPlanner.Apply(db, plan, act.Actions, EngineValues.For(conversation), conversation.WorkspaceId, conversation.Id);

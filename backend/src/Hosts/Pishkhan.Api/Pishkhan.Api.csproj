@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
     <ProjectReference Include="..\..\Modules\Conversations\Pishkhan.Modules.Conversations\Pishkhan.Modules.Conversations.csproj" />
     <ProjectReference Include="..\..\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Pishkhan.Modules.Catalog\Pishkhan.Modules.Catalog.csproj" />
   </ItemGroup>
 </Project>

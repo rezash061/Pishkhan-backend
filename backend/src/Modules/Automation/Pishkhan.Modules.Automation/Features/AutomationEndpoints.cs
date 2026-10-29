@@ -8,6 +8,7 @@ using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Automation.Domain;
 using Pishkhan.Modules.Automation.Engine;
 using Pishkhan.Modules.Automation.Persistence;
+using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
@@ -166,10 +167,10 @@ internal static class AutomationEndpoints
         await db.Rules.AsNoTracking().FirstOrDefaultAsync(r => r.Id == ruleId, ct) is { } rule ? Results.Ok(ToResponse(rule)) : Error.NotFound().ToProblem();
 
     private static async Task<IResult> CreateRuleAsync(
-        Guid workspaceId, RuleRequest request, AutomationDbContext db, IChannelDirectory channels, ICacheInvalidator invalidator, AutomationCache cache, IClock clock, CancellationToken ct)
+        Guid workspaceId, RuleRequest request, AutomationDbContext db, IChannelDirectory channels, ICatalogQueries catalog, ICacheInvalidator invalidator, AutomationCache cache, IClock clock, CancellationToken ct)
     {
         var definition = Definition(request);
-        if (await ValidateAsync(definition, db, channels, ct) is { } invalid)
+        if (await ValidateAsync(definition, db, channels, catalog, ct) is { } invalid)
         {
             return invalid;
         }
@@ -181,7 +182,7 @@ internal static class AutomationEndpoints
     }
 
     private static async Task<IResult> UpdateRuleAsync(
-        Guid workspaceId, Guid ruleId, RuleRequest request, AutomationDbContext db, IChannelDirectory channels, ICacheInvalidator invalidator, AutomationCache cache, CancellationToken ct)
+        Guid workspaceId, Guid ruleId, RuleRequest request, AutomationDbContext db, IChannelDirectory channels, ICatalogQueries catalog, ICacheInvalidator invalidator, AutomationCache cache, CancellationToken ct)
     {
         var rule = await db.Rules.FirstOrDefaultAsync(r => r.Id == ruleId, ct);
         if (rule is null)
@@ -190,7 +191,7 @@ internal static class AutomationEndpoints
         }
 
         var definition = Definition(request);
-        if (await ValidateAsync(definition, db, channels, ct) is { } invalid)
+        if (await ValidateAsync(definition, db, channels, catalog, ct) is { } invalid)
         {
             return invalid;
         }
@@ -216,7 +217,7 @@ internal static class AutomationEndpoints
     private static RuleDefinition Definition(RuleRequest r) =>
         new(r.Name ?? string.Empty, r.ChannelAccountId, r.TriggerKind ?? string.Empty, r.Trigger ?? new TriggerConfig(), r.Actions ?? [], r.Priority, r.Enabled);
 
-    private static async Task<IResult?> ValidateAsync(RuleDefinition definition, AutomationDbContext db, IChannelDirectory channels, CancellationToken ct)
+    private static async Task<IResult?> ValidateAsync(RuleDefinition definition, AutomationDbContext db, IChannelDirectory channels, ICatalogQueries catalog, CancellationToken ct)
     {
         var errors = RuleValidator.Validate(definition).ToList();
         if (definition.ChannelAccountId is { } account && await channels.GetAsync(account, ct) is null)
@@ -229,6 +230,14 @@ internal static class AutomationEndpoints
             if (!await db.Flows.AnyAsync(f => f.Id == flowId && f.PublishedVersion != null, ct))
             {
                 errors.Add(("actions", "automation.flow_not_published"));
+            }
+        }
+
+        foreach (var cardSetId in definition.Actions.Where(a => a.Kind == ActionKinds.SendCards && a.CardSetId is not null).Select(a => a.CardSetId!.Value))
+        {
+            if (await catalog.GetCardSetAsync(cardSetId, ct) is null)
+            {
+                errors.Add(("actions", "automation.card_set_not_found"));
             }
         }
 

@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Pishkhan.SharedKernel;
 
-/// <summary>ISO 4217 currency. Minor unit for IRR is the Rial itself (no decimals).</summary>
+/// <summary>ISO 4217 currency. Minor unit for IRR is the Rial itself (no decimals). JSON: the code, such as <c>"IRR"</c>.</summary>
+[JsonConverter(typeof(CurrencyJsonConverter))]
 public readonly record struct Currency
 {
     private Currency(string code, int minorUnitDigits)
@@ -58,6 +61,7 @@ public readonly record struct Money(long Amount, Currency Currency)
 
     public Money Multiply(int factor) => this * factor;
 
+    [JsonIgnore]
     public bool IsNegative => Amount < 0;
 
     /// <summary>
@@ -96,4 +100,26 @@ public readonly record struct Money(long Amount, Currency Currency)
             throw new DomainException("money.currency.mismatch");
         }
     }
+}
+
+public sealed class CurrencyJsonConverter : JsonConverter<Currency>
+{
+    public override Currency Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new JsonException("Currency must be a string code.");
+        }
+
+        try
+        {
+            return Currency.FromCode(reader.GetString()!);
+        }
+        catch (DomainException ex)
+        {
+            throw new JsonException(ex.Message, ex);
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, Currency value, JsonSerializerOptions options) => writer.WriteStringValue(value.Code);
 }

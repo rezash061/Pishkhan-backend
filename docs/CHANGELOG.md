@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.6 Catalog and storefront cards, 2026-10-29)
+- New Catalog module (`catalog` schema): categories, products (title, description, tags, status `draft`/`active`/`archived`, fixed price in Rial, images, link), variants (SKU unique per workspace, attributes such as color and size, own price or the product's, stock with `track`/`unlimited`), storefront card sets, imports.
+- Endpoints under `/workspaces/{ws}/catalog`: categories CRUD, products CRUD with Persian-normalized search, filters and cursor pagination, `GET /export`, `GET /import-template`, `POST /import` + `GET /imports/{id}`, storefront card sets CRUD and `/preview`.
+- Excel import/export with Persian headers (one row per variant, prices in Toman, Persian or Latin digits). Imports read a clean `import_sheet` file in the commerce group, match products by id then SKU, create missing categories, keep variant ids, and report bad rows without stopping the import.
+- Product images are Files uploads (`product_image`); only clean files get URLs, and cards use 3-day signed URLs that Instagram can fetch.
+- Automation: `send_cards` action (rules and flow action nodes) and flow storefront nodes with `cardSetId` send the set as a carousel built at send time from current prices and stock (active products only, at most 10, Instagram text limits). A card's button returns the product's details (prices per variant, stock) from the catalog.
+- Every product change emits `catalog.product-changed.v1` (for Knowledge, BE-1.4) and invalidates the workspace's card cache on all hosts.
+- Money in the API is `{ "amount": <Rial>, "currency": "IRR" }`.
+- Deferred: bulk price update and price-change batches (BE-2.6), formula pricing (Phase 3), the AI catalog tool (BE-1.4).
+
 ### Added (Phase 1, BE-1.3 Automation engine, 2026-10-29)
 - New Automation module (`automation` schema): rules, flows (draft and published versions), flow runs, comment records, backlog runs, per-rule daily stats, workspace settings (AI on or off, business hours, fallback message).
 - Triggers: DM keyword (exact, contains, any-of, safe `*`/`|` patterns), comment keyword, every comment on a post, story reply, story mention, live comment, post share, new conversation (welcome), postback and quick reply payloads, outside business hours. Comment rules cover all posts, one post, or the next post (bound on its first comment).
