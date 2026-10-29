@@ -27,8 +27,12 @@ services
     .AddFilesModule(configuration)
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)
+    .AddConversationsRealtime()
     .DecorateHandlers();
-services.AddPishkhanMessaging(configuration, "api", m => m.AddCacheInvalidation());
+services.AddPishkhanRealtime();
+services.AddPishkhanMessaging(configuration, "api", m => m
+    .AddCacheInvalidation()
+    .AddConversationsRealtimeConsumers());
 
 var app = builder.Build();
 app.UsePishkhanWebHost();

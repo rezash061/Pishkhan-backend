@@ -7,6 +7,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Conversations.Realtime;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
@@ -153,7 +154,7 @@ internal static class ConversationEndpoints
         c.Id, c.ChannelAccountId, c.ChannelKind, c.ContactId, c.Status, c.AssigneeId, c.AiPaused, c.LastInboundAt, c.LastOutboundAt,
         c.WindowExpiresAt, c.LastInboundAt + Conversation.HumanAgentWindow, c.UnreadCount, c.LastMessagePreview);
 
-    private static MessageResponse ToResponse(Message m) =>
+    internal static MessageResponse ToResponse(Message m) =>
         new(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.Status, m.ErrorCode, m.HandledBy, m.SentBy, m.Tag, m.SentAt, m.ReadAt);
 
     private static async Task<IResult> ListAsync(
@@ -262,7 +263,7 @@ internal static class ConversationEndpoints
         return Results.Json(ToResponse(message), statusCode: StatusCodes.Status202Accepted);
     }
 
-    private static async Task<IResult> AssignAsync(Guid workspaceId, Guid conversationId, AssignRequest request, ConversationsDbContext db, IWorkspaceAccessResolver access, CancellationToken ct)
+    private static async Task<IResult> AssignAsync(Guid workspaceId, Guid conversationId, AssignRequest request, ConversationsDbContext db, IWorkspaceAccessResolver access, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)
@@ -275,12 +276,16 @@ internal static class ConversationEndpoints
             return Invalid("assigneeId", "validation.assignee.not_member");
         }
 
-        conversation.Assign(request.AssigneeId);
-        await db.SaveChangesAsync(ct);
+        if (conversation.Assign(request.AssigneeId))
+        {
+            await db.SaveChangesAsync(ct);
+            await notifier.ConversationUpdatedAsync(conversation, ct);
+        }
+
         return Results.Ok(ToResponse(conversation));
     }
 
-    private static async Task<IResult> ChangeStatusAsync(Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, ICurrentUser caller, CancellationToken ct)
+    private static async Task<IResult> ChangeStatusAsync(Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, ICurrentUser caller, IInboxNotifier notifier, CancellationToken ct)
     {
         if (!ConversationStatuses.All.Contains(request.Status))
         {
@@ -293,17 +298,29 @@ internal static class ConversationEndpoints
             return Error.NotFound().ToProblem();
         }
 
-        if (conversation.ChangeStatus(request.Status) && request.Status == ConversationStatuses.HandedOff)
+        if (!conversation.ChangeStatus(request.Status))
+        {
+            return Results.Ok(ToResponse(conversation));
+        }
+
+        // A handoff reaches the panel through the handoff event (realtime and, later, notifications); other changes are pushed here.
+        var handedOff = request.Status == ConversationStatuses.HandedOff;
+        if (handedOff)
         {
             conversation.SetAiPaused(true);
             db.Publish(new HandoffRequested(conversation.Id, string.IsNullOrWhiteSpace(request.Reason) ? "manual" : request.Reason.Trim(), caller.UserId, null), conversation.Id.ToString());
         }
 
         await db.SaveChangesAsync(ct);
+        if (!handedOff)
+        {
+            await notifier.ConversationUpdatedAsync(conversation, ct);
+        }
+
         return Results.Ok(ToResponse(conversation));
     }
 
-    private static async Task<IResult> AiPauseAsync(Guid workspaceId, Guid conversationId, AiPauseRequest request, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> AiPauseAsync(Guid workspaceId, Guid conversationId, AiPauseRequest request, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)
@@ -311,12 +328,16 @@ internal static class ConversationEndpoints
             return Error.NotFound().ToProblem();
         }
 
-        conversation.SetAiPaused(request.Paused);
-        await db.SaveChangesAsync(ct);
+        if (conversation.SetAiPaused(request.Paused))
+        {
+            await db.SaveChangesAsync(ct);
+            await notifier.ConversationUpdatedAsync(conversation, ct);
+        }
+
         return Results.Ok(ToResponse(conversation));
     }
 
-    private static async Task<IResult> MarkReadAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> MarkReadAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)
@@ -324,8 +345,13 @@ internal static class ConversationEndpoints
             return Error.NotFound().ToProblem();
         }
 
-        conversation.MarkRead();
-        await db.SaveChangesAsync(ct);
+        if (conversation.UnreadCount > 0)
+        {
+            conversation.MarkRead();
+            await db.SaveChangesAsync(ct);
+            await notifier.ConversationUpdatedAsync(conversation, ct);
+        }
+
         return Results.NoContent();
     }
 
