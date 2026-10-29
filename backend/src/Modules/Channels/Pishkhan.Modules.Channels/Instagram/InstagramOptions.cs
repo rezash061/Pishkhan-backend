@@ -32,21 +32,57 @@ public sealed class InstagramOptions
     public string[] Scopes { get; set; } =
         ["instagram_business_basic", "instagram_business_manage_messages", "instagram_business_manage_comments"];
 
-    public string[] WebhookFields { get; set; } = ["messages", "messaging_postbacks", "messaging_seen", "comments"];
+    /// <summary>Fields the account is subscribed to on connect (Instagram API with Instagram Login names).</summary>
+    public string[] WebhookFields { get; set; } =
+        ["messages", "messaging_postbacks", "messaging_seen", "message_reactions", "messaging_referral", "comments", "live_comments"];
 
-    /// <summary>Rate profiles by name: outbound send token bucket per account. Admin-editable later (Meta limits change).</summary>
+    /// <summary>Long-lived tokens last 60 days; refresh them this long before they expire.</summary>
+    public TimeSpan RefreshBefore { get; set; } = TimeSpan.FromDays(10);
+
+    /// <summary>When refreshing keeps failing and expiry is this close, the account shows <c>token_expiring</c> to the owner.</summary>
+    public TimeSpan ExpiringWarning { get; set; } = TimeSpan.FromDays(3);
+
+    /// <summary>Default rate profiles by name. Admin overrides in <c>channels.rate_profiles</c> win (Meta limits change).</summary>
     public Dictionary<string, RateProfile> RateProfiles { get; set; } = new(StringComparer.Ordinal)
     {
-        ["default"] = new RateProfile { Capacity = 20, RefillPerSecond = 5 },
+        [RateProfile.Default] = new RateProfile(),
     };
-
-    public RateProfile ProfileFor(string name) =>
-        RateProfiles.TryGetValue(name, out var profile) ? profile : RateProfiles.GetValueOrDefault("default") ?? new RateProfile();
 }
 
+/// <summary>Token buckets per Instagram API family for one account.</summary>
 public sealed class RateProfile
+{
+    public const string Default = "default";
+
+    public RateBucket Send { get; set; } = new() { Capacity = 20, RefillPerSecond = 5 };
+
+    public RateBucket PrivateReply { get; set; } = new() { Capacity = 10, RefillPerSecond = 1 };
+
+    public RateBucket CommentReply { get; set; } = new() { Capacity = 10, RefillPerSecond = 0.5 };
+
+    public RateBucket Read { get; set; } = new() { Capacity = 30, RefillPerSecond = 2 };
+
+    public RateBucket For(string family) => family switch
+    {
+        RateFamilies.Send => Send,
+        RateFamilies.PrivateReply => PrivateReply,
+        RateFamilies.CommentReply => CommentReply,
+        RateFamilies.Read => Read,
+        _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown rate family."),
+    };
+}
+
+public sealed class RateBucket
 {
     public int Capacity { get; set; } = 20;
 
     public double RefillPerSecond { get; set; } = 5;
+}
+
+public static class RateFamilies
+{
+    public const string Send = "send";
+    public const string PrivateReply = "private_reply";
+    public const string CommentReply = "comment_reply";
+    public const string Read = "read";
 }

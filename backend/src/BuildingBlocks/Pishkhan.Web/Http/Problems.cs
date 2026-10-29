@@ -17,6 +17,7 @@ public static class ProblemTypes
     public const string Unprocessable = Base + "unprocessable";
     public const string Unsupported = Base + "unsupported-media-type";
     public const string Failure = Base + "internal";
+    public const string Unavailable = Base + "upstream-unavailable";
     public const string IdempotencyMismatch = Base + "idempotency-key-reused";
 }
 

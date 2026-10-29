@@ -149,7 +149,7 @@ internal sealed class OutboundSendHandler(ConversationsDbContext db, IChannelMes
             return;
         }
 
-        var result = await sender.SendAsync(conversation.ChannelAccountId, conversation.ExternalUserId, new OutboundContent(stored.Text), cancellationToken);
+        var result = await sender.SendAsync(conversation.ChannelAccountId, OutboundRecipient.User(conversation.ExternalUserId), new OutboundContent(stored.Text), cancellationToken);
         if (result.Success)
         {
             stored.MarkSent(result.ExternalMessageId, now);

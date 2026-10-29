@@ -26,7 +26,9 @@ using StackExchange.Redis;
 
 namespace Pishkhan.Modules.Channels.Features;
 
-public sealed record ChannelResponse(Guid Id, string Kind, string ExternalId, string? Username, string? DisplayName, string Status, DateTimeOffset? TokenExpiresAt, DateTimeOffset CreatedAt);
+public sealed record ChannelResponse(Guid Id, string Kind, string ExternalId, string? Username, string? DisplayName, string Status, string? StatusReason, DateTimeOffset? TokenExpiresAt, DateTimeOffset CreatedAt);
+
+public sealed record MediaResponse(string Id, string? Caption, string MediaType, Uri? MediaUrl, Uri? ThumbnailUrl, Uri? Permalink, DateTimeOffset? Timestamp);
 
 public sealed record ConnectInstagramResponse(Uri AuthorizeUrl);
 
@@ -54,6 +56,15 @@ internal static class ChannelEndpoints
             .Produces<ConnectInstagramResponse>()
             .WithStandardProblems();
 
+        ws.MapGet("/{channelId:guid}/media", ListMediaAsync)
+            .RequireWorkspacePermission(Permissions.AutomationWrite)
+            .WithSummary("Recent posts and reels of an Instagram account, newest first")
+            .WithDescription("For post-specific rules. `cursor` comes from the previous page; `limit` is 1 to 50 (default 25). Read live from Instagram.")
+            .Produces<Page<MediaResponse>>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
         ws.MapDelete("/{channelId:guid}", DisconnectAsync)
             .RequireWorkspacePermission(Permissions.ChannelsManage)
             .WithSummary("Disconnect a channel account; its token is erased")
@@ -69,7 +80,7 @@ internal static class ChannelEndpoints
         Results.Ok(await db.Accounts.AsNoTracking()
             .Where(a => a.Status != ChannelStatuses.Disconnected)
             .OrderBy(a => a.CreatedAt)
-            .Select(a => new ChannelResponse(a.Id, a.Kind, a.ExternalId, a.Username, a.DisplayName, a.Status, a.TokenExpiresAt, a.CreatedAt))
+            .Select(a => new ChannelResponse(a.Id, a.Kind, a.ExternalId, a.Username, a.DisplayName, a.Status, a.StatusReason, a.TokenExpiresAt, a.CreatedAt))
             .ToListAsync(ct));
 
     private static async Task<IResult> ConnectAsync(
@@ -160,13 +171,12 @@ internal static class ChannelEndpoints
             {
                 account = ChannelAccount.ConnectInstagram(parsed.WorkspaceId, profile.UserId, profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions, parsed.UserId, now);
                 db.Accounts.Add(account);
+                db.PublishStatus(account);
             }
-            else
+            else if (account.Reconnect(profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions, now))
             {
-                account.Reconnect(profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions);
+                db.PublishStatus(account);
             }
-
-            db.Publish(new ChannelStatusChanged(account.Id, account.WorkspaceId, account.Status, "connected"), account.Id.ToString());
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Instagram account {ExternalId} connected to workspace {WorkspaceId}", profile.UserId, parsed.WorkspaceId);
             return Back("connected", channelId: account.Id);
@@ -187,7 +197,30 @@ internal static class ChannelEndpoints
         }
     }
 
-    private static async Task<IResult> DisconnectAsync(Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, ILoggerFactory loggers, CancellationToken ct)
+    private static async Task<IResult> ListMediaAsync(Guid workspaceId, Guid channelId, string? cursor, int? limit, ChannelsDbContext db, InstagramAccountGateway gateway, InstagramGraphClient instagram, CancellationToken ct)
+    {
+        var account = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == channelId && a.Status != ChannelStatuses.Disconnected, ct);
+        if (account is null)
+        {
+            return Error.NotFound().ToProblem();
+        }
+
+        var result = await gateway.CallAsync(account.Id, RateFamilies.Read, token => instagram.ListMediaAsync(token, cursor, limit ?? 25, ct), ct);
+        if (result.Value is not { } page)
+        {
+            return result.ErrorCode switch
+            {
+                "channel.unavailable" or "instagram.token_invalid" => Error.Conflict("channels.reauth_required").ToProblem(),
+                _ => Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, type: ProblemTypes.Unavailable, title: result.ErrorCode),
+            };
+        }
+
+        return Results.Ok(new Page<MediaResponse>(
+            [.. page.Items.Select(m => new MediaResponse(m.Id, m.Caption, m.MediaType, ChannelProfileReader.ToUri(m.MediaUrl), ChannelProfileReader.ToUri(m.ThumbnailUrl), ChannelProfileReader.ToUri(m.Permalink), m.Timestamp))],
+            page.NextCursor));
+    }
+
+    private static async Task<IResult> DisconnectAsync(Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, IClock clock, ILoggerFactory loggers, CancellationToken ct)
     {
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == channelId && a.Status != ChannelStatuses.Disconnected, ct);
         if (account is null)
@@ -208,8 +241,11 @@ internal static class ChannelEndpoints
             }
         }
 
-        account.Disconnect();
-        db.Publish(new ChannelStatusChanged(account.Id, account.WorkspaceId, account.Status, "disconnected_by_user"), account.Id.ToString());
+        if (account.Disconnect("disconnected_by_user", clock.UtcNow))
+        {
+            db.PublishStatus(account);
+        }
+
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }

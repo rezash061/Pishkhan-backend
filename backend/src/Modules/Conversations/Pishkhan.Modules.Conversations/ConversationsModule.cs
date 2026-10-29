@@ -23,6 +23,10 @@ public static class ConversationsModule
     public static MessagingBuilder AddConversationsIngestConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<InstagramWebhookReceived, InstagramIngestHandler>("ingest");
 
+    /// <summary>Platform group: privacy requests.</summary>
+    public static MessagingBuilder AddConversationsPlatformConsumers(this MessagingBuilder messaging) =>
+        messaging.AddConsumer<DataDeletionRequested, ConversationsDataDeletionHandler>("platform");
+
     public static MessagingBuilder AddConversationsEngineConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<InboundMessageReceived, EchoReplyHandler>("engine");
 

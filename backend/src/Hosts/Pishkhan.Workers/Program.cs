@@ -30,13 +30,15 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddConversationsIngestConsumers()
     .AddConversationsEngineConsumers()
     .AddConversationsOutboundConsumers()
+    .AddConversationsPlatformConsumers()
+    .AddChannelsPlatformConsumers()
     .AddFilesConsumers());
 
 if (groups.IsEnabled("platform"))
 {
     services.AddOutboxRelay(configuration);
     services.AddHostedService<TimerDispatcher>();
-    services.AddPishkhanJobs(configuration, QuartzExtensions.PlatformJobs);
+    services.AddPishkhanJobs(configuration, [.. QuartzExtensions.PlatformJobs, .. ChannelsModule.Jobs]);
 }
 
 var app = builder.Build();

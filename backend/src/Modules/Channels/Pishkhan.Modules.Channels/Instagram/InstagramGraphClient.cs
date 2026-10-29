@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 
 namespace Pishkhan.Modules.Channels.Instagram;
@@ -14,12 +14,6 @@ namespace Pishkhan.Modules.Channels.Instagram;
 /// </summary>
 public sealed class InstagramGraphClient(HttpClient http, IOptions<InstagramOptions> options)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private InstagramOptions O => options.Value;
 
     public Uri BuildAuthorizeUrl(string state) => new(
@@ -85,15 +79,75 @@ public sealed class InstagramGraphClient(HttpClient http, IOptions<InstagramOpti
         await ReadAsync(response, ct);
     }
 
-    /// <summary>Sends a text DM. Returns Meta's message id.</summary>
-    public async Task<string?> SendTextAsync(string token, string recipientId, string text, CancellationToken ct)
+    /// <summary>Sends a DM or a private reply (body from <see cref="InstagramMessageBuilder"/>). Returns Meta's message id.</summary>
+    public async Task<string?> SendAsync(string token, JsonObject message, CancellationToken ct)
     {
         using var request = Authorized(HttpMethod.Post, $"{O.GraphBaseUrl}/{O.ApiVersion}/me/messages", token);
-        request.Content = JsonContent.Create(new SendRequest(new Recipient(recipientId), new MessageBody(text)), options: Json);
+        request.Content = new StringContent(message.ToJsonString(InstagramMessageBuilder.WireJson), System.Text.Encoding.UTF8, "application/json");
         using var response = await http.SendAsync(request, ct);
         var body = await ReadAsync(response, ct);
         return body.TryGetProperty("message_id", out var id) ? id.GetString() : null;
     }
+
+    /// <summary>Posts a public reply under a comment. Returns the new comment's id.</summary>
+    public async Task<string?> ReplyToCommentAsync(string token, string commentId, string text, CancellationToken ct)
+    {
+        using var request = Authorized(HttpMethod.Post, $"{O.GraphBaseUrl}/{O.ApiVersion}/{Uri.EscapeDataString(commentId)}/replies", token);
+        request.Content = new FormUrlEncodedContent(new Dictionary<string, string>(StringComparer.Ordinal) { ["message"] = text });
+        using var response = await http.SendAsync(request, ct);
+        var body = await ReadAsync(response, ct);
+        return body.TryGetProperty("id", out var id) ? id.GetString() : null;
+    }
+
+    /// <summary>Profile of a user who messaged the account (Instagram exposes it only after they started a conversation).</summary>
+    public async Task<InstagramUserProfile> GetUserProfileAsync(string token, string userId, CancellationToken ct)
+    {
+        using var request = Authorized(
+            HttpMethod.Get,
+            $"{O.GraphBaseUrl}/{O.ApiVersion}/{Uri.EscapeDataString(userId)}?fields=name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user",
+            token);
+        using var response = await http.SendAsync(request, ct);
+        var body = await ReadAsync(response, ct);
+        return new InstagramUserProfile(
+            userId,
+            Str(body, "name"),
+            Str(body, "username"),
+            Str(body, "profile_pic"),
+            body.TryGetProperty("follower_count", out var f) && f.ValueKind == JsonValueKind.Number ? f.GetInt32() : null,
+            Bool(body, "is_user_follow_business"),
+            Bool(body, "is_business_follow_user"));
+    }
+
+    /// <summary>One page of the account's media, newest first.</summary>
+    public async Task<InstagramMediaPage> ListMediaAsync(string token, string? after, int limit, CancellationToken ct)
+    {
+        var url = $"{O.GraphBaseUrl}/{O.ApiVersion}/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit={Math.Clamp(limit, 1, 50)}"
+            + (string.IsNullOrEmpty(after) ? string.Empty : $"&after={Uri.EscapeDataString(after)}");
+        using var request = Authorized(HttpMethod.Get, url, token);
+        using var response = await http.SendAsync(request, ct);
+        var body = await ReadAsync(response, ct);
+        var items = body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
+            ? data.EnumerateArray().Select(m => new InstagramMedia(
+                ReadId(m, "id"),
+                Str(m, "caption"),
+                Str(m, "media_type") ?? "UNKNOWN",
+                Str(m, "media_url"),
+                Str(m, "thumbnail_url"),
+                Str(m, "permalink"),
+                Str(m, "timestamp") is { } ts && DateTimeOffset.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null)).ToList()
+            : [];
+
+        // A next cursor without a "next" link means this was the last page.
+        var next = body.TryGetProperty("paging", out var paging) && paging.TryGetProperty("next", out _)
+            && paging.TryGetProperty("cursors", out var cursors) && cursors.TryGetProperty("after", out var a) ? a.GetString() : null;
+        return new InstagramMediaPage(items, next);
+    }
+
+    private static string? Str(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private static bool? Bool(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var v) && v.ValueKind is JsonValueKind.True or JsonValueKind.False ? v.GetBoolean() : null;
 
     private async Task<LongLivedToken> GetTokenAsync(string url, CancellationToken ct)
     {
@@ -132,11 +186,6 @@ public sealed class InstagramGraphClient(HttpClient http, IOptions<InstagramOpti
         return body;
     }
 
-    private sealed record SendRequest(Recipient Recipient, MessageBody Message);
-
-    private sealed record Recipient(string Id);
-
-    private sealed record MessageBody(string Text);
 }
 
 public sealed record ShortLivedToken(string AccessToken, string UserId, IReadOnlyList<string> Permissions);
@@ -144,6 +193,12 @@ public sealed record ShortLivedToken(string AccessToken, string UserId, IReadOnl
 public sealed record LongLivedToken(string AccessToken, long ExpiresInSeconds);
 
 public sealed record InstagramProfile(string UserId, string? Username, string? Name, string? AccountType);
+
+public sealed record InstagramUserProfile(string UserId, string? Name, string? Username, string? ProfilePicture, int? FollowerCount, bool? FollowsBusiness, bool? BusinessFollowsUser);
+
+public sealed record InstagramMedia(string Id, string? Caption, string MediaType, string? MediaUrl, string? ThumbnailUrl, string? Permalink, DateTimeOffset? Timestamp);
+
+public sealed record InstagramMediaPage(IReadOnlyList<InstagramMedia> Items, string? NextCursor);
 
 /// <summary>A Graph API error. <see cref="Kind"/> drives retry and status decisions.</summary>
 public sealed class InstagramApiException(HttpStatusCode status, int? code, int? subcode, string? message)

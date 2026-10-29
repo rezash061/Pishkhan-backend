@@ -17,6 +17,8 @@ public static class Topics
     public const string InboundMessageReceived = "channels.inbound-message-received.v1";
     public const string InboundCommentReceived = "channels.inbound-comment-received.v1";
     public const string ChannelStatusChanged = "channels.channel-status-changed.v1";
+    public const string DataDeletionRequested = "privacy.data-deletion-requested.v1";
+    public const string DataDeletionCompleted = "privacy.data-deletion-completed.v1";
     public const string ReplyRequested = "conversations.reply-requested.v1";
     public const string OutboundMessageRequested = "conversations.outbound-message-requested.v1";
     public const string OutboundMessageCompleted = "conversations.outbound-message-completed.v1";
@@ -51,6 +53,8 @@ public static class Topics
         new(InboundMessageReceived, 48, TwoWeeks, "conversation id"),
         new(InboundCommentReceived, 24, TwoWeeks, "instagram media id"),
         new(ChannelStatusChanged, 6, TwoWeeks, "channel account id"),
+        new(DataDeletionRequested, 6, TwoWeeks, "deletion request id"),
+        new(DataDeletionCompleted, 6, TwoWeeks, "deletion request id"),
         new(ReplyRequested, 48, Week, "conversation id"),
         new(OutboundMessageRequested, 48, Week, "conversation id"),
         new(OutboundMessageCompleted, 48, Week, "conversation id"),

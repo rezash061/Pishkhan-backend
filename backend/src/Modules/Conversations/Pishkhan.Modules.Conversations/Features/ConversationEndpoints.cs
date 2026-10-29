@@ -17,7 +17,6 @@ public sealed record ConversationResponse(
 
 public sealed record MessageResponse(Guid Id, DateTimeOffset CreatedAt, string Direction, string Kind, string? Text, string Status, string? ErrorCode, string? HandledBy, DateTimeOffset? SentAt);
 
-public sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 internal static class ConversationEndpoints
 {
