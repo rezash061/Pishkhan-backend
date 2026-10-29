@@ -14,6 +14,7 @@ using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Instagram;
@@ -238,6 +239,8 @@ internal static class MetaCallbacks
         };
         db.DataDeletionRequests.Add(request);
         db.Publish(new DataDeletionRequested(request.Id, ChannelKinds.Instagram, externalId), request.Id.ToString());
+        var entry = AuditEntries.Create(new AuditActor(AuditActorTypes.System, null, "meta", null), "privacy.data_deletion_requested", "data_deletion_request", request.Id.ToString(), null, now);
+        db.Publish(entry, entry.PartitionKey(), workspaceId: null);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.Json(
             new DataDeletionResponse(new Uri($"{options.Value.DataDeletionStatusUrl}?code={request.ConfirmationCode}"), request.ConfirmationCode),

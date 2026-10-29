@@ -15,6 +15,7 @@ using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Infrastructure.Antivirus;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Timers;
+using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;

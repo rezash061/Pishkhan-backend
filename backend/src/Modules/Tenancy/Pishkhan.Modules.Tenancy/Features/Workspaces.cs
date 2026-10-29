@@ -4,6 +4,7 @@ using Pishkhan.Infrastructure.Application;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
 using Pishkhan.Modules.Tenancy.Persistence;
@@ -83,6 +84,7 @@ internal sealed class WorkspaceHandlers(TenancyDbContext db, ITenantContext tena
         db.Memberships.Add(membership);
         db.Publish(new WorkspaceChanged(workspace.Id, "created"), key: workspace.Id.ToString());
         db.Publish(new MembershipChanged(workspace.Id, caller.UserId, WorkspaceRoles.Owner, false), key: workspace.Id.ToString());
+        Audit("workspace.create", "workspace", workspace.Id, after: new { workspace.Name, workspace.Slug, workspace.Industry });
         await db.SaveChangesAsync(cancellationToken);
         return ToResponse(workspace, WorkspaceRoles.Owner);
     }
@@ -107,8 +109,10 @@ internal sealed class WorkspaceHandlers(TenancyDbContext db, ITenantContext tena
     public async Task<Result<WorkspaceResponse>> HandleAsync(UpdateWorkspaceCommand command, CancellationToken cancellationToken)
     {
         var workspace = await db.Workspaces.FirstAsync(w => w.Id == tenant.WorkspaceId, cancellationToken);
+        var before = new { workspace.Name, workspace.Industry };
         workspace.Update(command.Request.Name, command.Request.Industry);
         db.Publish(new WorkspaceChanged(workspace.Id, "updated"), key: workspace.Id.ToString());
+        Audit("workspace.update", "workspace", workspace.Id, before, new { workspace.Name, workspace.Industry });
         cache.Enqueue(db, CacheTags.Workspace(workspace.Id));
         await db.SaveChangesAsync(cancellationToken);
         await cache.InvalidateLocalAsync([CacheTags.Workspace(workspace.Id)], cancellationToken);
@@ -126,9 +130,16 @@ internal sealed class WorkspaceHandlers(TenancyDbContext db, ITenantContext tena
         var workspace = await db.Workspaces.FirstAsync(w => w.Id == tenant.WorkspaceId, cancellationToken);
         workspace.SetBusinessHours(new BusinessHours(command.Hours.Days, command.Hours.ClosedDates));
         db.Publish(new WorkspaceChanged(workspace.Id, "business_hours"), key: workspace.Id.ToString());
+        Audit("workspace.business_hours_update", "workspace", workspace.Id, after: command.Hours);
         cache.Enqueue(db, CacheTags.Workspace(workspace.Id));
         await db.SaveChangesAsync(cancellationToken);
         return command.Hours;
+    }
+
+    private void Audit(string action, string entityType, Guid entityId, object? before = null, object? after = null)
+    {
+        var entry = AuditEntries.Create(AuditActor.User(caller.UserId, caller.ActorStaffId, caller.IpAddress), action, entityType, entityId.ToString(), tenant.WorkspaceId, clock.UtcNow, before, after);
+        db.Publish(entry, entry.PartitionKey());
     }
 
     private async Task<string> RoleAsync(CancellationToken cancellationToken) =>

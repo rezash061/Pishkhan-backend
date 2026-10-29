@@ -10,6 +10,7 @@ using Pishkhan.Infrastructure.Hosting;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Agent.Persistence;
+using Pishkhan.Modules.Audit.Persistence;
 using Pishkhan.Modules.Automation.Persistence;
 using Pishkhan.Modules.Catalog.Persistence;
 using Pishkhan.Modules.Backoffice;

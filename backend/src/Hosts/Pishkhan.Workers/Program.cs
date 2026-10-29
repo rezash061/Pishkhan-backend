@@ -4,10 +4,12 @@ using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Agent;
+using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
+using Pishkhan.Modules.Identity;
 using Pishkhan.Modules.Tenancy;
 using Pishkhan.Modules.Files;
 using Pishkhan.Web.Hosting;
@@ -23,6 +25,7 @@ services.AddAuthentication();
 services.AddAuthorization();
 services
     .AddFilesModule(configuration)
+    .AddIdentityModule(configuration)
     .AddTenancyModule(configuration)
     .AddChannelsModule(configuration)
     .AddConversationsModule(configuration)

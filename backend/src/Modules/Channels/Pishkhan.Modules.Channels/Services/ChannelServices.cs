@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.RateLimiting;
 using Pishkhan.Infrastructure.Security;
+using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Instagram;
@@ -21,9 +22,18 @@ internal static class TokenPurposes
 
 internal static class ChannelStatusEvents
 {
-    /// <summary>Queues <see cref="ChannelStatusChanged"/> in the same transaction as the status change (panel banner, notifications).</summary>
-    public static void PublishStatus(this ChannelsDbContext db, ChannelAccount account) =>
+    /// <summary>
+    /// Queues <see cref="ChannelStatusChanged"/> in the same transaction as the status change (panel banner, notifications), and an
+    /// audit entry <c>channel.&lt;status&gt;</c>. <paramref name="actor"/> defaults to the system (token refresh, Meta webhooks).
+    /// </summary>
+    public static void PublishStatus(this ChannelsDbContext db, ChannelAccount account, AuditActor? actor = null)
+    {
         db.Publish(new ChannelStatusChanged(account.Id, account.WorkspaceId, account.Status, account.StatusReason), account.Id.ToString(), account.WorkspaceId);
+        var entry = AuditEntries.Create(
+            actor ?? AuditActor.System, "channel." + account.Status, "channel_account", account.Id.ToString(), account.WorkspaceId, DateTimeOffset.UtcNow,
+            after: new { account.Kind, account.Username, account.Status }, reason: account.StatusReason);
+        db.Publish(entry, entry.PartitionKey(), account.WorkspaceId);
+    }
 }
 
 internal sealed class ChannelDirectory(ChannelsDbContext db) : IChannelDirectory
