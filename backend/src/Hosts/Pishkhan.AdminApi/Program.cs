@@ -4,6 +4,7 @@ using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Backoffice;
+using Pishkhan.Modules.Content;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Hosting;
 using Pishkhan.Web.OpenApi;
@@ -17,7 +18,7 @@ var services = builder.Services;
 var configuration = builder.Configuration;
 services.AddPishkhanAuthentication(configuration, builder.Environment, AuthSchemes.Staff);
 services.AddPishkhanOpenApi(ApiDocuments.Admin);
-services.AddBackofficeModule(configuration).AddAuditModule(configuration).DecorateHandlers();
+services.AddBackofficeModule(configuration).AddAuditModule(configuration).AddContentModule(configuration).DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
 
 var app = builder.Build();
@@ -25,6 +26,7 @@ app.UsePishkhanWebHost();
 app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
 app.MapJwks(AuthSchemes.Staff);
 app.MapBackofficeEndpoints();
+app.MapContentAdminEndpoints();
 app.MapAuditAdminEndpoints();
 await app.RunAsync();
 

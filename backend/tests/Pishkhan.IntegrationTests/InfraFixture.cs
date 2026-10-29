@@ -112,6 +112,7 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Conversations.Persistence.ConversationsDbContext>("conversations");
         await Migrate<Modules.Agent.Persistence.AgentDbContext>("agent");
         await Migrate<Modules.Automation.Persistence.AutomationDbContext>("automation");
+        await Migrate<Modules.Content.Persistence.ContentDbContext>("content");
         await Migrate<Modules.Catalog.Persistence.CatalogDbContext>("catalog");
         await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
 
