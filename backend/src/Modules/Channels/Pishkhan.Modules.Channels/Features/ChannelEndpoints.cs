@@ -13,6 +13,7 @@ using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Audit.Contracts;
+using Pishkhan.Modules.Billing.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Instagram;
@@ -53,8 +54,9 @@ internal static class ChannelEndpoints
         ws.MapPost("/instagram/connect", ConnectAsync)
             .RequireWorkspacePermission(Permissions.ChannelsManage)
             .WithSummary("Start connecting an Instagram professional account")
-            .WithDescription("Returns the Instagram authorization URL. The browser is sent back to the panel after the callback with `status=connected|denied|error` and `reason`.")
+            .WithDescription("Returns the Instagram authorization URL. The browser is sent back to the panel after the callback with `status=connected|denied|error` and `reason` (`plan_limit` when a new account would exceed the plan's `channel_accounts`). 402 `billing.plan_limit` when the plan's accounts are all in use and none needs reconnecting.")
             .Produces<ConnectInstagramResponse>()
+            .ProducesProblem(StatusCodes.Status402PaymentRequired)
             .WithStandardProblems();
 
         ws.MapGet("/{channelId:guid}/media", ListMediaAsync)
@@ -92,11 +94,22 @@ internal static class ChannelEndpoints
         IOptions<InstagramOptions> options,
         [FromKeyedServices(RedisInstances.State)] IConnectionMultiplexer redis,
         RedisKeys keys,
-        IClock clock)
+        ChannelsDbContext db,
+        IEntitlements entitlements,
+        IClock clock,
+        CancellationToken ct)
     {
         if (string.IsNullOrEmpty(options.Value.AppId) || string.IsNullOrEmpty(options.Value.RedirectUri))
         {
             return Error.Unprocessable("channels.instagram.not_configured").ToProblem();
+        }
+
+        // Reconnecting an account that needs it is always allowed; the callback checks the limit again for a new account.
+        var accounts = await db.Accounts.AsNoTracking().Where(a => a.Status != ChannelStatuses.Disconnected).Select(a => a.Status).ToListAsync(ct);
+        var reconnectable = accounts.Any(s => s is ChannelStatuses.ReauthRequired or ChannelStatuses.TokenExpiring);
+        if (!reconnectable && !(await entitlements.GetAsync(workspaceId, ct)).Allows(BillingMeters.ChannelAccounts, accounts.Count + 1))
+        {
+            return Error.PlanLimit(BillingMeters.ChannelAccounts).ToProblem();
         }
 
         var nonce = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
@@ -119,6 +132,7 @@ internal static class ChannelEndpoints
         IOptions<InstagramOptions> options,
         [FromKeyedServices(RedisInstances.State)] IConnectionMultiplexer redis,
         RedisKeys keys,
+        IEntitlements entitlements,
         IClock clock,
         ILoggerFactory loggers)
     {
@@ -169,6 +183,14 @@ internal static class ChannelEndpoints
                 .Where(a => a.Kind == ChannelKinds.Instagram && a.ExternalId == profile.UserId)
                 .OrderBy(a => a.Status == ChannelStatuses.Disconnected)
                 .FirstOrDefaultAsync(ct);
+            if (account is null || account.Status == ChannelStatuses.Disconnected)
+            {
+                var connected = await db.Accounts.CountAsync(a => a.Status != ChannelStatuses.Disconnected, ct);
+                if (!(await entitlements.GetAsync(parsed.WorkspaceId, ct)).Allows(BillingMeters.ChannelAccounts, connected + 1))
+                {
+                    return Back("error", "plan_limit");
+                }
+            }
             if (account is null)
             {
                 account = ChannelAccount.ConnectInstagram(parsed.WorkspaceId, profile.UserId, profile.Username, profile.Name, tokenEnc, expiresAt, shortLived.Permissions, parsed.UserId, now);

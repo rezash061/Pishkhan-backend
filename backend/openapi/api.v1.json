@@ -1456,6 +1456,7 @@
           "Workspaces"
         ],
         "summary": "Invite a team member by phone (SMS link)",
+        "description": "Members and pending invitations count against the plan's `seats`; over the limit answers 402 `billing.plan_limit`.",
         "parameters": [
           {
             "name": "workspaceId",
@@ -1497,6 +1498,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InvitationResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1809,7 +1820,7 @@
           "Channels"
         ],
         "summary": "Start connecting an Instagram professional account",
-        "description": "Returns the Instagram authorization URL. The browser is sent back to the panel after the callback with `status=connected|denied|error` and `reason`.",
+        "description": "Returns the Instagram authorization URL. The browser is sent back to the panel after the callback with `status=connected|denied|error` and `reason` (`plan_limit` when a new account would exceed the plan's `channel_accounts`). 402 `billing.plan_limit` when the plan's accounts are all in use and none needs reconnecting.",
         "parameters": [
           {
             "name": "workspaceId",
@@ -1828,6 +1839,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConnectInstagramResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -5460,6 +5481,120 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/billing/subscription": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "The workspace's plan and its limits",
+        "description": "Without a subscription the workspace is on the free plan. During the beta plans are granted by the Pishkhan team.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentPlanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/usage": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Usage this billing period against the plan's limits",
+        "description": "Every meter: ai_conversations, ai_messages, receipt_verifications and sms count this period; channel_accounts and seats (members plus pending invitations) are current counts.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/audit": {
       "get": {
         "tags": [
@@ -6561,6 +6696,81 @@
           "IRR"
         ],
         "type": "string"
+      },
+      "CurrentPlanResponse": {
+        "required": [
+          "source",
+          "planId",
+          "planCode",
+          "planName",
+          "planVersion",
+          "trial",
+          "endsAt",
+          "limits",
+          "subscription"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "format": "int32"
+            }
+          },
+          "subscription": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SubscriptionResponse"
+              }
+            ]
+          }
+        }
       },
       "DashboardDay": {
         "required": [
@@ -9448,6 +9658,68 @@
           }
         }
       },
+      "SubscriptionResponse": {
+        "required": [
+          "id",
+          "planId",
+          "planCode",
+          "planVersion",
+          "state",
+          "trial",
+          "startsAt",
+          "endsAt",
+          "endedAt",
+          "endReason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "planVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SupportSessionResponse": {
         "required": [
           "accessToken",
@@ -9633,6 +9905,54 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UsageMeter": {
+        "required": [
+          "meter",
+          "used",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "meter": {
+            "type": "string"
+          },
+          "used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UsageResponse": {
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "meters"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "meters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageMeter"
+            }
           }
         }
       },
@@ -9862,6 +10182,9 @@
     },
     {
       "name": "Catalog"
+    },
+    {
+      "name": "Billing"
     },
     {
       "name": "Audit"

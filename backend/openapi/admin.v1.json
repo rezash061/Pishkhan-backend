@@ -1589,6 +1589,294 @@
           }
         ]
       }
+    },
+    "/admin/v1/workspaces/{workspaceId}/billing": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "A workspace's plan, usage this period and subscription history",
+        "description": "Roles: SuperAdmin, Finance, Support, ReadOnly. History is newest first.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkspaceBilling"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}/subscription": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Grant a plan or a trial",
+        "description": "Finance or SuperAdmin, step-up. `planId` is a published version. Replaces the current subscription; audited in the workspace as subscription.grant.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}/subscription/extend": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Extend the current subscription or trial",
+        "description": "Finance or SuperAdmin, step-up. 409 `billing.subscription.none` without a subscription, `billing.subscription.not_extendable` when it has no end. Audited as subscription.extend.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}/subscription/cancel": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "End the current subscription now; the workspace returns to the free plan",
+        "description": "Finance or SuperAdmin, step-up. Audited as subscription.cancel.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1757,6 +2045,28 @@
           "activeSessions": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "AdminWorkspaceBilling": {
+        "required": [
+          "current",
+          "usage",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/CurrentPlanResponse"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageResponse"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionResponse"
+            }
           }
         }
       },
@@ -2178,6 +2488,133 @@
           "IRR"
         ],
         "type": "string"
+      },
+      "CurrentPlanResponse": {
+        "required": [
+          "source",
+          "planId",
+          "planCode",
+          "planName",
+          "planVersion",
+          "trial",
+          "endsAt",
+          "limits",
+          "subscription"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "format": "int32"
+            }
+          },
+          "subscription": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SubscriptionResponse"
+              }
+            ]
+          }
+        }
+      },
+      "ExtendSubscriptionRequest": {
+        "required": [
+          "days",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "GrantPlanRequest": {
+        "required": [
+          "planId",
+          "trial",
+          "endsAt",
+          "days",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "days": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
       },
       "JsonElement": { },
       "LeadResponse": {
@@ -2901,6 +3338,79 @@
           }
         }
       },
+      "SubscriptionActionRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "SubscriptionResponse": {
+        "required": [
+          "id",
+          "planId",
+          "planCode",
+          "planVersion",
+          "state",
+          "trial",
+          "startsAt",
+          "endsAt",
+          "endedAt",
+          "endReason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "planVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SupportSessionLink": {
         "required": [
           "url",
@@ -2929,6 +3439,54 @@
           },
           "code": {
             "type": "string"
+          }
+        }
+      },
+      "UsageMeter": {
+        "required": [
+          "meter",
+          "used",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "meter": {
+            "type": "string"
+          },
+          "used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UsageResponse": {
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "meters"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "meters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageMeter"
+            }
           }
         }
       },
@@ -2995,6 +3553,9 @@
     },
     {
       "name": "Plans"
+    },
+    {
+      "name": "Billing"
     }
   ]
 }

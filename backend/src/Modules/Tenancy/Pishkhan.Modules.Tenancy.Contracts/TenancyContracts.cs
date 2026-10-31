@@ -27,6 +27,9 @@ public interface IMembershipQueries
     /// <summary>Ids of the workspace's members who have <paramref name="permission"/>.</summary>
     Task<IReadOnlyList<Guid>> GetMembersWithPermissionAsync(Guid workspaceId, string permission, CancellationToken cancellationToken);
 
+    /// <summary>Seats in use for the plan's <c>seats</c> limit: members plus pending, unexpired invitations.</summary>
+    Task<int> CountSeatsAsync(Guid workspaceId, CancellationToken cancellationToken);
+
     /// <summary>Back office: the user's workspaces with their role, oldest membership first.</summary>
     Task<IReadOnlyList<UserMembership>> GetMembershipsOfUserAsync(Guid userId, CancellationToken cancellationToken);
 }

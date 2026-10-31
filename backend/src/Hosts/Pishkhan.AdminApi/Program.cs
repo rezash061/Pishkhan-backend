@@ -29,7 +29,7 @@ services
     .AddTenancyModule(configuration)
     .AddIdentityDirectory()
     .AddChannelsDirectory()
-    .AddBillingModule(configuration)
+    .AddBillingModule(configuration).AddBillingBackoffice()
     .DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
 

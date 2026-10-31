@@ -18,6 +18,12 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
 
     public DbSet<Plan> Plans => Set<Plan>();
 
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+
+    public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
+
+    public DbSet<UsageSubject> UsageSubjects => Set<UsageSubject>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Plan>(b =>
@@ -37,6 +43,34 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.HasIndex(x => x.Code, "ix_plans_code_published").IsUnique().HasFilter("status = 'Published'");
             b.HasIndex(x => x.Code, "ix_plans_code_draft").IsUnique().HasFilter("status = 'Draft'");
             b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<Subscription>(b =>
+        {
+            b.ToTable("subscriptions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.PlanCode).HasMaxLength(30);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            b.Property(x => x.EndReason).HasMaxLength(20);
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+
+            // One current subscription per workspace.
+            b.HasIndex(x => x.WorkspaceId, "ix_subscriptions_workspace_active").IsUnique().HasFilter("status = 'Active'");
+            b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<UsageCounter>(b =>
+        {
+            b.ToTable("usage_counters");
+            b.HasKey(x => new { x.WorkspaceId, x.Meter, x.PeriodStart });
+            b.Property(x => x.Meter).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<UsageSubject>(b =>
+        {
+            b.ToTable("usage_subjects");
+            b.HasKey(x => new { x.WorkspaceId, x.Meter, x.PeriodStart, x.SubjectId });
+            b.Property(x => x.Meter).HasMaxLength(40);
         });
     }
 

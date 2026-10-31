@@ -142,7 +142,9 @@ public static class TenancyModule
             .RequireWorkspacePermission(Permissions.MembersManage)
             .WithIdempotency()
             .WithSummary("Invite a team member by phone (SMS link)")
+            .WithDescription("Members and pending invitations count against the plan's `seats`; over the limit answers 402 `billing.plan_limit`.")
             .Produces<InvitationResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status402PaymentRequired)
             .WithStandardProblems()
             .WithExamples(new InviteRequest("09120005678", WorkspaceRoles.Agent));
 
