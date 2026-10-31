@@ -217,6 +217,9 @@ public interface IChannelDirectory
 
     /// <summary>An account of the current workspace, any status.</summary>
     Task<ChannelAccountInfo?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The current workspace's accounts that are not disconnected.</summary>
+    Task<IReadOnlyList<ChannelAccountInfo>> ListAsync(CancellationToken cancellationToken);
 }
 
 public interface IChannelWebhookParser

@@ -5363,6 +5363,70 @@
           }
         ]
       }
+    },
+    "/api/v1/workspaces/{workspaceId}/dashboard": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Dashboard: activity over `range` (today, 7d, 30d), the overnight summary, the inbox now and channel health",
+        "description": "Period counts come from hourly rollups and may lag a few minutes; `inbox` and `channels` are live. Days are Tehran days.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5754,6 +5818,37 @@
           }
         }
       },
+      "ChannelHealth": {
+        "required": [
+          "id",
+          "kind",
+          "username",
+          "status",
+          "healthy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "healthy": {
+            "type": "boolean"
+          }
+        }
+      },
       "ChannelResponse": {
         "required": [
           "id",
@@ -5981,6 +6076,147 @@
           "IRR"
         ],
         "type": "string"
+      },
+      "DashboardDay": {
+        "required": [
+          "day",
+          "messagesReceived",
+          "newConversations",
+          "repliesByRule",
+          "repliesByAi",
+          "repliesByHuman",
+          "handoffs"
+        ],
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "messagesReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newConversations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByRule": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByAi": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByHuman": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handoffs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DashboardResponse": {
+        "required": [
+          "range",
+          "from",
+          "to",
+          "totals",
+          "days",
+          "overnight",
+          "inbox",
+          "channels"
+        ],
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DashboardTotals"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardDay"
+            }
+          },
+          "overnight": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OvernightSummary"
+              }
+            ]
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxNow"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelHealth"
+            }
+          }
+        }
+      },
+      "DashboardTotals": {
+        "required": [
+          "messagesReceived",
+          "newConversations",
+          "repliesByRule",
+          "repliesByAi",
+          "repliesByHuman",
+          "handoffs",
+          "automatedShare"
+        ],
+        "type": "object",
+        "properties": {
+          "messagesReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newConversations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByRule": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByAi": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repliesByHuman": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handoffs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "automatedShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
       },
       "DayHours": {
         "required": [
@@ -6601,6 +6837,36 @@
           }
         }
       },
+      "InboxNow": {
+        "required": [
+          "open",
+          "handedOff",
+          "unread",
+          "oldestHandoffAt"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handedOff": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oldestHandoffAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "InvitationResponse": {
         "required": [
           "id",
@@ -7101,6 +7367,46 @@
           },
           "isEmpty": {
             "type": "boolean"
+          }
+        }
+      },
+      "OvernightSummary": {
+        "required": [
+          "from",
+          "to",
+          "ongoing",
+          "messagesReceived",
+          "automatedReplies",
+          "handoffs",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ongoing": {
+            "type": "boolean"
+          },
+          "messagesReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "automatedReplies": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handoffs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -8866,6 +9172,9 @@
     },
     {
       "name": "Audit"
+    },
+    {
+      "name": "Dashboard"
     }
   ]
 }

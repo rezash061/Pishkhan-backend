@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.10 part 1: dashboard, 2026-10-31)
+- New Analytics module (`analytics` schema) with hourly rollups per workspace (`analytics.hourly_metrics`): messages received, new conversations, replies by rule, by AI and by a team member, and handoffs. The platform worker group fills it from `conversations.inbound-message-received`, `conversations.outbound-message-requested` (sends postponed by the rate limit are not counted twice) and `conversations.handoff-requested`, each counted once.
+- `GET /api/v1/workspaces/{workspaceId}/dashboard?range=today|7d|30d` (permission `workspace.analytics.read`) returns totals with the automated share, one entry per Tehran day, and the overnight summary. The summary covers the latest stretch of closed business hours in the last 24 hours and includes a ready Persian sentence such as «از ۲۱:۳۰ تا ۰۹:۳۰: ۷ پیام دریافت شد، ۶ پاسخ خودکار داده شد و ۱ گفتگو به تیم سپرده شد.». The response also has the live inbox (open, handed off, unread, oldest waiting handoff) and channel health. Rollup figures are cached for up to 5 minutes (`dash:{ws}:{range}`).
+- Overnight periods follow the hourly buckets, which start at :30 Tehran time (UTC+03:30).
+- Not yet: leads captured and forms (BE-1.7), knowledge score and unanswered questions (BE-1.4), orders and revenue (Phase 2), quota usage (billing).
+
 ### Added (Phase 1, automation test runs, product images, one set of business hours, 2026-10-29)
 - `POST /workspaces/{workspaceId}/automation/test` dry-runs the rules against a sample DM or comment (`text`, `payload`, `source`, `kind`, optional `channelAccountId`, `mediaId`, `at`, `ruleId`, `contact`). It returns the outcome (`rule`, `outside_hours`, `product_details`, `ai`, `fallback`, `none`), the rule, the other rules that also matched, the steps with variables filled in, and the flow the rule starts, run to its first wait. Nothing is sent or stored, and cooldowns are ignored.
 - `POST /workspaces/{workspaceId}/automation/flows/{flowId}/test` runs a flow's draft (or `published`) with sample `answers`, turn by turn. Delays end at once, and tag and field actions apply to the conditions that follow. An invalid draft gets 422 with the validation result.
