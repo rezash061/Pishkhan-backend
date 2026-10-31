@@ -69,9 +69,12 @@ public sealed class NotificationsTests(InfraFixture infra, ChannelsHost workers)
             },
         }), DateTimeOffset.UtcNow), account, null);
 
-    private async Task<int> SmsCountAsync(string marker) =>
+    /// <summary>SMS to <paramref name="phone"/> containing <paramref name="marker"/>; other tests text other owners the same titles.</summary>
+    private async Task<int> SmsCountAsync(string phone, string marker) =>
         (await workers.Host.Services.GetRequiredService<DevSmsSender>().RecentAsync())
-            .Count(s => JsonDocument.Parse(s).RootElement.GetProperty("text").GetString()!.Contains(marker, StringComparison.Ordinal));
+            .Select(s => JsonDocument.Parse(s).RootElement)
+            .Count(e => e.GetProperty("to").GetString()!.EndsWith(phone[1..], StringComparison.Ordinal)
+                && e.GetProperty("text").GetString()!.Contains(marker, StringComparison.Ordinal));
 
     private static async Task<JsonElement> Eventually(Func<Task<JsonElement>> read, Func<JsonElement, bool> condition, string because)
     {
@@ -96,7 +99,8 @@ public sealed class NotificationsTests(InfraFixture infra, ChannelsHost workers)
     [Fact]
     public async Task Handoffs_and_requests_notify_per_preferences_and_critical_ones_send_one_sms()
     {
-        var owner = await _api.SignInAsync(Ct);
+        var phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999);
+        var owner = await _api.SignInAsync(phone, Ct);
         var ws = await ApiFactory.CreateWorkspaceAsync(owner, Ct);
         var account = await SeedAccountAsync(ws);
         var prefs = $"/api/v1/workspaces/{ws}/notification-preferences";
@@ -131,14 +135,14 @@ public sealed class NotificationsTests(InfraFixture infra, ChannelsHost workers)
         var marker = Guid.NewGuid().ToString("N")[..8];
         await PublishAsync(new NotificationRequested(ws, null, "automation", "خاموش " + marker, null, null), ws.ToString(), ws);
         await PublishAsync(new NotificationRequested(ws, null, "channel", "اتصال " + marker, null, "/settings/channels"), ws.ToString(), ws);
-        await Eventually(async () => JsonSerializer.SerializeToElement(await SmsCountAsync("اتصال " + marker)), n => n.GetInt32() == 1, "the channel SMS");
+        await Eventually(async () => JsonSerializer.SerializeToElement(await SmsCountAsync(phone, "اتصال " + marker)), n => n.GetInt32() == 1, "the channel SMS");
         await PublishAsync(new ChannelStatusChanged(Guid.NewGuid(), ws, ChannelStatuses.ReauthRequired, "invalid_token"), ws.ToString(), ws);
         page = await Eventually(() => owner.GetFromJsonAsync<JsonElement>(list, Ct), p => p.GetProperty("unreadCount").GetInt32() == 3, "the channel notifications");
         page.GetProperty("items").EnumerateArray().ShouldNotContain(n => n.GetProperty("kind").GetString() == "automation");
         page.GetProperty("items")[0].GetProperty("title").GetString()!.ShouldContain("دوباره وصل کنید");
         await Task.Delay(500, Ct);
-        (await SmsCountAsync("اتصال " + marker)).ShouldBe(1);
-        (await SmsCountAsync("دوباره وصل کنید")).ShouldBe(0); // the second channel SMS falls in the cooldown
+        (await SmsCountAsync(phone, "اتصال " + marker)).ShouldBe(1);
+        (await SmsCountAsync(phone, "دوباره وصل کنید")).ShouldBe(0); // the second channel SMS falls in the cooldown
 
         // Paging, then read one and the rest.
         var first = await owner.GetFromJsonAsync<JsonElement>(list + "?limit=2", Ct);

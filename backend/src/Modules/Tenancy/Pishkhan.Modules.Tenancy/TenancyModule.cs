@@ -42,6 +42,13 @@ public static class TenancyModule
     public static MessagingBuilder AddTenancyPlatformConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<WorkspaceDeleted, WorkspaceDataPurgeHandler>("platform");
 
+    /// <summary>AdminApi: <c>GET /admin/v1/workspaces</c> and <c>/workspaces/{id}</c>. The host also needs the Identity and Channels directories.</summary>
+    public static IEndpointRouteBuilder MapTenancyAdminEndpoints(this IEndpointRouteBuilder app)
+    {
+        AdminWorkspaceEndpoints.Map(app);
+        return app;
+    }
+
     public static IEndpointRouteBuilder MapTenancyEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapPanelApi().WithTags("Workspaces");

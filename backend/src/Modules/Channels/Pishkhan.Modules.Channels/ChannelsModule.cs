@@ -32,6 +32,14 @@ public static class ChannelsModule
         return services;
     }
 
+    /// <summary>Only <see cref="IChannelDirectory"/> (AdminApi host): no Instagram client.</summary>
+    public static IServiceCollection AddChannelsDirectory(this IServiceCollection services)
+    {
+        services.AddModuleDbContext<ChannelsDbContext>(ChannelsDbContext.SchemaName);
+        services.AddScoped<IChannelDirectory, ChannelDirectory>();
+        return services;
+    }
+
     /// <summary>Webhook ingress only (Ingress host): no database, just options, Redis and the Kafka producer.</summary>
     public static IServiceCollection AddChannelsIngress(this IServiceCollection services, IConfiguration configuration)
     {
