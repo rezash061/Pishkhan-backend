@@ -324,6 +324,10 @@ namespace Pishkhan.Modules.Tenancy.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<DateTimeOffset?>("DeletionRequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deletion_requested_at");

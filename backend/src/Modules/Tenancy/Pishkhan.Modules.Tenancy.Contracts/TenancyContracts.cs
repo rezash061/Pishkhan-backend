@@ -5,6 +5,13 @@ namespace Pishkhan.Modules.Tenancy.Contracts;
 [IntegrationEvent(Topics.WorkspaceChanged)]
 public sealed record WorkspaceChanged(Guid WorkspaceId, string Change) : IIntegrationEvent;
 
+/// <summary>
+/// The grace period is over: every module deletes what the workspace owned (rows, files). Handlers must be safe to run twice.
+/// The audit log is kept.
+/// </summary>
+[IntegrationEvent(Topics.WorkspaceDeleted)]
+public sealed record WorkspaceDeleted(Guid WorkspaceId, DateTimeOffset DeletionRequestedAt) : IIntegrationEvent;
+
 [IntegrationEvent(Topics.MembershipChanged)]
 public sealed record MembershipChanged(Guid WorkspaceId, Guid UserId, string? Role, bool Removed) : IIntegrationEvent;
 
