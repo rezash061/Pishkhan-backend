@@ -7,6 +7,7 @@ using Pishkhan.Infrastructure.Application;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Modules.Identity.Contracts;
+using Pishkhan.Modules.Identity.Features;
 using Pishkhan.Modules.Identity.Features.Auth;
 using Pishkhan.Modules.Identity.Features.Me;
 using Pishkhan.Modules.Identity.Persistence;
@@ -33,13 +34,24 @@ public static class IdentityModule
         return services;
     }
 
-    /// <summary>Only <see cref="IUserDirectory"/> (AdminApi host, which serves no user endpoints).</summary>
+    /// <summary>
+    /// AdminApi host, which serves no user endpoints: <see cref="IUserDirectory"/> and the back-office user actions. Needs the
+    /// Tenancy module (<see cref="Tenancy.Contracts.IMembershipQueries"/>) and Backoffice (<see cref="Backoffice.Contracts.IStaffDirectory"/>).
+    /// </summary>
     public static IServiceCollection AddIdentityDirectory(this IServiceCollection services)
     {
         services.AddModuleDbContext<IdentityDbContext>(IdentityDbContext.SchemaName);
         services.AddSingleton<PhoneProtection>();
         services.AddScoped<IUserDirectory, UserDirectory>();
+        services.AddScoped<AdminUserActions>();
         return services;
+    }
+
+    /// <summary>AdminApi: <c>/admin/v1/users</c>.</summary>
+    public static IEndpointRouteBuilder MapIdentityAdminEndpoints(this IEndpointRouteBuilder app)
+    {
+        AdminUserEndpoints.Map(app);
+        return app;
     }
 
     public static IEndpointRouteBuilder MapIdentityEndpoints(this IEndpointRouteBuilder app)

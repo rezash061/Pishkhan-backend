@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.12 part 2: admin users, 2026-10-31)
+- `GET /admin/v1/users?q=&status=&page=&pageSize=` (SuperAdmin, Support, Finance, ReadOnly) lists panel users newest first. `q` is a user id, a phone (exact, in any spelling) or text in the display name; `status` is `active` or `suspended`. Rows carry the masked phone, 2FA, last sign-in and the number of signed-in devices.
+- `GET /admin/v1/users/{userId}` (same roles) adds the user's workspaces with role and status, and their signed-in devices (first and last use, expiry, IP, user agent, sign-in method).
+- `POST /admin/v1/users/{userId}/sessions/revoke`, `/block` and `/unblock` (Support or SuperAdmin, step-up, `reason` of 5 to 300 characters). Revoking and blocking end every session at once, including access tokens already issued. A blocked user cannot sign in or refresh. Audited as `user.sessions_revoke`, `user.block` and `user.unblock`.
+- `RequireStepUp` moves to `Pishkhan.Web.Auth` so any module's admin endpoints can use it. New `IStaffDirectory` (Backoffice contracts) and `IMembershipQueries.GetMembershipsOfUserAsync`.
+- Integration tests use a 1-second OTP resend cooldown so a test can sign the same phone in twice.
+
 ### Added (Phase 1, BE-1.12 part 1: admin workspace search and detail, 2026-10-31)
 - `GET /admin/v1/workspaces?q=&status=&industry=&createdFrom=&createdTo=&page=&pageSize=` (SuperAdmin, Support, Finance, ReadOnly) lists workspaces newest first with `totalCount`. `q` is a workspace id, the owner's phone (exact, in any spelling) or text found in the name, the slug or an Instagram username (a leading @ is ignored). Each row has the owner (masked phone), the member count and the channels with their status.
 - `GET /admin/v1/workspaces/{workspaceId}` (same roles) adds the time zone, plan, deletion dates, the members with their roles, the channels' status history fields (`statusReason`, `statusChangedAt`, `tokenExpiresAt`) and the number of pending invitations. Deleted workspaces are still found.

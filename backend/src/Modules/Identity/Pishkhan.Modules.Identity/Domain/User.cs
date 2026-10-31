@@ -131,6 +131,7 @@ public sealed class Session : AggregateRoot<Guid>
     public const string ReasonReuse = "reuse_detected";
     public const string ReasonLogout = "logout";
     public const string ReasonRevokedByUser = "revoked_by_user";
+    public const string ReasonRevokedByStaff = "revoked_by_staff";
 
     public static Session Start(Guid userId, string refreshHash, string amr, TimeSpan lifetime, TimeSpan familyLifetime, string? ip, string? ua, DateTimeOffset now)
     {

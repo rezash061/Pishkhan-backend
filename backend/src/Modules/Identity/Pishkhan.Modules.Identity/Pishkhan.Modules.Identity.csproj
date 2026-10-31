@@ -7,6 +7,7 @@
     <ProjectReference Include="..\Pishkhan.Modules.Identity.Contracts\Pishkhan.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
     <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Backoffice\Pishkhan.Modules.Backoffice.Contracts\Pishkhan.Modules.Backoffice.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />

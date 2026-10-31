@@ -67,6 +67,17 @@ internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQuerie
             .ToListAsync(cancellationToken);
         return [.. members.Where(m => m.EffectivePermissions().Contains(permission)).Select(m => m.UserId)];
     }
+
+    public async Task<IReadOnlyList<UserMembership>> GetMembershipsOfUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var rows = await db.Memberships.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(m => m.UserId == userId)
+            .Join(db.Workspaces, m => m.WorkspaceId, w => w.Id, (m, w) => new { m.WorkspaceId, w.Name, w.Status, m.Role, m.CreatedAt })
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new UserMembership(r.WorkspaceId, r.Name, Workspace.StatusName(r.Status), r.Role, r.CreatedAt))];
+    }
 }
 
 /// <summary>Workspace status and business hours for other modules (<c>ws:{ws}:status</c>, <c>ws:{ws}:hours</c>, 5 minutes, tagged by workspace).</summary>

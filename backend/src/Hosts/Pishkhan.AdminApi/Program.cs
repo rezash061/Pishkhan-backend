@@ -39,6 +39,7 @@ app.MapBackofficeEndpoints();
 app.MapContentAdminEndpoints();
 app.MapAuditAdminEndpoints();
 app.MapTenancyAdminEndpoints();
+app.MapIdentityAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>
