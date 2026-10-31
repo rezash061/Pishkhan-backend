@@ -5499,15 +5499,6 @@
             }
           },
           {
-            "name": "workspaceId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "From",
             "in": "query",
             "schema": {
