@@ -116,6 +116,18 @@ internal sealed class ConversationActionsHandler(ConversationsDbContext db, ITen
 
 internal sealed class ConversationQueries(ConversationsDbContext db) : IConversationQueries
 {
+    public async Task<ConversationCounts> CountsAsync(CancellationToken cancellationToken)
+    {
+        var rows = await db.Conversations.AsNoTracking()
+            .Where(c => c.Status != ConversationStatuses.Closed)
+            .GroupBy(c => c.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count(), Unread = g.Count(c => c.UnreadCount > 0), Oldest = g.Min(c => c.HandedOffAt) })
+            .ToListAsync(cancellationToken);
+        var handedOff = rows.FirstOrDefault(r => r.Status == ConversationStatuses.HandedOff);
+        return new ConversationCounts(
+            rows.Where(r => r.Status != ConversationStatuses.HandedOff).Sum(r => r.Count), handedOff?.Count ?? 0, rows.Sum(r => r.Unread), handedOff?.Oldest);
+    }
+
     public async Task<ConversationSnapshot?> GetAsync(Guid conversationId, CancellationToken cancellationToken) =>
         await SnapshotAsync(db.Conversations.Where(c => c.Id == conversationId), cancellationToken);
 

@@ -11,7 +11,7 @@ namespace Pishkhan.ArchitectureTests;
 /// <summary>Module boundaries and platform rules from backend plan 1.3, checked on every build.</summary>
 public class ArchitectureTests
 {
-    private static readonly string[] Modules = ["Identity", "Tenancy", "Backoffice", "Files", "Channels", "Conversations", "Agent", "Automation", "Catalog", "Audit", "Content"];
+    private static readonly string[] Modules = ["Identity", "Tenancy", "Backoffice", "Files", "Channels", "Conversations", "Agent", "Automation", "Catalog", "Audit", "Content", "Analytics"];
 
     private static Assembly ModuleAssembly(string module) => Assembly.Load($"Pishkhan.Modules.{module}");
 
@@ -67,7 +67,8 @@ public class ArchitectureTests
         typeof(Modules.Automation.Persistence.AutomationDbContext),
         typeof(Modules.Catalog.Persistence.CatalogDbContext),
         typeof(Modules.Audit.Persistence.AuditDbContext),
-        typeof(Modules.Content.Persistence.ContentDbContext));
+        typeof(Modules.Content.Persistence.ContentDbContext),
+        typeof(Modules.Analytics.Persistence.AnalyticsDbContext));
 
     [Theory]
     [MemberData(nameof(ModuleContexts))]
