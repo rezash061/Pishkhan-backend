@@ -971,6 +971,150 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/deletion": {
+      "post": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Ask to delete the workspace (owner); its data is deleted after 30 days unless cancelled",
+        "description": "`confirmName` must equal the workspace name. Members lose access at once and automations stop; the workspace stays in `GET /workspaces` with status `pending_deletion` and `deletionScheduledFor`.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestDeletionRequest"
+              },
+              "example": {
+                "confirmName": "گالری لباس ترمه"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Cancel a pending deletion (owner); the workspace is active again",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/business-hours": {
       "get": {
         "tags": [
@@ -8075,6 +8219,17 @@
           }
         }
       },
+      "RequestDeletionRequest": {
+        "required": [
+          "confirmName"
+        ],
+        "type": "object",
+        "properties": {
+          "confirmName": {
+            "type": "string"
+          }
+        }
+      },
       "RequestOtpRequest": {
         "required": [
           "phone",
@@ -9216,7 +9371,8 @@
           "timeZone",
           "status",
           "role",
-          "createdAt"
+          "createdAt",
+          "deletionScheduledFor"
         ],
         "type": "object",
         "properties": {
@@ -9244,6 +9400,13 @@
           },
           "createdAt": {
             "type": "string",
+            "format": "date-time"
+          },
+          "deletionScheduledFor": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           }
         }

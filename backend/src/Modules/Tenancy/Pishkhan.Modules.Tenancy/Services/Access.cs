@@ -26,7 +26,7 @@ internal sealed class WorkspaceAccessResolver(TenancyDbContext db, HybridCache c
                     .Where(m => m.WorkspaceId == state.workspaceId && m.UserId == state.userId)
                     .Join(state.db.Workspaces, m => m.WorkspaceId, w => w.Id, (m, w) => new { Membership = m, w.Status })
                     .FirstOrDefaultAsync(ct);
-                return row is null || row.Status == WorkspaceStatus.PendingDeletion
+                return row is null || row.Status is WorkspaceStatus.PendingDeletion or WorkspaceStatus.Deleted
                     ? null
                     : new CachedAccess(row.Membership.Role, [.. row.Membership.EffectivePermissions()], row.Status == WorkspaceStatus.Suspended);
             },

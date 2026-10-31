@@ -145,6 +145,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             .AddAutomationOutboundConsumers()
             .AddAutomationPlatformConsumers()
             .AddFilesConsumers()
+            .AddTenancyPlatformConsumers()
             .AddCatalogConsumers()
             .AddAuditConsumers()
             .AddAnalyticsConsumers());

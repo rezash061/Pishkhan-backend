@@ -85,6 +85,7 @@ public sealed class SupportSessionTests(InfraFixture infra, ChannelsHost workers
         var denied = await support.PutAsJsonAsync("/api/v1/me/password", new { newPassword = "a-long-password-1" }, Ct);
         denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await denied.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("title").GetString().ShouldBe("auth.support_session.not_allowed");
+        (await support.PostAsJsonAsync($"/api/v1/workspaces/{ws}/deletion", new { confirmName = "نام تازه" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
 
         // The owner sees the grant, the start and the change, each by «support».
         var watch = Stopwatch.StartNew();
