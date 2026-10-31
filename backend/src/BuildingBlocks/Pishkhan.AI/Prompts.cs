@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Options;
 
 namespace Pishkhan.AI;
 
@@ -32,11 +31,11 @@ public interface IPromptRegistry
     PromptTemplate Get(string key, string? version = null);
 }
 
-internal sealed class ConfigPromptRegistry(IOptionsMonitor<AiOptions> options) : IPromptRegistry
+internal sealed class ConfigPromptRegistry(IAiSettings settings) : IPromptRegistry
 {
     public PromptTemplate Get(string key, string? version = null)
     {
-        var o = options.CurrentValue;
+        var o = settings.Current;
         if (!o.Prompts.TryGetValue(key, out var versions) || versions.Count == 0)
         {
             throw new KeyNotFoundException($"Prompt '{key}' is not registered.");
