@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.12 part 1: admin workspace search and detail, 2026-10-31)
+- `GET /admin/v1/workspaces?q=&status=&industry=&createdFrom=&createdTo=&page=&pageSize=` (SuperAdmin, Support, Finance, ReadOnly) lists workspaces newest first with `totalCount`. `q` is a workspace id, the owner's phone (exact, in any spelling) or text found in the name, the slug or an Instagram username (a leading @ is ignored). Each row has the owner (masked phone), the member count and the channels with their status.
+- `GET /admin/v1/workspaces/{workspaceId}` (same roles) adds the time zone, plan, deletion dates, the members with their roles, the channels' status history fields (`statusReason`, `statusChangedAt`, `tokenExpiresAt`) and the number of pending invitations. Deleted workspaces are still found.
+- The AdminApi host now runs the Tenancy module and the Identity and Channels directories (`AddIdentityDirectory`, `AddChannelsDirectory`). `IUserDirectory` gains `FindByPhoneAsync` and `GetManyAsync`; `IChannelDirectory` gains `FindWorkspacesByUsernameAsync` and `ListForWorkspacesAsync`.
+
+### Changed
+- `Backoffice:UserPanelUrl` defaults to `http://localhost:3001`, the user panel's development port (it was 3000).
+
 ### Added (Phase 1, support sessions, 2026-10-31)
 - `POST /admin/v1/workspaces/{workspaceId}/support-sessions` (Support or SuperAdmin, step-up, `reason` of 5 to 300 characters, optional `userId`, by default the owner) returns a one-time link `{UserPanelUrl}/api/auth/impersonation?token=…` valid 2 minutes (`Backoffice:UserPanelUrl`). Audited in the workspace as `support_session.grant` with the reason.
 - `POST /api/v1/auth/support-session` (`token`) exchanges it once for a 30-minute access token as that member, with no refresh token. The token carries the staff member in `act` and `act_name`; every change under it is audited as staff on behalf of the member, which the owner's audit view shows as «support». The exchange is audited as `support_session.start` and notifies the owner. `POST /auth/logout` ends the session.
