@@ -25,6 +25,12 @@ public sealed class MessagingBuilder
 
     internal List<ConsumerRegistration> Registrations { get; } = [];
 
+    /// <summary>
+    /// Tells this host instance apart from others in the same process (the integration tests run several Api hosts in one
+    /// process): with a group per process they would split the partitions and each would miss most broadcasts.
+    /// </summary>
+    private readonly string _instance = Guid.NewGuid().ToString("N")[..8];
+
     /// <summary>Adds a handler for <typeparamref name="TEvent"/> in a worker group. Ignored when this process does not run the group.</summary>
     public MessagingBuilder AddConsumer<TEvent, THandler>(string group, RetryPolicy? retry = null)
         where TEvent : class, IIntegrationEvent
@@ -53,13 +59,13 @@ public sealed class MessagingBuilder
 
     /// <summary>
     /// Adds a handler that every process instance receives (its own consumer group), for example cache invalidation.
-    /// Broadcast consumers start from the latest offset.
+    /// Broadcast consumers start from the latest offset; the group carries a random instance id, so a restart gets a new one.
     /// </summary>
     public MessagingBuilder AddBroadcastConsumer<TEvent, THandler>(string purpose)
         where TEvent : class, IIntegrationEvent
         where THandler : class, IIntegrationEventHandler<TEvent>
     {
-        Add<TEvent, THandler>($"{purpose}.{HostName}.{Environment.MachineName}.{Environment.ProcessId}".ToLowerInvariant(), null, broadcast: true);
+        Add<TEvent, THandler>($"{purpose}.{HostName}.{Environment.MachineName}.{Environment.ProcessId}.{_instance}".ToLowerInvariant(), null, broadcast: true);
         return this;
     }
 
