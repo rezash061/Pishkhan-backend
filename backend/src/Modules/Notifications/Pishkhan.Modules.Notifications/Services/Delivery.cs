@@ -130,6 +130,6 @@ internal sealed class ChannelNotificationHandler(NotificationsDbContext db, Noti
         };
         return title is null
             ? Task.CompletedTask
-            : Writer.WriteAsync(message.WorkspaceId, null, NotificationKinds.Channel, title, null, "/settings/channels", cancellationToken);
+            : Writer.WriteAsync(message.WorkspaceId, null, NotificationKinds.Channel, title, null, "/channels", cancellationToken);
     }
 }

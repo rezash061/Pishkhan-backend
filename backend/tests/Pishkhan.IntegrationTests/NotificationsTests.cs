@@ -134,7 +134,7 @@ public sealed class NotificationsTests(InfraFixture infra, ChannelsHost workers)
         // Automation notifications are off for the owner now; channel problems text them once per 30 minutes.
         var marker = Guid.NewGuid().ToString("N")[..8];
         await PublishAsync(new NotificationRequested(ws, null, "automation", "خاموش " + marker, null, null), ws.ToString(), ws);
-        await PublishAsync(new NotificationRequested(ws, null, "channel", "اتصال " + marker, null, "/settings/channels"), ws.ToString(), ws);
+        await PublishAsync(new NotificationRequested(ws, null, "channel", "اتصال " + marker, null, "/channels"), ws.ToString(), ws);
         await Eventually(async () => JsonSerializer.SerializeToElement(await SmsCountAsync(phone, "اتصال " + marker)), n => n.GetInt32() == 1, "the channel SMS");
         await PublishAsync(new ChannelStatusChanged(Guid.NewGuid(), ws, ChannelStatuses.ReauthRequired, "invalid_token"), ws.ToString(), ws);
         page = await Eventually(() => owner.GetFromJsonAsync<JsonElement>(list, Ct), p => p.GetProperty("unreadCount").GetInt32() == 3, "the channel notifications");
