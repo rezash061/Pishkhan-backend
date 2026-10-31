@@ -116,6 +116,30 @@
           }
         }
       }
+    },
+    "/api/v1/public/plans": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Plans on sale, in display order (pricing page)",
+        "description": "Published public plans. Cached; a publish shows within a minute.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicPlan"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -147,6 +171,12 @@
             "type": "string"
           }
         }
+      },
+      "Currency": {
+        "enum": [
+          "IRR"
+        ],
+        "type": "string"
       },
       "DataDeletionStatusResponse": {
         "required": [
@@ -246,6 +276,44 @@
           }
         }
       },
+      "Money": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        }
+      },
+      "PlanFeature": {
+        "required": [
+          "key",
+          "label",
+          "included",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "included": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -279,6 +347,111 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PublicPlan": {
+        "required": [
+          "code",
+          "name",
+          "tagline",
+          "description",
+          "monthly",
+          "annual",
+          "aiConversations",
+          "overagePerConversation",
+          "channelAccounts",
+          "seats",
+          "highlighted",
+          "isFree",
+          "limits",
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tagline": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "monthly": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "annual": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "aiConversations": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "overagePerConversation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "channelAccounts": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "seats": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "highlighted": {
+            "type": "boolean"
+          },
+          "isFree": {
+            "type": "boolean"
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "format": "int32"
+            }
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanFeature"
+            }
           }
         }
       }

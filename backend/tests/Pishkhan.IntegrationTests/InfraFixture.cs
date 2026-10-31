@@ -59,6 +59,7 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Kafka:ReplicationFactor"] = "1",
             // Every test signs users and staff in from one address; the production limits (20 an hour per IP, for requests and for OTPs) would trip mid-run.
             ["RateLimits:AuthPerHour"] = "1000",
+            ["RateLimits:PublicPerMinute"] = "1000",
             ["Identity:OtpPerIpPerHour"] = "1000",
             ["Identity:OtpResendCooldown"] = "00:00:01",
             ["Storage:Provider"] = "filesystem",
@@ -122,6 +123,7 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
         await Migrate<Modules.Analytics.Persistence.AnalyticsDbContext>("analytics");
         await Migrate<Modules.Notifications.Persistence.NotificationsDbContext>("notifications");
+        await Migrate<Modules.Billing.Persistence.BillingDbContext>("billing");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();
