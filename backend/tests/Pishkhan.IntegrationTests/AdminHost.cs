@@ -10,7 +10,10 @@ using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Modules.Backoffice;
+using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
+using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Tenancy;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Hosting;
@@ -33,12 +36,14 @@ public sealed class AdminHost : IAsyncDisposable
         builder.AddPishkhanWebHost("it-admin-api").AddPostgresCheck();
         builder.Services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
         builder.Services.AddPishkhanOpenApi(ApiDocuments.Admin);
-        builder.Services.AddBackofficeModule(builder.Configuration).AddContentModule(builder.Configuration).DecorateHandlers();
+        builder.Services.AddBackofficeModule(builder.Configuration).AddContentModule(builder.Configuration)
+            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().DecorateHandlers();
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-admin-api", m => m.AddCacheInvalidation());
         var app = builder.Build();
         app.UsePishkhanWebHost();
         app.MapBackofficeEndpoints();
         app.MapContentAdminEndpoints();
+        app.MapTenancyAdminEndpoints();
         await app.StartAsync(ct);
         return new AdminHost(app);
     }

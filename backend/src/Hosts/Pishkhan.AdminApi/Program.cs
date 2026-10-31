@@ -4,7 +4,10 @@ using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Backoffice;
+using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
+using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Tenancy;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Hosting;
 using Pishkhan.Web.OpenApi;
@@ -18,7 +21,14 @@ var services = builder.Services;
 var configuration = builder.Configuration;
 services.AddPishkhanAuthentication(configuration, builder.Environment, AuthSchemes.Staff);
 services.AddPishkhanOpenApi(ApiDocuments.Admin);
-services.AddBackofficeModule(configuration).AddAuditModule(configuration).AddContentModule(configuration).DecorateHandlers();
+services
+    .AddBackofficeModule(configuration)
+    .AddAuditModule(configuration)
+    .AddContentModule(configuration)
+    .AddTenancyModule(configuration)
+    .AddIdentityDirectory()
+    .AddChannelsDirectory()
+    .DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
 
 var app = builder.Build();
@@ -28,6 +38,7 @@ app.MapJwks(AuthSchemes.Staff);
 app.MapBackofficeEndpoints();
 app.MapContentAdminEndpoints();
 app.MapAuditAdminEndpoints();
+app.MapTenancyAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>

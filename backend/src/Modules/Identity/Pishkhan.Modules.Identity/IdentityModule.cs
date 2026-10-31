@@ -33,6 +33,15 @@ public static class IdentityModule
         return services;
     }
 
+    /// <summary>Only <see cref="IUserDirectory"/> (AdminApi host, which serves no user endpoints).</summary>
+    public static IServiceCollection AddIdentityDirectory(this IServiceCollection services)
+    {
+        services.AddModuleDbContext<IdentityDbContext>(IdentityDbContext.SchemaName);
+        services.AddSingleton<PhoneProtection>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
+        return services;
+    }
+
     public static IEndpointRouteBuilder MapIdentityEndpoints(this IEndpointRouteBuilder app)
     {
         var anonymous = app.MapPanelAnonymousApi().WithTags("Auth");

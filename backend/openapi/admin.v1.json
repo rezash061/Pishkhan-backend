@@ -504,10 +504,434 @@
           }
         ]
       }
+    },
+    "/admin/v1/workspaces": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Search workspaces, newest first",
+        "description": "Roles: SuperAdmin, Support, Finance, ReadOnly. Owner phones are masked; each row carries its channels' status.",
+        "parameters": [
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Industry",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CreatedFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "CreatedTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAdminWorkspaceSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "A workspace with its owner, members and channels",
+        "description": "Roles: SuperAdmin, Support, Finance, ReadOnly. Deleted workspaces are still found (their data is gone).",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkspaceDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminWorkspaceChannel": {
+        "required": [
+          "id",
+          "kind",
+          "username",
+          "status",
+          "statusReason",
+          "statusChangedAt",
+          "tokenExpiresAt",
+          "connectedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statusChangedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "tokenExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminWorkspaceDetail": {
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "industry",
+          "timeZone",
+          "status",
+          "planId",
+          "createdAt",
+          "deletionRequestedAt",
+          "deletionScheduledFor",
+          "deletedAt",
+          "owner",
+          "members",
+          "channels",
+          "pendingInvitations"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletionRequestedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "deletionScheduledFor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdminWorkspaceOwner"
+              }
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspaceMember"
+            }
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspaceChannel"
+            }
+          },
+          "pendingInvitations": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AdminWorkspaceMember": {
+        "required": [
+          "userId",
+          "displayName",
+          "maskedPhone",
+          "role",
+          "joinedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maskedPhone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminWorkspaceOwner": {
+        "required": [
+          "id",
+          "displayName",
+          "maskedPhone"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maskedPhone": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminWorkspaceSummary": {
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "industry",
+          "status",
+          "createdAt",
+          "deletionScheduledFor",
+          "owner",
+          "memberCount",
+          "channels"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletionScheduledFor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdminWorkspaceOwner"
+              }
+            ]
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspaceChannel"
+            }
+          }
+        }
+      },
       "AuditEntryResponse": {
         "required": [
           "id",
@@ -705,6 +1129,35 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PagedResultOfAdminWorkspaceSummary": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspaceSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -1017,6 +1470,9 @@
     },
     {
       "name": "Audit"
+    },
+    {
+      "name": "Workspaces"
     }
   ]
 }

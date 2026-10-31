@@ -18,6 +18,12 @@ public interface IUserDirectory
 
     /// <summary>The user's phone, decrypted, for sending them an SMS. Never return it in an API response.</summary>
     Task<SharedKernel.PhoneNumber?> GetPhoneAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>The user registered with this phone (matched by its blind index), or null. Back office search.</summary>
+    Task<Guid?> FindByPhoneAsync(SharedKernel.PhoneNumber phone, CancellationToken cancellationToken);
+
+    /// <summary>Several users at once, for back office lists. Unknown ids are left out.</summary>
+    Task<IReadOnlyDictionary<Guid, UserSummary>> GetManyAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 }
 
 public sealed record UserSummary(Guid Id, string? DisplayName, string MaskedPhone);

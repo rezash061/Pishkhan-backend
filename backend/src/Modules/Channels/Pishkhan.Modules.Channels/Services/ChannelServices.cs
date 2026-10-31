@@ -57,6 +57,28 @@ internal sealed class ChannelDirectory(ChannelsDbContext db) : IChannelDirectory
             .OrderBy(a => a.CreatedAt)
             .Select(a => new ChannelAccountInfo(a.Id, a.WorkspaceId, a.Kind, a.ExternalId, a.Username, a.Status))
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> FindWorkspacesByUsernameAsync(string username, int limit, CancellationToken cancellationToken)
+    {
+        var pattern = "%" + username.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+        return await db.Accounts.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(a => a.Username != null && EF.Functions.ILike(a.Username, pattern, "\\"))
+            .Select(a => a.WorkspaceId)
+            .Distinct()
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ChannelAccountState>> ListForWorkspacesAsync(IReadOnlyCollection<Guid> workspaceIds, CancellationToken cancellationToken) =>
+        workspaceIds.Count == 0
+            ? []
+            : await db.Accounts.AsNoTracking()
+                .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+                .Where(a => workspaceIds.Contains(a.WorkspaceId))
+                .OrderBy(a => a.CreatedAt)
+                .Select(a => new ChannelAccountState(a.Id, a.WorkspaceId, a.Kind, a.Username, a.Status, a.StatusReason, a.StatusChangedAt, a.TokenExpiresAt, a.CreatedAt))
+                .ToListAsync(cancellationToken);
 }
 
 /// <summary>Resolves a rate profile: an admin override in <c>channels.rate_profiles</c>, else configuration. Overrides are cached for a minute.</summary>

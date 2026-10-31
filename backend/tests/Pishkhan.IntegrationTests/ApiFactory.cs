@@ -53,10 +53,12 @@ public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Progr
     }
 
     /// <summary>Signs a new user in with a phone OTP (dev SMS sender) and returns a client carrying the access token.</summary>
-    public async Task<HttpClient> SignInAsync(CancellationToken ct)
+    public Task<HttpClient> SignInAsync(CancellationToken ct) => SignInAsync("0912" + Random.Shared.Next(1_000_000, 9_999_999), ct);
+
+    /// <summary>Signs in with <paramref name="phone"/> (national form, 0912…).</summary>
+    public async Task<HttpClient> SignInAsync(string phone, CancellationToken ct)
     {
         var client = CreateClient();
-        var phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999);
         (await client.PostAsJsonAsync("/api/v1/auth/otp/request", new { phone }, ct)).EnsureSuccessStatusCode();
 
         var sms = Services.GetRequiredService<DevSmsSender>();

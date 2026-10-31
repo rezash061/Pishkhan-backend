@@ -220,7 +220,18 @@ public interface IChannelDirectory
 
     /// <summary>The current workspace's accounts that are not disconnected.</summary>
     Task<IReadOnlyList<ChannelAccountInfo>> ListAsync(CancellationToken cancellationToken);
+
+    /// <summary>Back office search: workspaces with an account (any status) whose username contains <paramref name="username"/>.</summary>
+    Task<IReadOnlyList<Guid>> FindWorkspacesByUsernameAsync(string username, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Back office: every account of these workspaces, any status, oldest first.</summary>
+    Task<IReadOnlyList<ChannelAccountState>> ListForWorkspacesAsync(IReadOnlyCollection<Guid> workspaceIds, CancellationToken cancellationToken);
 }
+
+/// <summary>An account's connection state for the back office (no token or external ids).</summary>
+public sealed record ChannelAccountState(
+    Guid Id, Guid WorkspaceId, string Kind, string? Username, string Status, string? StatusReason, DateTimeOffset? StatusChangedAt,
+    DateTimeOffset? TokenExpiresAt, DateTimeOffset ConnectedAt);
 
 public interface IChannelWebhookParser
 {
