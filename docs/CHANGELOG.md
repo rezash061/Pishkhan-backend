@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.14 notifications v1, 2026-10-31)
+- New Notifications module (`notifications` schema). Handoffs, Instagram connection problems (reconnect needed, token expiring, access removed in Instagram) and `notifications.notification-requested.v1` (for example the automations' «notify the team» action) become notifications for the members who should act: those who can reply for handoffs and automations, those who manage channels for connection problems. A member who hands a conversation over is not notified about it.
+- `GET /workspaces/{workspaceId}/notifications?unread=&cursor=&limit=` lists the caller's notifications, newest first, with `unreadCount`. `POST /workspaces/{workspaceId}/notifications/{notificationId}/read` and `POST /workspaces/{workspaceId}/notifications/read-all` mark them read.
+- `GET` and `PUT /workspaces/{workspaceId}/notification-preferences`: per kind (`handoff`, `automation`, `channel`) the caller turns `inApp`, `push` and `sms` on or off. Defaults: in-app and push on, SMS on only for connection problems. SMS is offered for `handoff` and `channel` only, and at most one SMS per kind every 30 minutes is sent. `push` is stored now and used once web push ships.
+- `IdempotentHandler` gains `AfterCommitAsync` for side effects outside the database (sent at most once).
+
 ### Added (Phase 1, workspace deletion with a grace period, 2026-10-31)
 - `POST /workspaces/{workspaceId}/deletion` (owner, `workspace.delete`) with `confirmName` equal to the workspace name returns 202 and the workspace with status `pending_deletion` and `deletionScheduledFor` (30 days later). Members lose access at once (its endpoints answer 404) and automations stop sending. A wrong name gets 400 `tenancy.deletion.confirm_mismatch`.
 - `DELETE /workspaces/{workspaceId}/deletion` cancels while the deletion is pending (owner; other members 403, non-members 404, nothing pending 409). The workspace is active again.

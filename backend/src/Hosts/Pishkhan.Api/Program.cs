@@ -12,6 +12,7 @@ using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Files;
 using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Notifications;
 using Pishkhan.Modules.Tenancy;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Hosting;
@@ -37,6 +38,7 @@ services
     .AddContentModule(configuration)
     .AddCatalogModule(configuration)
     .AddAuditModule(configuration)
+    .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
     .DecorateHandlers();
 services.AddPishkhanRealtime();
@@ -57,6 +59,7 @@ app.MapAutomationEndpoints();
 app.MapContentEndpoints();
 app.MapCatalogEndpoints();
 app.MapAuditEndpoints();
+app.MapNotificationsEndpoints();
 app.MapAnalyticsEndpoints();
 
 if (app.Environment.IsDevelopment())

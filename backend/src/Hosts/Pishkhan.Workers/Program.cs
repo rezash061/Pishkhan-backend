@@ -11,6 +11,7 @@ using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
 using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Notifications;
 using Pishkhan.Modules.Tenancy;
 using Pishkhan.Modules.Files;
 using Pishkhan.Web.Hosting;
@@ -34,6 +35,7 @@ services
     .AddCatalogModule(configuration)
     .AddAgentModule(configuration)
     .AddAuditModule(configuration)
+    .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
@@ -51,6 +53,7 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddFilesConsumers()
     .AddTenancyPlatformConsumers()
     .AddAuditConsumers()
+    .AddNotificationsConsumers()
     .AddAnalyticsConsumers());
 
 if (groups.IsEnabled("platform"))
