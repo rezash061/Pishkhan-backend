@@ -47,13 +47,14 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAutomationPlatformConsumers()
     .AddCatalogConsumers()
     .AddFilesConsumers()
+    .AddTenancyPlatformConsumers()
     .AddAuditConsumers());
 
 if (groups.IsEnabled("platform"))
 {
     services.AddOutboxRelay(configuration);
     services.AddHostedService<TimerDispatcher>();
-    services.AddPishkhanJobs(configuration, [.. QuartzExtensions.PlatformJobs, .. ChannelsModule.Jobs]);
+    services.AddPishkhanJobs(configuration, [.. QuartzExtensions.PlatformJobs, .. ChannelsModule.Jobs, .. TenancyModule.Jobs]);
 }
 
 var app = builder.Build();

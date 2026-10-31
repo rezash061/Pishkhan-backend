@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added (Phase 1, workspace deletion with a grace period, 2026-10-31)
+- `POST /workspaces/{workspaceId}/deletion` (owner, `workspace.delete`) with `confirmName` equal to the workspace name returns 202 and the workspace with status `pending_deletion` and `deletionScheduledFor` (30 days later). Members lose access at once (its endpoints answer 404) and automations stop sending. A wrong name gets 400 `tenancy.deletion.confirm_mismatch`.
+- `DELETE /workspaces/{workspaceId}/deletion` cancels while the deletion is pending (owner; other members 403, non-members 404, nothing pending 409). The workspace is active again.
+- `GET /workspaces` lists workspaces pending deletion too, so the owner can find and cancel them. `WorkspaceResponse` gains `deletionScheduledFor`.
+- The daily `tenancy.workspace-purge` job marks workspaces past the grace period `deleted` and emits the new `tenancy.workspace-deleted.v1` event. The data is then deleted: every row with the workspace's `workspace_id` in the module schemas, and the workspace's files with their stored objects. The audit log is kept, and the workspace row stays as a tombstone with `deleted_at` (migration `WorkspaceDeletion`).
+
 ### Added (Phase 1, automation test runs, product images, one set of business hours, 2026-10-29)
 - `POST /workspaces/{workspaceId}/automation/test` dry-runs the rules against a sample DM or comment (`text`, `payload`, `source`, `kind`, optional `channelAccountId`, `mediaId`, `at`, `ruleId`, `contact`). It returns the outcome (`rule`, `outside_hours`, `product_details`, `ai`, `fallback`, `none`), the rule, the other rules that also matched, the steps with variables filled in, and the flow the rule starts, run to its first wait. Nothing is sent or stored, and cooldowns are ignored.
 - `POST /workspaces/{workspaceId}/automation/flows/{flowId}/test` runs a flow's draft (or `published`) with sample `answers`, turn by turn. Delays end at once, and tag and field actions apply to the conditions that follow. An invalid draft gets 422 with the validation result.

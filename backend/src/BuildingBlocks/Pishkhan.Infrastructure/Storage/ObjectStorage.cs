@@ -194,8 +194,16 @@ public sealed class FileSystemObjectStorage(IOptions<StorageOptions> options, Ur
     public Task DeleteAsync(string bucket, string key, CancellationToken cancellationToken = default)
     {
         var path = PathFor(bucket, key);
-        File.Delete(path);
-        File.Delete(path + ".meta");
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        if (File.Exists(path + ".meta"))
+        {
+            File.Delete(path + ".meta");
+        }
+
         return Task.CompletedTask;
     }
 
