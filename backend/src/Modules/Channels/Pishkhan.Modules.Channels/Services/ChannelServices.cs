@@ -50,6 +50,13 @@ internal sealed class ChannelDirectory(ChannelsDbContext db) : IChannelDirectory
             .Where(a => a.Id == id)
             .Select(a => new ChannelAccountInfo(a.Id, a.WorkspaceId, a.Kind, a.ExternalId, a.Username, a.Status))
             .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ChannelAccountInfo>> ListAsync(CancellationToken cancellationToken) =>
+        await db.Accounts.AsNoTracking()
+            .Where(a => a.Status != ChannelStatuses.Disconnected)
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new ChannelAccountInfo(a.Id, a.WorkspaceId, a.Kind, a.ExternalId, a.Username, a.Status))
+            .ToListAsync(cancellationToken);
 }
 
 /// <summary>Resolves a rate profile: an admin override in <c>channels.rate_profiles</c>, else configuration. Overrides are cached for a minute.</summary>

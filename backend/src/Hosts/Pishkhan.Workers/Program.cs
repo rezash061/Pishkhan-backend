@@ -4,6 +4,7 @@ using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Timers;
 using Pishkhan.Modules.Agent;
+using Pishkhan.Modules.Analytics;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
@@ -32,7 +33,8 @@ services
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
     .AddAgentModule(configuration)
-    .AddAuditModule(configuration);
+    .AddAuditModule(configuration)
+    .AddAnalyticsModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
 services.AddPishkhanMessaging(configuration, "workers", m => m
@@ -47,7 +49,8 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAutomationPlatformConsumers()
     .AddCatalogConsumers()
     .AddFilesConsumers()
-    .AddAuditConsumers());
+    .AddAuditConsumers()
+    .AddAnalyticsConsumers());
 
 if (groups.IsEnabled("platform"))
 {
