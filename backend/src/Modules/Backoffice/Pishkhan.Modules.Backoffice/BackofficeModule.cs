@@ -75,6 +75,19 @@ public static class BackofficeModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithStandardProblems();
 
+        admin.MapPost("/workspaces/{workspaceId:guid}/support-sessions", (Guid workspaceId, StartSupportSessionRequest request, ICommandHandler<StartSupportSessionCommand, SupportSessionLink> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new StartSupportSessionCommand(workspaceId, request), ct)))
+            .RequireAuthorization(AuthPolicies.StaffRole(StaffRoles.Support))
+            .RequireStepUp()
+            .WithTags("Support sessions")
+            .WithSummary("Start a support session in a workspace (Support, step-up, reason required)")
+            .WithDescription("Returns a one-time link to the user panel, valid 2 minutes. The panel exchanges it for a 30-minute session as the member " +
+                "(the owner unless `userId` is given) with the staff member recorded on every change. The owner sees the reason in their audit log.")
+            .Produces<SupportSessionLink>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .WithStandardProblems()
+            .WithExamples(new StartSupportSessionRequest("تیکت ۱۲۴۵: قانون پاسخ خودکار کار نمی‌کند", null));
+
         return app;
     }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added (Phase 1, support sessions, 2026-10-31)
+- `POST /admin/v1/workspaces/{workspaceId}/support-sessions` (Support or SuperAdmin, step-up, `reason` of 5 to 300 characters, optional `userId`, by default the owner) returns a one-time link `{UserPanelUrl}/api/auth/impersonation?token=…` valid 2 minutes (`Backoffice:UserPanelUrl`). Audited in the workspace as `support_session.grant` with the reason.
+- `POST /api/v1/auth/support-session` (`token`) exchanges it once for a 30-minute access token as that member, with no refresh token. The token carries the staff member in `act` and `act_name`; every change under it is audited as staff on behalf of the member, which the owner's audit view shows as «support». The exchange is audited as `support_session.start` and notifies the owner. `POST /auth/logout` ends the session.
+- Under a support session, password, TOTP and session changes, and asking for or cancelling workspace deletion, answer 403 `auth.support_session.not_allowed` (endpoint filter `DenySupportSession`, for billing and other sensitive actions as they arrive).
+
 ### Added (Phase 1, BE-1.14 notifications v1, 2026-10-31)
 - New Notifications module (`notifications` schema). Handoffs, Instagram connection problems (reconnect needed, token expiring, access removed in Instagram) and `notifications.notification-requested.v1` (for example the automations' «notify the team» action) become notifications for the members who should act: those who can reply for handoffs and automations, those who manage channels for connection problems. A member who hands a conversation over is not notified about it.
 - `GET /workspaces/{workspaceId}/notifications?unread=&cursor=&limit=` lists the caller's notifications, newest first, with `unreadCount`. `POST /workspaces/{workspaceId}/notifications/{notificationId}/read` and `POST /workspaces/{workspaceId}/notifications/read-all` mark them read.

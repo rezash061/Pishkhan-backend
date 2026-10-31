@@ -86,6 +86,7 @@ public static class TenancyModule
         ws.MapPost("/deletion", (RequestDeletionRequest request, ICommandHandler<RequestDeletionCommand, WorkspaceResponse> handler, CancellationToken ct) =>
                 Send(handler.HandleAsync(new RequestDeletionCommand(request), ct), r => Results.Accepted($"/api/v1/workspaces/{r.Id}/deletion", r)))
             .RequireWorkspacePermission(Permissions.WorkspaceDelete)
+            .DenySupportSession()
             .WithSummary("Ask to delete the workspace (owner); its data is deleted after 30 days unless cancelled")
             .WithDescription("`confirmName` must equal the workspace name. Members lose access at once and automations stop; " +
                 "the workspace stays in `GET /workspaces` with status `pending_deletion` and `deletionScheduledFor`.")
@@ -96,6 +97,7 @@ public static class TenancyModule
 
         ws.MapDelete("/deletion", (Guid workspaceId, ICommandHandler<CancelDeletionCommand, WorkspaceResponse> handler, CancellationToken ct) =>
                 Send(handler.HandleAsync(new CancelDeletionCommand(workspaceId), ct), r => Results.Ok(r)))
+            .DenySupportSession()
             .WithSummary("Cancel a pending deletion (owner); the workspace is active again")
             .Produces<WorkspaceResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)

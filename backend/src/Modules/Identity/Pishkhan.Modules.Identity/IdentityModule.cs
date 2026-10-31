@@ -81,6 +81,18 @@ public static class IdentityModule
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithStandardProblems();
 
+        anonymous.MapPost("/auth/support-session", (ExchangeSupportSessionRequest request, ICommandHandler<ExchangeSupportSessionRequest, SupportSessionResponse> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(request, ct), r => Results.Ok(r)))
+            .RequireRateLimiting(RateLimitPolicies.Auth)
+            .WithTags("Support sessions")
+            .WithSummary("Exchange a one-time support-session token (from the back office link) for a 30-minute access token")
+            .WithDescription("The token works once and for 2 minutes. The session has no refresh token; `POST /auth/logout` ends it. " +
+                "Under it, password, TOTP and session changes (and other sensitive actions) answer 403 `auth.support_session.not_allowed`.")
+            .Produces<SupportSessionResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithStandardProblems();
+
         var panel = app.MapPanelApi().WithTags("Account");
 
         panel.MapPost("/auth/logout", (ICommandHandler<LogoutCommand, Unit> handler, CancellationToken ct) =>
@@ -108,6 +120,7 @@ public static class IdentityModule
             .WithExamples(new UpdateMeRequest("مریم احمدی"));
 
         panel.MapPut("/me/password", (SetPasswordRequest request, ICommandHandler<SetPasswordRequest, Unit> handler, CancellationToken ct) => Send(handler.HandleAsync(request, ct), _ => Results.NoContent()))
+            .DenySupportSession()
             .WithSummary("Set or change the optional password")
             .Produces(StatusCodes.Status204NoContent)
             .WithStandardProblems();
@@ -117,20 +130,24 @@ public static class IdentityModule
             .Produces<IReadOnlyList<SessionResponse>>();
 
         panel.MapDelete("/me/sessions/{sessionId:guid}", (Guid sessionId, ICommandHandler<RevokeSessionCommand, Unit> handler, CancellationToken ct) => Send(handler.HandleAsync(new RevokeSessionCommand(sessionId), ct), _ => Results.NoContent()))
+            .DenySupportSession()
             .WithSummary("Revoke a session")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         panel.MapPost("/auth/totp/setup", (ICommandHandler<BeginTotpSetupCommand, TotpSetupResponse> handler, CancellationToken ct) => Send(handler.HandleAsync(new BeginTotpSetupCommand(), ct), r => Results.Ok(r)))
+            .DenySupportSession()
             .WithSummary("Start TOTP setup; returns the secret for the authenticator app")
             .Produces<TotpSetupResponse>();
 
         panel.MapPost("/auth/totp/enable", (TotpCodeRequest request, ICommandHandler<EnableTotpCommand, Unit> handler, CancellationToken ct) => Send(handler.HandleAsync(new EnableTotpCommand(request.Code), ct), _ => Results.NoContent()))
+            .DenySupportSession()
             .WithSummary("Confirm TOTP setup with a code")
             .Produces(StatusCodes.Status204NoContent)
             .WithStandardProblems();
 
         panel.MapPost("/auth/totp/disable", (TotpCodeRequest request, ICommandHandler<DisableTotpCommand, Unit> handler, CancellationToken ct) => Send(handler.HandleAsync(new DisableTotpCommand(request.Code), ct), _ => Results.NoContent()))
+            .DenySupportSession()
             .WithSummary("Turn TOTP off (requires a current code)")
             .Produces(StatusCodes.Status204NoContent)
             .WithStandardProblems();

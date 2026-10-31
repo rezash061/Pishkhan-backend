@@ -52,4 +52,18 @@ public static class WorkspaceAccessExtensions
         });
         return builder;
     }
+
+    /// <summary>
+    /// For actions a support session must not take (backend plan 3.4): account security (password, TOTP, other sessions), billing,
+    /// deleting the workspace. Answers 403 <c>auth.support_session.not_allowed</c>.
+    /// </summary>
+    public static TBuilder DenySupportSession<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.AddEndpointFilter(async (context, next) =>
+            context.HttpContext.RequestServices.GetRequiredService<ICurrentUser>().ActorStaffId is not null
+                ? SharedKernel.Error.Forbidden("auth.support_session.not_allowed").ToProblem()
+                : await next(context));
+        return builder;
+    }
 }

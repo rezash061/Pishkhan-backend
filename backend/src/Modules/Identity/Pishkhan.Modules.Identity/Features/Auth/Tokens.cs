@@ -52,6 +52,12 @@ internal sealed class LogoutHandler(SessionService sessions, ICurrentUser caller
 {
     public async Task<Result<Unit>> HandleAsync(LogoutCommand command, CancellationToken cancellationToken)
     {
+        if (caller.ActorStaffId is not null)
+        {
+            await sessions.RevokeSupportSessionAsync(caller.SessionId, cancellationToken);
+            return Unit.Value;
+        }
+
         await sessions.RevokeFamilyAsync(caller.UserId, caller.SessionId, Session.ReasonLogout, cancellationToken);
         return Unit.Value;
     }
