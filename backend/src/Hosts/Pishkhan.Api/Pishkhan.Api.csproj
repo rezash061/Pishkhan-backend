@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\Modules\Notifications\Pishkhan.Modules.Notifications\Pishkhan.Modules.Notifications.csproj" />
     <ProjectReference Include="..\..\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />
     <ProjectReference Include="..\..\Modules\Audit\Pishkhan.Modules.Audit\Pishkhan.Modules.Audit.csproj" />
+    <ProjectReference Include="..\..\Modules\Analytics\Pishkhan.Modules.Analytics\Pishkhan.Modules.Analytics.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Tenancy\Pishkhan.Modules.Tenancy\Pishkhan.Modules.Tenancy.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Pishkhan.Modules.Files\Pishkhan.Modules.Files.csproj" />

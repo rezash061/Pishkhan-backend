@@ -151,9 +151,14 @@ public sealed record ConversationSnapshot(
     public bool IsWindowOpen(DateTimeOffset now) => WindowExpiresAt > now;
 }
 
+/// <summary>Live inbox counts of a workspace: open (or pending), handed off and waiting, with unread messages; the oldest waiting handoff.</summary>
+public sealed record ConversationCounts(int Open, int HandedOff, int Unread, DateTimeOffset? OldestHandoffAt);
+
 /// <summary>In-process reads of the Conversations module (current tenant).</summary>
 public interface IConversationQueries
 {
+    Task<ConversationCounts> CountsAsync(CancellationToken cancellationToken);
+
     Task<ConversationSnapshot?> GetAsync(Guid conversationId, CancellationToken cancellationToken);
 
     Task<ConversationSnapshot?> FindAsync(Guid channelAccountId, string externalUserId, CancellationToken cancellationToken);
