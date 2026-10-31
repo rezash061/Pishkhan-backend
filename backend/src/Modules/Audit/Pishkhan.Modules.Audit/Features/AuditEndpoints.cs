@@ -22,6 +22,9 @@ public sealed record AuditEntryResponse(
 /// <summary>Filters of the audit search. Text filters match anywhere, case-insensitive; <c>actor</c> also matches an exact actor id.</summary>
 public sealed record AuditSearch(string? Actor, string? Action, string? EntityType, Guid? WorkspaceId, DateTimeOffset? From, DateTimeOffset? To, int? Page, int? PageSize);
 
+/// <summary>The workspace audit filters: <see cref="AuditSearch"/> without <c>workspaceId</c>, which the route already carries.</summary>
+public sealed record WorkspaceAuditSearch(string? Actor, string? Action, string? EntityType, DateTimeOffset? From, DateTimeOffset? To, int? Page, int? PageSize);
+
 internal static class AuditEndpoints
 {
     public const int DefaultPageSize = 25;
@@ -58,8 +61,8 @@ internal static class AuditEndpoints
         return await RunAsync(db, search, search.WorkspaceId, supportOnly, maskStaff: false, ct);
     }
 
-    private static Task<IResult> WorkspaceSearchAsync(Guid workspaceId, [AsParameters] AuditSearch search, AuditDbContext db, CancellationToken ct) =>
-        RunAsync(db, search with { WorkspaceId = null }, workspaceId, workspaceOnly: true, maskStaff: true, ct);
+    private static Task<IResult> WorkspaceSearchAsync(Guid workspaceId, [AsParameters] WorkspaceAuditSearch search, AuditDbContext db, CancellationToken ct) =>
+        RunAsync(db, new AuditSearch(search.Actor, search.Action, search.EntityType, null, search.From, search.To, search.Page, search.PageSize), workspaceId, workspaceOnly: true, maskStaff: true, ct);
 
     private static async Task<IResult> RunAsync(AuditDbContext db, AuditSearch search, Guid? workspaceId, bool workspaceOnly, bool maskStaff, CancellationToken ct)
     {

@@ -16,6 +16,10 @@
 
 ### Changed
 - `Backoffice:UserPanelUrl` defaults to `http://localhost:3001`, the user panel's development port (it was 3000).
+- Channel notifications link to `/channels`, the user panel's page (it was `/settings/channels`).
+
+### Fixed
+- The OpenAPI document listed the `workspaceId` path parameter of `GET /workspaces/{workspaceId}/audit` twice.
 
 ### Added (Phase 1, support sessions, 2026-10-31)
 - `POST /admin/v1/workspaces/{workspaceId}/support-sessions` (Support or SuperAdmin, step-up, `reason` of 5 to 300 characters, optional `userId`, by default the owner) returns a one-time link `{UserPanelUrl}/api/auth/impersonation?token=…` valid 2 minutes (`Backoffice:UserPanelUrl`). Audited in the workspace as `support_session.grant` with the reason.
