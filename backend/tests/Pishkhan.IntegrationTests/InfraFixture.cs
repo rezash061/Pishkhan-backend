@@ -119,6 +119,7 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Content.Persistence.ContentDbContext>("content");
         await Migrate<Modules.Catalog.Persistence.CatalogDbContext>("catalog");
         await Migrate<Modules.Audit.Persistence.AuditDbContext>("audit");
+        await Migrate<Modules.Notifications.Persistence.NotificationsDbContext>("notifications");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();

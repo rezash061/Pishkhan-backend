@@ -18,6 +18,7 @@ using Pishkhan.Modules.Backoffice.Contracts;
 using Pishkhan.Modules.Backoffice.Persistence;
 using Pishkhan.Modules.Channels.Persistence;
 using Pishkhan.Modules.Content.Persistence;
+using Pishkhan.Modules.Notifications.Persistence;
 using Pishkhan.Modules.Conversations.Persistence;
 using Pishkhan.Modules.Files.Persistence;
 using Pishkhan.Modules.Identity.Persistence;
@@ -41,6 +42,7 @@ services.AddModuleDbContext<AutomationDbContext>(AutomationDbContext.SchemaName)
 services.AddModuleDbContext<ContentDbContext>(ContentDbContext.SchemaName);
 services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.SchemaName);
 services.AddModuleDbContext<AuditDbContext>(AuditDbContext.SchemaName);
+services.AddModuleDbContext<NotificationsDbContext>(NotificationsDbContext.SchemaName);
 // Staff provisioning reuses the Backoffice handlers, which need the staff token setup.
 services.AddRouting();
 services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
@@ -87,7 +89,7 @@ static async Task MigrateAsync(IServiceProvider services, IConfiguration configu
     [
         typeof(PlatformDbContext), typeof(IdentityDbContext), typeof(TenancyDbContext), typeof(BackofficeDbContext),
         typeof(FilesDbContext), typeof(ChannelsDbContext), typeof(ConversationsDbContext), typeof(AgentDbContext), typeof(AutomationDbContext), typeof(CatalogDbContext),
-        typeof(AuditDbContext), typeof(ContentDbContext),
+        typeof(AuditDbContext), typeof(ContentDbContext), typeof(NotificationsDbContext),
     ];
     await using (var scope = services.CreateAsyncScope())
     {

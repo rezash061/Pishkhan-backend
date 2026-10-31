@@ -13,6 +13,9 @@ public interface IMembershipQueries
 {
     /// <summary>Ids of the workspaces the user belongs to, sorted.</summary>
     Task<IReadOnlyList<Guid>> GetWorkspaceIdsAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Ids of the workspace's members who have <paramref name="permission"/>.</summary>
+    Task<IReadOnlyList<Guid>> GetMembersWithPermissionAsync(Guid workspaceId, string permission, CancellationToken cancellationToken);
 }
 
 public interface IWorkspaceQueries

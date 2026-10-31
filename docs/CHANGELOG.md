@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.14 notifications v1, 2026-10-31)
+- New Notifications module (`notifications` schema). Handoffs, Instagram connection problems (reconnect needed, token expiring, access removed in Instagram) and `notifications.notification-requested.v1` (for example the automations' «notify the team» action) become notifications for the members who should act: those who can reply for handoffs and automations, those who manage channels for connection problems. A member who hands a conversation over is not notified about it.
+- `GET /workspaces/{workspaceId}/notifications?unread=&cursor=&limit=` lists the caller's notifications, newest first, with `unreadCount`. `POST /workspaces/{workspaceId}/notifications/{notificationId}/read` and `POST /workspaces/{workspaceId}/notifications/read-all` mark them read.
+- `GET` and `PUT /workspaces/{workspaceId}/notification-preferences`: per kind (`handoff`, `automation`, `channel`) the caller turns `inApp`, `push` and `sms` on or off. Defaults: in-app and push on, SMS on only for connection problems. SMS is offered for `handoff` and `channel` only, and at most one SMS per kind every 30 minutes is sent. `push` is stored now and used once web push ships.
+- `IdempotentHandler` gains `AfterCommitAsync` for side effects outside the database (sent at most once).
+
 ### Added (Phase 1, automation test runs, product images, one set of business hours, 2026-10-29)
 - `POST /workspaces/{workspaceId}/automation/test` dry-runs the rules against a sample DM or comment (`text`, `payload`, `source`, `kind`, optional `channelAccountId`, `mediaId`, `at`, `ruleId`, `contact`). It returns the outcome (`rule`, `outside_hours`, `product_details`, `ai`, `fallback`, `none`), the rule, the other rules that also matched, the steps with variables filled in, and the flow the rule starts, run to its first wait. Nothing is sent or stored, and cooldowns are ignored.
 - `POST /workspaces/{workspaceId}/automation/flows/{flowId}/test` runs a flow's draft (or `published`) with sample `answers`, turn by turn. Delays end at once, and tag and field actions apply to the conditions that follow. An invalid draft gets 422 with the validation result.
