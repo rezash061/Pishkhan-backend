@@ -5,6 +5,7 @@ using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
 using Pishkhan.Modules.Tenancy.Persistence;
+using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
 
 namespace Pishkhan.Modules.Tenancy.Services;
@@ -40,8 +41,17 @@ internal sealed class WorkspaceAccessResolver(TenancyDbContext db, HybridCache c
     internal sealed record CachedAccess(string Role, string[] Permissions, bool Suspended);
 }
 
-internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQueries
+internal sealed class MembershipQueries(TenancyDbContext db, IClock clock) : IMembershipQueries
 {
+    public async Task<int> CountSeatsAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var members = await db.Memberships.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]).CountAsync(m => m.WorkspaceId == workspaceId, cancellationToken);
+        var invited = await db.Invitations.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .CountAsync(i => i.WorkspaceId == workspaceId && i.Status == InvitationStatus.Pending && i.ExpiresAt > now, cancellationToken);
+        return members + invited;
+    }
+
     public async Task<IReadOnlyList<Guid>> GetWorkspaceIdsAsync(Guid userId, CancellationToken cancellationToken) =>
         await db.Memberships.AsNoTracking()
             .IgnoreQueryFilters([ModuleDbContext.TenantFilter])

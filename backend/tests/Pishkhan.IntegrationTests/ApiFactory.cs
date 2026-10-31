@@ -45,6 +45,13 @@ public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Progr
     {
         builder.UseEnvironment("Testing");
 
+        // As in Development: every registration must resolve at startup, so a module needing a service its host lacks fails here.
+        builder.UseDefaultServiceProvider(o =>
+        {
+            o.ValidateOnBuild = true;
+            o.ValidateScopes = true;
+        });
+
         // UseSetting lands before Program reads configuration (minimal hosting applies ConfigureAppConfiguration only at Build).
         foreach (var (key, value) in infra.Settings)
         {

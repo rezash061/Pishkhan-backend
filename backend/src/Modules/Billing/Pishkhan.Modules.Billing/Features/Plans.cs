@@ -404,13 +404,13 @@ internal static partial class PlanEndpoints
     private static PlanStatus? ParseStatus(string value) =>
         Enum.GetValues<PlanStatus>().Cast<PlanStatus?>().FirstOrDefault(s => Plan.StatusName(s!.Value) == value.Trim().ToLowerInvariant());
 
-    private static IResult? Reason(string? reason, bool required)
+    internal static IResult? Reason(string? reason, bool required)
     {
         var length = reason?.Trim().Length ?? 0;
         return (length == 0 && !required) || length is >= 5 and <= 300 ? null : Invalid("reason", length < 5 ? "validation.too_short" : "validation.too_long");
     }
 
-    private static IResult Invalid(string field, string code) => Invalid(new Dictionary<string, string[]> { [field] = [code] });
+    internal static IResult Invalid(string field, string code) => Invalid(new Dictionary<string, string[]> { [field] = [code] });
 
     private static IResult Invalid(Dictionary<string, string[]> errors) => Error.Validation("validation.failed", errors).ToProblem();
 }

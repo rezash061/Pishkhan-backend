@@ -11,6 +11,7 @@ using Pishkhan.Infrastructure.Sms;
 using Pishkhan.Infrastructure.Storage;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Audit.Contracts;
+using Pishkhan.Modules.Billing.Contracts;
 using Pishkhan.Modules.Identity.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
@@ -75,6 +76,7 @@ internal sealed class MemberHandlers(
     ISecretProtector secrets,
     ISmsSender sms,
     ICacheInvalidator cache,
+    IEntitlements entitlements,
     IOptions<TenancyOptions> options,
     IClock clock) :
     IQueryHandler<ListMembersQuery, IReadOnlyList<MemberResponse>>,
@@ -147,6 +149,16 @@ internal sealed class MemberHandlers(
 
     public async Task<Result<InvitationResponse>> HandleAsync(InviteRequest command, CancellationToken cancellationToken)
     {
+        // Members and pending invitations both hold a seat of the plan.
+        var workspaceId = tenant.WorkspaceId!.Value;
+        var now = clock.UtcNow;
+        var seats = await db.Memberships.CountAsync(cancellationToken)
+            + await db.Invitations.CountAsync(i => i.Status == InvitationStatus.Pending && i.ExpiresAt > now, cancellationToken);
+        if (!(await entitlements.GetAsync(workspaceId, cancellationToken)).Allows(BillingMeters.Seats, seats + 1))
+        {
+            return Error.PlanLimit(BillingMeters.Seats);
+        }
+
         var phone = PhoneNumber.Parse(command.Phone);
         var token = Base64Url.Encode(RandomNumberGenerator.GetBytes(24));
         var invitation = Invitation.Create(

@@ -38,7 +38,7 @@ public sealed class AdminHost : IAsyncDisposable
         builder.Services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
         builder.Services.AddPishkhanOpenApi(ApiDocuments.Admin);
         builder.Services.AddBackofficeModule(builder.Configuration).AddContentModule(builder.Configuration)
-            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddBillingModule(builder.Configuration).DecorateHandlers();
+            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddBillingModule(builder.Configuration).AddBillingBackoffice().DecorateHandlers();
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-admin-api", m => m.AddCacheInvalidation());
         var app = builder.Build();
         app.UsePishkhanWebHost();
