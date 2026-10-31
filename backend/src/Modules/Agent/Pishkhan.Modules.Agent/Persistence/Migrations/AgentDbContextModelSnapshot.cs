@@ -190,6 +190,131 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.AiProvider", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ApiKeyEnc")
+                        .HasColumnType("text")
+                        .HasColumnName("api_key_enc");
+
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("base_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastTestError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("last_test_error");
+
+                    b.Property<DateTimeOffset?>("LastTestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_tested_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Name")
+                        .HasName("pk_ai_providers");
+
+                    b.ToTable("ai_providers", "agent");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.AiRoute", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal?>("InputPricePerMillion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("input_price_per_million");
+
+                    b.Property<int?>("MaxOutputTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_output_tokens");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model");
+
+                    b.Property<decimal?>("OutputPricePerMillion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("output_price_per_million");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Task")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("task");
+
+                    b.Property<float?>("Temperature")
+                        .HasColumnType("real")
+                        .HasColumnName("temperature");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("timeout_seconds");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_routes");
+
+                    b.HasIndex("Task", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_routes_task_position");
+
+                    b.ToTable("ai_routes", "agent");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.EvalCase", b =>
                 {
                     b.Property<Guid>("Id")
@@ -420,6 +545,92 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasDatabaseName("ix_eval_sets_name");
 
                     b.ToTable("eval_sets", "agent");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.PromptActivation", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("ActivatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activated_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EvalRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("eval_run_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Key")
+                        .HasName("pk_prompt_activations");
+
+                    b.ToTable("prompt_activations", "agent");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.PromptVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaseVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("base_version");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prompt_versions");
+
+                    b.HasIndex("Key", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_prompt_versions_key_version");
+
+                    b.ToTable("prompt_versions", "agent");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.EvalCase", b =>

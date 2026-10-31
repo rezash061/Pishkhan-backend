@@ -13,7 +13,10 @@ public static class AiExtensions
         services.TryAddSingleton<IClock, SystemClock>();
         services.TryAddSingleton<IAiUsageSink, MetricsUsageSink>();
         services.AddSingleton<CircuitBreakers>();
-        services.AddSingleton<IModelRouter, ModelRouter>();
+        services.TryAddSingleton<IAiSettings, ConfigAiSettings>();
+        services.AddSingleton<ModelRouter>();
+        services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
+        services.AddSingleton<IAiProviderProbe>(sp => sp.GetRequiredService<ModelRouter>());
         services.AddSingleton<IPromptRegistry, ConfigPromptRegistry>();
 
         // Per-route timeouts are applied by the router; the HttpClient only bounds a hung connection.

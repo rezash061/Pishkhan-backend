@@ -122,12 +122,18 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
     {
         var set = await db.EvalSets.AsNoTracking().FirstOrDefaultAsync(s => s.Name == setName, ct)
             ?? throw new InvalidOperationException($"Eval set '{setName}' does not exist.");
+        var run = await StartClassifyAsync(set.Id, promptVersion, ct);
+        return await ExecuteAsync(run.Id, ct);
+    }
+
+    /// <summary>Records a new run (status running) of the classifier prompt over a set; <see cref="ExecuteAsync"/> runs it.</summary>
+    public async Task<EvalRun> StartClassifyAsync(Guid setId, string? promptVersion, CancellationToken ct)
+    {
         var prompt = prompts.Get(ClassifyPromptKey, promptVersion);
-        var cases = await db.EvalCases.AsNoTracking().Where(c => c.SetId == set.Id).OrderBy(c => c.ExternalRef).ToListAsync(ct);
         var run = new EvalRun
         {
             Id = Uuid.NewV7(clock.UtcNow),
-            SetId = set.Id,
+            SetId = setId,
             Task = AiTasks.Classify,
             PromptKey = prompt.Key,
             PromptVersion = prompt.Version,
@@ -135,6 +141,14 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
         };
         db.EvalRuns.Add(run);
         await db.SaveChangesAsync(ct);
+        return run;
+    }
+
+    public async Task<EvalRunReport> ExecuteAsync(Guid runId, CancellationToken ct)
+    {
+        var run = await db.EvalRuns.FirstAsync(r => r.Id == runId, ct);
+        var prompt = prompts.Get(run.PromptKey, run.PromptVersion);
+        var cases = await db.EvalCases.AsNoTracking().Where(c => c.SetId == run.SetId).OrderBy(c => c.ExternalRef).ToListAsync(ct);
 
         var client = router.GetChatClient(AiTasks.Classify);
         var routes = new Dictionary<string, int>(StringComparer.Ordinal);

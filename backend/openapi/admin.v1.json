@@ -1877,6 +1877,792 @@
           }
         ]
       }
+    },
+    "/admin/v1/ai/providers": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "AI providers in effect",
+        "description": "Roles: SuperAdmin, AIOps, ReadOnly. Keys are never returned.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiProviderResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/routes": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Model routes per task",
+        "description": "Roles: SuperAdmin, AIOps, ReadOnly. Every task, with its fallback chain in effect.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiTaskRoutes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/prompts": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Prompt keys with their active version",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PromptKeyResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/prompts/{key}": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Every version of a prompt, newest first, with its latest eval run",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PromptVersionResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/eval-sets": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Eval sets with their case counts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvalSetResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/eval-runs": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Eval runs, newest first",
+        "parameters": [
+          {
+            "name": "PromptKey",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PromptVersion",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SetId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfEvalRunResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Start an eval run",
+        "description": "AIOps or SuperAdmin. Runs in the background (202); poll the run. Only `intent.classify` is evaluated for now.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalRunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/eval-runs/{runId}": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "A run with its per-case results (failures first)",
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalRunDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/routes/{task}": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Set a task's fallback chain",
+        "description": "AIOps or SuperAdmin. Up to 5 steps over providers in effect; an empty list falls back to configuration. Audited as ai.routes.update.",
+        "parameters": [
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiRoutesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTaskRoutes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/prompts/{key}/versions": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Write a new version",
+        "description": "AIOps or SuperAdmin. Numbered after the highest existing version; not active until it passes the eval gate. Audited as ai.prompt.create.",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/prompts/{key}/versions/{version}/activate": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Activate a version through the eval gate",
+        "description": "AIOps or SuperAdmin. 409 `ai.prompt.eval_gate` (with the gate in `errors`) unless the run is a completed run of this version that passes every check. Audited as ai.prompt.activate.",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptActivateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptKeyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/eval-sets/{name}/import": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Import or update cases from JSON Lines",
+        "description": "AIOps or SuperAdmin. Body: UTF-8 JSON Lines (`application/x-ndjson` or `text/plain`), one anonymized case per line; a known `ref` updates its case. Creates the set when new.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-ndjson": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalImportReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/providers/{name}": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Create or change a provider",
+        "description": "SuperAdmin, step-up. Takes effect on every host within the refresh interval; audited as ai.provider.update.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiProviderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/providers/{name}/test": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Send one tiny request through a provider",
+        "description": "SuperAdmin. The provider as it is in effect now; the result is kept on a back-office provider.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiProviderTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderTestResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2134,6 +2920,7 @@
           "timeZone",
           "status",
           "planId",
+          "plan",
           "createdAt",
           "deletionRequestedAt",
           "deletionScheduledFor",
@@ -2170,6 +2957,9 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/AdminWorkspacePlan"
           },
           "createdAt": {
             "type": "string",
@@ -2282,6 +3072,59 @@
           }
         }
       },
+      "AdminWorkspacePlan": {
+        "required": [
+          "source",
+          "planId",
+          "code",
+          "name",
+          "version",
+          "trial",
+          "endsAt"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "trial": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "AdminWorkspaceSummary": {
         "required": [
           "id",
@@ -2342,6 +3185,218 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AdminWorkspaceChannel"
+            }
+          }
+        }
+      },
+      "AiProviderRequest": {
+        "required": [
+          "kind",
+          "baseUrl",
+          "apiKey",
+          "clearApiKey",
+          "enabled",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "apiKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clearApiKey": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "AiProviderResponse": {
+        "required": [
+          "name",
+          "kind",
+          "baseUrl",
+          "hasApiKey",
+          "enabled",
+          "source",
+          "lastTestError",
+          "lastTestedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasApiKey": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
+          "lastTestError": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastTestedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AiProviderTestRequest": {
+        "required": [
+          "model"
+        ],
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "AiProviderTestResponse": {
+        "required": [
+          "ok",
+          "error",
+          "latencyMs"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AiRoutesRequest": {
+        "required": [
+          "routes",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiRouteStep"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "AiRouteStep": {
+        "required": [
+          "provider",
+          "model",
+          "temperature",
+          "maxOutputTokens",
+          "timeoutSeconds",
+          "inputPricePerMillion",
+          "outputPricePerMillion"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "temperature": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "float"
+          },
+          "maxOutputTokens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputPricePerMillion": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "outputPricePerMillion": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "AiTaskRoutes": {
+        "required": [
+          "task",
+          "source",
+          "routes"
+        ],
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiRouteStep"
             }
           }
         }
@@ -2564,6 +3619,303 @@
           }
         }
       },
+      "EvalGate": {
+        "required": [
+          "passed",
+          "checks"
+        ],
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvalGateCheck"
+            }
+          }
+        }
+      },
+      "EvalGateCheck": {
+        "required": [
+          "name",
+          "required",
+          "actual",
+          "passed"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "number",
+            "format": "double"
+          },
+          "actual": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EvalImportReport": {
+        "required": [
+          "imported",
+          "updated",
+          "errors"
+        ],
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "EvalResultResponse": {
+        "required": [
+          "caseId",
+          "ref",
+          "vertical",
+          "input",
+          "expectedIntent",
+          "predictedIntent",
+          "correct",
+          "route",
+          "latencyMs",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "vertical": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "input": {
+            "type": "string"
+          },
+          "expectedIntent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "predictedIntent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correct": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "route": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EvalRunDetail": {
+        "required": [
+          "run",
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvalRunResponse"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvalResultResponse"
+            }
+          }
+        }
+      },
+      "EvalRunRequest": {
+        "required": [
+          "setId",
+          "promptKey",
+          "promptVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "setId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "promptKey": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "EvalRunResponse": {
+        "required": [
+          "id",
+          "setId",
+          "setName",
+          "task",
+          "promptKey",
+          "promptVersion",
+          "route",
+          "status",
+          "caseCount",
+          "errorCount",
+          "intentAccuracy",
+          "inputTokens",
+          "outputTokens",
+          "startedAt",
+          "finishedAt",
+          "gate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setName": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "promptKey": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "route": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "caseCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errorCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "intentAccuracy": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/EvalGate"
+          }
+        }
+      },
+      "EvalSetResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "caseCount",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caseCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ExtendSubscriptionRequest": {
         "required": [
           "days",
@@ -2777,6 +4129,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AuditEntryResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfEvalRunResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvalRunResponse"
             }
           },
           "totalCount": {
@@ -3137,6 +4518,117 @@
             "type": [
               "null",
               "string"
+            ]
+          }
+        }
+      },
+      "PromptActivateRequest": {
+        "required": [
+          "evalRunId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "evalRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "PromptKeyResponse": {
+        "required": [
+          "key",
+          "activeVersion",
+          "activeSource",
+          "versionCount"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "activeVersion": {
+            "type": "string"
+          },
+          "activeSource": {
+            "type": "string"
+          },
+          "versionCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PromptVersionRequest": {
+        "required": [
+          "text",
+          "baseVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PromptVersionResponse": {
+        "required": [
+          "key",
+          "version",
+          "text",
+          "source",
+          "baseVersion",
+          "active",
+          "createdAt",
+          "latestRun"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latestRun": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalRunResponse"
+              }
             ]
           }
         }
@@ -3556,6 +5048,9 @@
     },
     {
       "name": "Billing"
+    },
+    {
+      "name": "AI"
     }
   ]
 }

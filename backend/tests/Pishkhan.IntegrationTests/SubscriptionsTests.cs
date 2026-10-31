@@ -111,6 +111,13 @@ public sealed class SubscriptionsTests(InfraFixture infra, ChannelsHost workers)
         current.GetProperty("trial").GetBoolean().ShouldBeTrue();
         current.GetProperty("limits").GetProperty("seats").GetInt32().ShouldBe(2);
 
+        // The back office's workspace detail shows the same plan.
+        var detail = await _admin.StaffClient(StaffRoles.Support).GetFromJsonAsync<JsonElement>($"/admin/v1/workspaces/{ws}", Ct);
+        detail.GetProperty("planId").GetGuid().ShouldBe(teamId);
+        detail.GetProperty("plan").GetProperty("source").GetString().ShouldBe("subscription");
+        detail.GetProperty("plan").GetProperty("code").GetString().ShouldBe("team-" + marker);
+        detail.GetProperty("plan").GetProperty("trial").GetBoolean().ShouldBeTrue();
+
         // Seats: the owner and one invitation fill the plan; Instagram: the plan has no accounts.
         (await owner.PostAsJsonAsync($"/api/v1/workspaces/{ws}/invitations", new { phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999), role = "agent" }, Ct))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
