@@ -23,6 +23,9 @@ public interface IMembershipQueries
 
     /// <summary>The workspace owner's user id, or null for an unknown workspace.</summary>
     Task<Guid?> GetOwnerIdAsync(Guid workspaceId, CancellationToken cancellationToken);
+
+    /// <summary>Ids of the workspace's members who have <paramref name="permission"/>.</summary>
+    Task<IReadOnlyList<Guid>> GetMembersWithPermissionAsync(Guid workspaceId, string permission, CancellationToken cancellationToken);
 }
 
 public interface IWorkspaceQueries

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <!-- Kafka consumers by worker group, the outbox relay, timers and recurring jobs. HTTP is only for health. -->
   <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Notifications\Pishkhan.Modules.Notifications\Pishkhan.Modules.Notifications.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Audit\Pishkhan.Modules.Audit\Pishkhan.Modules.Audit.csproj" />
     <ProjectReference Include="..\..\Modules\Analytics\Pishkhan.Modules.Analytics\Pishkhan.Modules.Analytics.csproj" />

@@ -15,6 +15,9 @@ public interface IUserDirectory
     string PhoneBlindIndex(SharedKernel.PhoneNumber phone);
 
     Task<UserSummary?> GetAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>The user's phone, decrypted, for sending them an SMS. Never return it in an API response.</summary>
+    Task<SharedKernel.PhoneNumber?> GetPhoneAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 public sealed record UserSummary(Guid Id, string? DisplayName, string MaskedPhone);

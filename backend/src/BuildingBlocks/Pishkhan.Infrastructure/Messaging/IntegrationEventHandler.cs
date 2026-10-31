@@ -27,7 +27,7 @@ public abstract class IdempotentHandler<TEvent, TDbContext>(TDbContext db) : IIn
     public async Task HandleAsync(TEvent message, EventEnvelope envelope, CancellationToken cancellationToken)
     {
         var strategy = Db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async ct =>
+        var committed = await strategy.ExecuteAsync(async ct =>
         {
             Db.ChangeTracker.Clear();
             await using var transaction = await Db.Database.BeginTransactionAsync(ct);
@@ -37,15 +37,27 @@ public abstract class IdempotentHandler<TEvent, TDbContext>(TDbContext db) : IIn
             if (inserted == 0)
             {
                 await transaction.RollbackAsync(ct);
-                return;
+                return false;
             }
 
             await HandleOnceAsync(message, envelope, ct);
             await Db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            return true;
         }, cancellationToken);
+
+        if (committed)
+        {
+            await AfterCommitAsync(message, envelope, cancellationToken);
+        }
     }
 
     /// <summary>Runs at most once per message. Do not call SaveChanges; the base class saves and commits.</summary>
     protected abstract Task HandleOnceAsync(TEvent message, EventEnvelope envelope, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Side effects outside the database (an SMS), after the commit. At most once: a crash between the commit and this call skips it,
+    /// and a redelivered message does not run it again.
+    /// </summary>
+    protected virtual Task AfterCommitAsync(TEvent message, EventEnvelope envelope, CancellationToken cancellationToken) => Task.CompletedTask;
 }

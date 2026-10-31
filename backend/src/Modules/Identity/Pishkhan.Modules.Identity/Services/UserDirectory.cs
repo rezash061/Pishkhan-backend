@@ -17,4 +17,10 @@ internal sealed class UserDirectory(IdentityDbContext db, PhoneProtection phones
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
         return user is null ? null : new UserSummary(user.Id, user.DisplayName, phones.Decrypt(user.PhoneE164Enc).Masked);
     }
+
+    public async Task<PhoneNumber?> GetPhoneAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var encrypted = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.PhoneE164Enc).FirstOrDefaultAsync(cancellationToken);
+        return encrypted is null ? null : phones.Decrypt(encrypted);
+    }
 }
