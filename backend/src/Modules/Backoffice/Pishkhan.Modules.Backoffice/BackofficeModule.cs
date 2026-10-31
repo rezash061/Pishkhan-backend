@@ -23,6 +23,7 @@ public static class BackofficeModule
         services.AddModuleDbContext<BackofficeDbContext>(BackofficeDbContext.SchemaName);
         services.AddHandlersFrom(typeof(BackofficeModule).Assembly);
         services.AddScoped<IStaffProvisioning, StaffAuthHandlers>();
+        services.AddScoped<IStaffDirectory, StaffDirectory>();
         return services;
     }
 

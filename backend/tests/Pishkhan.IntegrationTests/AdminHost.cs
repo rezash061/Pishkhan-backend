@@ -44,15 +44,21 @@ public sealed class AdminHost : IAsyncDisposable
         app.MapBackofficeEndpoints();
         app.MapContentAdminEndpoints();
         app.MapTenancyAdminEndpoints();
+        app.MapIdentityAdminEndpoints();
         await app.StartAsync(ct);
         return new AdminHost(app);
     }
 
-    /// <summary>A client with a staff access token for <paramref name="role"/>, minted directly (sign-in itself is covered elsewhere).</summary>
-    public HttpClient StaffClient(string role)
+    /// <summary>A client with a staff access token for <paramref name="role"/> (fresh step-up if asked), minted directly (sign-in itself is covered elsewhere).</summary>
+    public HttpClient StaffClient(string role, bool stepUp = false)
     {
-        var token = App.Services.GetRequiredService<TokenFactory>()
-            .CreateAccessToken(AuthSchemes.Staff, Uuid.NewV7(), Uuid.NewV7(), [new Claim(PishkhanClaims.Roles, role), new Claim(PishkhanClaims.AuthMethods, "pwd+otp")]);
+        List<Claim> claims = [new(PishkhanClaims.Roles, role), new(PishkhanClaims.AuthMethods, "pwd+otp")];
+        if (stepUp)
+        {
+            claims.Add(new Claim("step_up_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64));
+        }
+
+        var token = App.Services.GetRequiredService<TokenFactory>().CreateAccessToken(AuthSchemes.Staff, Uuid.NewV7(), Uuid.NewV7(), claims);
         var client = App.GetTestClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         return client;

@@ -26,7 +26,13 @@ public interface IMembershipQueries
 
     /// <summary>Ids of the workspace's members who have <paramref name="permission"/>.</summary>
     Task<IReadOnlyList<Guid>> GetMembersWithPermissionAsync(Guid workspaceId, string permission, CancellationToken cancellationToken);
+
+    /// <summary>Back office: the user's workspaces with their role, oldest membership first.</summary>
+    Task<IReadOnlyList<UserMembership>> GetMembershipsOfUserAsync(Guid userId, CancellationToken cancellationToken);
 }
+
+/// <summary><c>WorkspaceStatus</c>: active, suspended, pending_deletion, deleted.</summary>
+public sealed record UserMembership(Guid WorkspaceId, string WorkspaceName, string WorkspaceStatus, string Role, DateTimeOffset JoinedAt);
 
 public interface IWorkspaceQueries
 {

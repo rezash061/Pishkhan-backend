@@ -60,6 +60,7 @@ public sealed class InfraFixture : IAsyncLifetime
             // Every test signs users and staff in from one address; the production limits (20 an hour per IP, for requests and for OTPs) would trip mid-run.
             ["RateLimits:AuthPerHour"] = "1000",
             ["Identity:OtpPerIpPerHour"] = "1000",
+            ["Identity:OtpResendCooldown"] = "00:00:01",
             ["Storage:Provider"] = "filesystem",
             ["Storage:RootPath"] = StorageRoot,
             ["Secrets:ActiveKeyId"] = "it",
