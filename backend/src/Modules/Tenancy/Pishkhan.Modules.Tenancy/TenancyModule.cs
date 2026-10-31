@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Pishkhan.Infrastructure.Application;
+using Pishkhan.Infrastructure.Jobs;
+using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.Modules.Tenancy.Domain;
@@ -29,6 +31,16 @@ public static class TenancyModule
         services.AddHandlersFrom(typeof(TenancyModule).Assembly);
         return services;
     }
+
+    /// <summary>Recurring jobs (Workers host, platform group). Daily: the grace period is counted in days.</summary>
+    public static readonly IReadOnlyList<RecurringJob> Jobs =
+    [
+        new(typeof(WorkspacePurgeJob), "tenancy.workspace-purge", "0 40 0 * * ?"),
+    ];
+
+    /// <summary>Platform group: deletes a workspace's rows once its grace period is over.</summary>
+    public static MessagingBuilder AddTenancyPlatformConsumers(this MessagingBuilder messaging) =>
+        messaging.AddConsumer<WorkspaceDeleted, WorkspaceDataPurgeHandler>("platform");
 
     public static IEndpointRouteBuilder MapTenancyEndpoints(this IEndpointRouteBuilder app)
     {
@@ -63,6 +75,25 @@ public static class TenancyModule
             .Produces<WorkspaceResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .WithStandardProblems();
+
+        ws.MapPost("/deletion", (RequestDeletionRequest request, ICommandHandler<RequestDeletionCommand, WorkspaceResponse> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new RequestDeletionCommand(request), ct), r => Results.Accepted($"/api/v1/workspaces/{r.Id}/deletion", r)))
+            .RequireWorkspacePermission(Permissions.WorkspaceDelete)
+            .WithSummary("Ask to delete the workspace (owner); its data is deleted after 30 days unless cancelled")
+            .WithDescription("`confirmName` must equal the workspace name. Members lose access at once and automations stop; " +
+                "the workspace stays in `GET /workspaces` with status `pending_deletion` and `deletionScheduledFor`.")
+            .Produces<WorkspaceResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .WithStandardProblems()
+            .WithExamples(new RequestDeletionRequest("گالری لباس ترمه"));
+
+        ws.MapDelete("/deletion", (Guid workspaceId, ICommandHandler<CancelDeletionCommand, WorkspaceResponse> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new CancelDeletionCommand(workspaceId), ct), r => Results.Ok(r)))
+            .WithSummary("Cancel a pending deletion (owner); the workspace is active again")
+            .Produces<WorkspaceResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         ws.MapGet("/business-hours", (IQueryHandler<GetBusinessHoursQuery, BusinessHoursDto> handler, CancellationToken ct) => Send(handler.HandleAsync(new GetBusinessHoursQuery(), ct), r => Results.Ok(r)))
             .RequireWorkspacePermission(Permissions.SettingsRead)

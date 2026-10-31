@@ -17,7 +17,12 @@ public sealed record CreateWorkspaceRequest(string Name, string? Slug, string? I
 
 public sealed record UpdateWorkspaceRequest(string? Name, string? Industry);
 
-public sealed record WorkspaceResponse(Guid Id, string Name, string Slug, string Industry, string TimeZone, string Status, string Role, DateTimeOffset CreatedAt);
+/// <summary>
+/// <c>status</c>: active, suspended, pending_deletion. A workspace pending deletion is listed (so its owner can cancel) but its
+/// other endpoints answer 404; <c>deletionScheduledFor</c> is when its data is deleted.
+/// </summary>
+public sealed record WorkspaceResponse(
+    Guid Id, string Name, string Slug, string Industry, string TimeZone, string Status, string Role, DateTimeOffset CreatedAt, DateTimeOffset? DeletionScheduledFor);
 
 public sealed record ListMyWorkspacesQuery;
 
@@ -94,7 +99,7 @@ internal sealed class WorkspaceHandlers(TenancyDbContext db, ITenantContext tena
         var rows = await db.Memberships.AsNoTracking()
             .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
             .Where(m => m.UserId == caller.UserId)
-            .Join(db.Workspaces.Where(w => w.Status != WorkspaceStatus.PendingDeletion), m => m.WorkspaceId, w => w.Id, (m, w) => new { w, m.Role })
+            .Join(db.Workspaces.Where(w => w.Status != WorkspaceStatus.Deleted), m => m.WorkspaceId, w => w.Id, (m, w) => new { w, m.Role })
             .OrderBy(x => x.w.CreatedAt)
             .ToListAsync(cancellationToken);
         return rows.Select(r => ToResponse(r.w, r.Role)).ToList();
@@ -145,6 +150,6 @@ internal sealed class WorkspaceHandlers(TenancyDbContext db, ITenantContext tena
     private async Task<string> RoleAsync(CancellationToken cancellationToken) =>
         await db.Memberships.Where(m => m.UserId == caller.UserId).Select(m => m.Role).FirstOrDefaultAsync(cancellationToken) ?? WorkspaceRoles.Viewer;
 
-    private static WorkspaceResponse ToResponse(Workspace w, string role) =>
-        new(w.Id, w.Name, w.Slug, w.Industry, w.TimeZone, w.Status.ToString().ToLowerInvariant(), role, w.CreatedAt);
+    internal static WorkspaceResponse ToResponse(Workspace w, string role) =>
+        new(w.Id, w.Name, w.Slug, w.Industry, w.TimeZone, Workspace.StatusName(w.Status), role, w.CreatedAt, w.DeletionScheduledFor);
 }

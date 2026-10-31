@@ -9,6 +9,9 @@ public enum WorkspaceStatus
     Active,
     Suspended,
     PendingDeletion,
+
+    /// <summary>Purged after the grace period: the row stays as a tombstone, everything the workspace owned is deleted.</summary>
+    Deleted,
 }
 
 /// <summary>A tenant: one business. Owns channels, contacts, catalog and automations.</summary>
@@ -34,6 +37,13 @@ public sealed partial class Workspace : AggregateRoot<Guid>
     public WorkspaceStatus Status { get; private set; }
 
     public DateTimeOffset? DeletionRequestedAt { get; private set; }
+
+    public DateTimeOffset? DeletedAt { get; private set; }
+
+    /// <summary>Backend plan 3.4: data is deleted 30 days after the owner asks; until then the owner can cancel.</summary>
+    public static readonly TimeSpan DeletionGracePeriod = TimeSpan.FromDays(30);
+
+    public DateTimeOffset? DeletionScheduledFor => Status == WorkspaceStatus.PendingDeletion ? DeletionRequestedAt + DeletionGracePeriod : null;
 
     public BusinessHours BusinessHours { get; private set; } = BusinessHours.Default;
 
@@ -66,12 +76,32 @@ public sealed partial class Workspace : AggregateRoot<Guid>
 
     public void Suspend() => Status = WorkspaceStatus.Suspended;
 
-    /// <summary>Deletion has a 30-day grace period (backend plan 3.4, data retention).</summary>
+    /// <summary>Starts the grace period. Members lose access and nothing is sent; the owner can still cancel.</summary>
     public void RequestDeletion(DateTimeOffset now)
     {
         Status = WorkspaceStatus.PendingDeletion;
         DeletionRequestedAt = now;
     }
+
+    /// <summary>Back to active. A workspace suspended before the request comes back active too; staff can suspend it again.</summary>
+    public void CancelDeletion()
+    {
+        Status = WorkspaceStatus.Active;
+        DeletionRequestedAt = null;
+    }
+
+    public void MarkDeleted(DateTimeOffset now)
+    {
+        Status = WorkspaceStatus.Deleted;
+        DeletedAt = now;
+    }
+
+    /// <summary>The API spelling: active, suspended, pending_deletion, deleted.</summary>
+    public static string StatusName(WorkspaceStatus status) => status switch
+    {
+        WorkspaceStatus.PendingDeletion => "pending_deletion",
+        _ => status.ToString().ToLowerInvariant(),
+    };
 
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$", RegexOptions.CultureInvariant, 100)]
     public static partial Regex SlugPattern();
