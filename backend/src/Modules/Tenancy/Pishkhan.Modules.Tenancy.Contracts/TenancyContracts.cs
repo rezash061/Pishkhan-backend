@@ -13,6 +13,9 @@ public interface IMembershipQueries
 {
     /// <summary>Ids of the workspaces the user belongs to, sorted.</summary>
     Task<IReadOnlyList<Guid>> GetWorkspaceIdsAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>The workspace owner's user id, or null for an unknown workspace.</summary>
+    Task<Guid?> GetOwnerIdAsync(Guid workspaceId, CancellationToken cancellationToken);
 }
 
 public interface IWorkspaceQueries

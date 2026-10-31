@@ -250,6 +250,77 @@
         }
       }
     },
+    "/api/v1/auth/support-session": {
+      "post": {
+        "tags": [
+          "Support sessions"
+        ],
+        "summary": "Exchange a one-time support-session token (from the back office link) for a 30-minute access token",
+        "description": "The token works once and for 2 minutes. The session has no refresh token; `POST /auth/logout` ends it. Under it, password, TOTP and session changes (and other sensitive actions) answer 403 `auth.support_session.not_allowed`.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeSupportSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "tags": [
@@ -6239,6 +6310,17 @@
       "DayOfWeek": {
         "type": "integer"
       },
+      "ExchangeSupportSessionRequest": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "FileResponse": {
         "required": [
           "id",
@@ -8800,6 +8882,40 @@
           }
         }
       },
+      "SupportSessionResponse": {
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "workspaceId",
+          "userId",
+          "staffUsername",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "staffUsername": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "TimeRange": {
         "required": [
           "from",
@@ -9145,6 +9261,9 @@
   "tags": [
     {
       "name": "Auth"
+    },
+    {
+      "name": "Support sessions"
     },
     {
       "name": "Account"

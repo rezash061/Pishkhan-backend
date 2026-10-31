@@ -82,6 +82,9 @@ public sealed class BackofficeOptions
     public TimeSpan AbsoluteTimeout { get; set; } = TimeSpan.FromHours(8);
 
     public TimeSpan StepUpLifetime { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Base URL of the user panel; support-session links open <c>{UserPanelUrl}/api/auth/impersonation?token=</c>.</summary>
+    public string UserPanelUrl { get; set; } = "http://localhost:3000";
 }
 
 /// <summary>Staff sign-in: password, then mandatory TOTP (enrolled on first sign-in), with lockout after 5 failures.</summary>

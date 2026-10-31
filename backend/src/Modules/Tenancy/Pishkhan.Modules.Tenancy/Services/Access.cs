@@ -49,6 +49,14 @@ internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQuerie
             .OrderBy(m => m.WorkspaceId)
             .Select(m => m.WorkspaceId)
             .ToListAsync(cancellationToken);
+
+    public async Task<Guid?> GetOwnerIdAsync(Guid workspaceId, CancellationToken cancellationToken) =>
+        await db.Memberships.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceRoles.Owner)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => (Guid?)m.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
 }
 
 /// <summary>Workspace status and business hours for other modules (<c>ws:{ws}:status</c>, <c>ws:{ws}:hours</c>, 5 minutes, tagged by workspace).</summary>

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added (Phase 1, support sessions, 2026-10-31)
+- `POST /admin/v1/workspaces/{workspaceId}/support-sessions` (Support or SuperAdmin, step-up, `reason` of 5 to 300 characters, optional `userId`, by default the owner) returns a one-time link `{UserPanelUrl}/api/auth/impersonation?token=…` valid 2 minutes (`Backoffice:UserPanelUrl`). Audited in the workspace as `support_session.grant` with the reason.
+- `POST /api/v1/auth/support-session` (`token`) exchanges it once for a 30-minute access token as that member, with no refresh token. The token carries the staff member in `act` and `act_name`; every change under it is audited as staff on behalf of the member, which the owner's audit view shows as «support». The exchange is audited as `support_session.start` and notifies the owner. `POST /auth/logout` ends the session.
+- Under a support session, password, TOTP and session changes answer 403 `auth.support_session.not_allowed` (endpoint filter `DenySupportSession`, for billing and other sensitive actions as they arrive).
+
 ### Added (Phase 1, BE-1.10 part 1: dashboard, 2026-10-31)
 - New Analytics module (`analytics` schema) with hourly rollups per workspace (`analytics.hourly_metrics`): messages received, new conversations, replies by rule, by AI and by a team member, and handoffs. The platform worker group fills it from `conversations.inbound-message-received`, `conversations.outbound-message-requested` (sends postponed by the rate limit are not counted twice) and `conversations.handoff-requested`, each counted once.
 - `GET /api/v1/workspaces/{workspaceId}/dashboard?range=today|7d|30d` (permission `workspace.analytics.read`) returns totals with the automated share, one entry per Tehran day, and the overnight summary. The summary covers the latest stretch of closed business hours in the last 24 hours and includes a ready Persian sentence such as «از ۲۱:۳۰ تا ۰۹:۳۰: ۷ پیام دریافت شد، ۶ پاسخ خودکار داده شد و ۱ گفتگو به تیم سپرده شد.». The response also has the live inbox (open, handed off, unread, oldest waiting handoff) and channel health. Rollup figures are cached for up to 5 minutes (`dash:{ws}:{range}`).
