@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Pishkhan.Infrastructure.Storage;
+using Pishkhan.Modules.Identity.Contracts;
 using Pishkhan.Modules.Identity.Domain;
 using Pishkhan.Modules.Identity.Persistence;
 using Pishkhan.Modules.Tenancy.Contracts;
@@ -95,20 +96,42 @@ internal sealed class SessionService(
         return exists;
     }
 
+    /// <summary>
+    /// A support-session access token: no refresh token and no session row, so it ends after <see cref="SupportSessions.SessionLifetime"/>
+    /// or when revoked by its session id. The staff member is in <c>act</c> and <c>act_name</c>.
+    /// </summary>
+    public async Task<IssuedToken> IssueSupportTokenAsync(Guid userId, Guid sessionId, Guid staffId, string staffUsername, CancellationToken cancellationToken)
+    {
+        var workspaces = await memberships.GetWorkspaceIdsAsync(userId, cancellationToken);
+        return tokens.CreateAccessToken(AuthSchemes.User, userId, sessionId,
+        [
+            new Claim(PishkhanClaims.WorkspacesHash, WorkspacesHash(workspaces)),
+            new Claim(PishkhanClaims.AuthMethods, "support"),
+            new Claim(PishkhanClaims.Actor, staffId.ToString()),
+            new Claim(SupportSessions.ActorNameClaim, staffUsername),
+        ], SupportSessions.SessionLifetime);
+    }
+
+    /// <summary>Ends a support session: its token is rejected from now on.</summary>
+    public Task RevokeSupportSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        revocations.RevokeAsync(AuthSchemes.User, sessionId.ToString(), SupportSessions.SessionLifetime + TimeSpan.FromMinutes(1), cancellationToken);
+
     public IssuedToken IssueRealtimeToken(Guid userId, Guid sessionId) =>
         tokens.CreateAccessToken(AuthSchemes.User, userId, sessionId, [], options.Value.RealtimeTokenLifetime, tokenUse: "realtime");
 
     private async Task<AuthTokens> IssueAsync(Session session, string refreshToken, CancellationToken cancellationToken)
     {
         var workspaces = await memberships.GetWorkspaceIdsAsync(session.UserId, cancellationToken);
-        var wsHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.ASCII.GetBytes(string.Join(',', workspaces))))[..16];
         var access = tokens.CreateAccessToken(AuthSchemes.User, session.UserId, session.FamilyId,
         [
-            new Claim(PishkhanClaims.WorkspacesHash, wsHash),
+            new Claim(PishkhanClaims.WorkspacesHash, WorkspacesHash(workspaces)),
             new Claim(PishkhanClaims.AuthMethods, session.AuthMethods),
         ]);
         return new AuthTokens(access.Token, access.ExpiresAt, refreshToken, session.ExpiresAt);
     }
+
+    private static string WorkspacesHash(IReadOnlyList<Guid> workspaces) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.ASCII.GetBytes(string.Join(',', workspaces))))[..16];
 
     private static string NewRefreshToken() => Base64Url.Encode(RandomNumberGenerator.GetBytes(32));
 

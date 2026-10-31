@@ -50,6 +50,14 @@ internal sealed class MembershipQueries(TenancyDbContext db) : IMembershipQuerie
             .Select(m => m.WorkspaceId)
             .ToListAsync(cancellationToken);
 
+    public async Task<Guid?> GetOwnerIdAsync(Guid workspaceId, CancellationToken cancellationToken) =>
+        await db.Memberships.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(m => m.WorkspaceId == workspaceId && m.Role == WorkspaceRoles.Owner)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => (Guid?)m.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Guid>> GetMembersWithPermissionAsync(Guid workspaceId, string permission, CancellationToken cancellationToken)
     {
         var members = await db.Memberships.AsNoTracking()

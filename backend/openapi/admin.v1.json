@@ -326,6 +326,87 @@
         ]
       }
     },
+    "/admin/v1/workspaces/{workspaceId}/support-sessions": {
+      "post": {
+        "tags": [
+          "Support sessions"
+        ],
+        "summary": "Start a support session in a workspace (Support, step-up, reason required)",
+        "description": "Returns a one-time link to the user panel, valid 2 minutes. The panel exchanges it for a 30-minute session as the member (the owner unless `userId` is given) with the staff member recorded on every change. The owner sees the reason in their audit log.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSupportSessionRequest"
+              },
+              "example": {
+                "reason": "تیکت ۱۲۴۵: قانون پاسخ خودکار کار نمی‌کند",
+                "userId": null
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportSessionLink"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/leads": {
       "get": {
         "tags": [
@@ -949,6 +1030,25 @@
           }
         }
       },
+      "StartSupportSessionRequest": {
+        "required": [
+          "reason",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "StepUpRequest": {
         "required": [
           "password",
@@ -975,6 +1075,22 @@
             "type": "string"
           },
           "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupportSessionLink": {
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
             "type": "string",
             "format": "date-time"
           }
@@ -1011,6 +1127,9 @@
     },
     {
       "name": "Staff"
+    },
+    {
+      "name": "Support sessions"
     },
     {
       "name": "Leads"
