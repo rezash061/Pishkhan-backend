@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.11 part 1: plans and the public price list, 2026-10-31)
+- New Billing module (`billing` schema, migration `Initial`) with versioned plans. A plan is a `code` with numbered versions; each version is `draft`, `published` or `archived`, and only one version per code can be a draft or published at a time. Prices are Rial (`monthly`, optional `annual` and `overagePerConversation` as `Money`); `limits` are per meter (`ai_conversations`, `ai_messages`, `channel_accounts`, `seats`, `receipt_verifications`, `sms`; `null` means unlimited) and `features` are the price-list lines (`key`, `label`, `included`, optional `limit` text).
+- Back office (`/admin/v1`): `GET /plans?code=&status=&page=&pageSize=` and `GET /plans/{planId}` (SuperAdmin, Finance, Support, ReadOnly). Finance or SuperAdmin: `POST /plans` (201; 409 `billing.plan.code_taken`), `PUT /plans/{planId}` (drafts only, otherwise 409 `billing.plan.not_draft`), `POST /plans/{planId}/versions` (copies a version into a new draft; 409 `billing.plan.draft_exists`), `POST /plans/{planId}/publish` (step-up, optional `reason`; archives the previously published version of the code) and `POST /plans/{planId}/archive` (step-up, `reason` required). Audited as `plan.create`, `plan.update`, `plan.version`, `plan.publish` and `plan.archive`.
+- `GET /api/v1/public/plans` (anonymous, the website's price list) returns the published public plans in sort order, cached 10 minutes and refreshed on every publish or archive.
+- The Api, AdminApi and Migrator hosts run the Billing module.
+
+### Fixed
+- Cache invalidations from another host never reached the cache the endpoints read. The Redis cache that `AddStackExchangeRedisCache` registers asks the container for `HybridCache` when it first connects, and that happens inside HybridCache's own constructor, so each host built two HybridCache instances and, depending on how a reader got its cache (an endpoint parameter or a service's constructor) and which resolved first, it could read a different one from the one the `CacheInvalidated` consumer cleared. Such entries only went stale until their TTL. The platform now registers the plain `RedisCache`, and a test checks that a host holds one HybridCache.
+- Broadcast consumer groups now carry a random instance id. Several hosts in one process (the integration tests) shared one group and split its partitions, so each missed most broadcasts.
+
 ### Added (Phase 1, BE-1.12 part 2: admin users, 2026-10-31)
 - `GET /admin/v1/users?q=&status=&page=&pageSize=` (SuperAdmin, Support, Finance, ReadOnly) lists panel users newest first. `q` is a user id, a phone (exact, in any spelling) or text in the display name; `status` is `active` or `suspended`. Rows carry the masked phone, 2FA, last sign-in and the number of signed-in devices.
 - `GET /admin/v1/users/{userId}` (same roles) adds the user's workspaces with role and status, and their signed-in devices (first and last use, expiry, IP, user agent, sign-in method).

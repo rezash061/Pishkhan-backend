@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,13 @@ public static class CachingExtensions
             o.ConnectionMultiplexerFactory = () => Task.FromResult(redis);
             o.InstanceName = sp.GetRequiredService<RedisKeys>().Prefix + ":hc:";
         }));
-        services.AddStackExchangeRedisCache(_ => { });
+        services.AddOptions<RedisCacheOptions>();
+
+        // The plain RedisCache, not the one AddStackExchangeRedisCache registers: that one asks the container for HybridCache when it
+        // first connects, which happens inside HybridCache's own constructor (it reads tag invalidations from L2). The re-entrant
+        // resolution built a second HybridCache, so endpoints and the invalidation consumer held different instances and
+        // invalidations from other hosts never reached what the endpoints read.
+        services.AddSingleton<IDistributedCache>(sp => new RedisCache(sp.GetRequiredService<IOptions<RedisCacheOptions>>()));
         services.AddHybridCache(o =>
         {
             o.MaximumPayloadBytes = 1024 * 1024;
