@@ -57,6 +57,35 @@ public sealed class AiAdminTests(InfraFixture infra) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_v1_eval_set_imports_and_runs_with_handoff_scores()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "tools", "Pishkhan.EvalRunner", "samples", "v1.jsonl")))
+        {
+            dir = dir.Parent;
+        }
+
+        dir.ShouldNotBeNull("the repository root holds tools/Pishkhan.EvalRunner/samples/v1.jsonl");
+        var lines = await File.ReadAllTextAsync(Path.Combine(dir.FullName, "tools", "Pishkhan.EvalRunner", "samples", "v1.jsonl"), Ct);
+        var ops = _admin.StaffClient(StaffRoles.AiOps);
+        var name = "v1-" + Guid.NewGuid().ToString("N")[..6];
+        var imported = await Json(await ops.PostAsync($"/admin/v1/ai/eval-sets/{name}/import", new StringContent(lines, Encoding.UTF8, "application/x-ndjson"), Ct), HttpStatusCode.OK);
+        imported.GetProperty("imported").GetInt32().ShouldBe(100);
+        imported.GetProperty("errors").GetArrayLength().ShouldBe(0);
+        var sets = await ops.GetFromJsonAsync<JsonElement>("/admin/v1/ai/eval-sets", Ct);
+        var setId = sets.EnumerateArray().First(s => s.GetProperty("name").GetString() == name).GetProperty("id").GetString()!;
+
+        // The fake classifier answers «other», so only the code rules hand off: every «talk to a person» case, and nothing else.
+        var run = await RunAsync(ops, setId, "2");
+        run.GetProperty("run").GetProperty("caseCount").GetInt32().ShouldBe(100);
+        run.GetProperty("run").GetProperty("handoffPrecision").GetDecimal().ShouldBe(1m);
+        run.GetProperty("run").GetProperty("handoffRecall").GetDecimal().ShouldBe(decimal.Round(9m / 29m, 4));
+        var results = run.GetProperty("results").EnumerateArray().ToList();
+        results.Count(r => r.GetProperty("handoffReason").GetString() == "human_request").ShouldBe(9);
+        results.ShouldContain(r => r.GetProperty("expectedHandoff").GetBoolean() && !r.GetProperty("predictedHandoff").GetBoolean());
+    }
+
+    [Fact]
     public async Task Staff_manage_providers_routes_and_prompts_and_activation_needs_a_passing_eval_run()
     {
         var marker = Guid.NewGuid().ToString("N")[..6];

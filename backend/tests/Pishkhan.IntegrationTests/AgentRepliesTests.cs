@@ -29,6 +29,7 @@ namespace Pishkhan.IntegrationTests;
 public sealed class AgentRepliesTests(InfraFixture infra, ChannelsHost workers) : IAsyncLifetime
 {
     private const string Shipping = "ارسال به شهرستان‌ها با پست پیشتاز دو تا چهار روز کاری است.";
+    private const string Hours = "فروشگاه حضوری هر روز از ساعت ۹ صبح تا ۹ شب باز است.";
     private ApiFactory _api = null!;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -94,6 +95,11 @@ public sealed class AgentRepliesTests(InfraFixture infra, ChannelsHost workers) 
         if (user.Contains("ارسال", StringComparison.Ordinal) && system.Contains("پست پیشتاز", StringComparison.Ordinal))
         {
             return Reply(Shipping, 0.9);
+        }
+
+        if (user.Contains("ساعت کاری", StringComparison.Ordinal) && system.Contains(Hours, StringComparison.Ordinal))
+        {
+            return Reply(Hours, 0.9);
         }
 
         if (user.Contains("عجیب", StringComparison.Ordinal))
@@ -402,5 +408,72 @@ public sealed class AgentRepliesTests(InfraFixture infra, ChannelsHost workers) 
         trace.GetProperty("threshold").GetDouble().ShouldBe(0.7);
         await Task.Delay(1_000, Ct);
         TextsTo(c1).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Test_mode_answers_without_sending_and_an_answered_question_teaches_the_agent()
+    {
+        var (s, _) = await ShopAsync();
+        _api.Services.GetRequiredService<FakeChatScript>().Respond = Respond; // test mode runs in the Api
+        var sandbox = $"/api/v1/workspaces/{s.WorkspaceId}/agent/sandbox";
+        async Task<JsonElement> TryAsync(object body)
+        {
+            var response = await s.Client.PostAsJsonAsync(sandbox, body, Ct);
+            var text = await response.Content.ReadAsStringAsync(Ct);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, text);
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+
+        (await s.Client.PostAsJsonAsync(sandbox, new { text = " " }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await s.Client.PostAsJsonAsync(sandbox, new { text = "سلام", history = new[] { new { role = "bot", text = "x" } } }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        // The same pipeline, with the trace in the answer; nothing is stored or metered.
+        var answered = await TryAsync(new { text = "ارسال به شیراز چند روزه؟", history = new[] { new { role = "customer", text = "سلام" }, new { role = "agent", text = "سلام! بفرمایید" } } });
+        answered.GetProperty("outcome").GetString().ShouldBe("sent");
+        answered.GetProperty("messages").EnumerateArray().Select(m => m.GetString()).ShouldBe([Shipping]);
+        answered.GetProperty("trace").GetProperty("facts").EnumerateArray().ShouldContain(f => f.GetProperty("sourceKind").GetString() == "faq");
+        var vip = await TryAsync(new { text = "سلام", tags = new[] { "VIP" } });
+        vip.GetProperty("handoffReason").GetString().ShouldBe("vip");
+        vip.GetProperty("messages").EnumerateArray().Select(m => m.GetString()).ShouldBe([AgentProfile.DefaultHandoffMessage]);
+        (await s.Client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{s.WorkspaceId}/agent/traces", Ct)).GetProperty("items").GetArrayLength().ShouldBe(0);
+
+        // A real customer asks something the knowledge does not cover: it becomes an unanswered question.
+        var unansweredUrl = $"/api/v1/workspaces/{s.WorkspaceId}/knowledge/unanswered";
+        var customer = "u1" + Guid.NewGuid().ToString("N")[..8];
+        await DmAsync(s, customer, "ساعت کاری فروشگاه حضوری چیه؟");
+        var question = await EventuallyValue<JsonElement>(async () =>
+        {
+            var page = await s.Client.GetFromJsonAsync<JsonElement>(unansweredUrl, Ct);
+            return page.GetProperty("items").GetArrayLength() == 1 ? page.GetProperty("items")[0] : null;
+        }, "the unanswered question");
+        question.GetProperty("question").GetString().ShouldBe("ساعت کاری فروشگاه حضوری چیه؟");
+        question.GetProperty("count").GetInt32().ShouldBe(1);
+        (await TryAsync(new { text = "ساعت کاری فروشگاه حضوری چیه؟" })).GetProperty("handoffReason").GetString().ShouldBe("missing_knowledge");
+
+        // Answering it once adds a FAQ; after indexing, test mode answers it.
+        var id = question.GetProperty("id").GetGuid();
+        (await s.Client.PostAsJsonAsync($"{unansweredUrl}/{id}/answer", new { answer = "" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var answer = await s.Client.PostAsJsonAsync($"{unansweredUrl}/{id}/answer", new { answer = Hours, question = "ساعت کاری فروشگاه حضوری چیست؟" }, Ct);
+        answer.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var result = await answer.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        result.GetProperty("question").GetProperty("status").GetString().ShouldBe("answered");
+        result.GetProperty("source").GetProperty("kind").GetString().ShouldBe("faq");
+        result.GetProperty("source").GetProperty("question").GetString().ShouldBe("ساعت کاری فروشگاه حضوری چیست؟");
+        result.GetProperty("question").GetProperty("answerSourceId").GetGuid().ShouldBe(result.GetProperty("source").GetProperty("id").GetGuid());
+        (await s.Client.PostAsJsonAsync($"{unansweredUrl}/{id}/answer", new { answer = Hours }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await s.Client.GetFromJsonAsync<JsonElement>(unansweredUrl, Ct)).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await s.Client.GetFromJsonAsync<JsonElement>($"{unansweredUrl}?status=answered", Ct)).GetProperty("items").GetArrayLength().ShouldBe(1);
+        (await s.Client.GetAsync($"{unansweredUrl}?status=nope", Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        await EventuallyValue<JsonElement>(async () =>
+        {
+            var reply = await TryAsync(new { text = "ساعت کاری فروشگاه حضوری چیه؟" });
+            return reply.GetProperty("outcome").GetString() == "sent" ? reply : null;
+        }, "test mode answers from the new FAQ");
+
+        // Dismissing hides it; another question from a customer is not affected.
+        var dismissed = await s.Client.PostAsync($"{unansweredUrl}/{id}/dismiss", null, Ct);
+        (await dismissed.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("status").GetString().ShouldBe("dismissed");
+        (await s.Client.PostAsync($"{unansweredUrl}/{Guid.NewGuid()}/dismiss", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 }

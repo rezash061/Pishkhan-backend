@@ -3753,6 +3753,24 @@
               "null",
               "string"
             ]
+          },
+          "expectedHandoff": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "predictedHandoff": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "handoffReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3880,6 +3898,20 @@
           },
           "gate": {
             "$ref": "#/components/schemas/EvalGate"
+          },
+          "handoffPrecision": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "handoffRecall": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         }
       },

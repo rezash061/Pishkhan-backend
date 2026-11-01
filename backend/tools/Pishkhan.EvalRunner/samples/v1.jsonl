@@ -1,0 +1,100 @@
+{"ref": "v1-0001", "vertical": "clothing", "input": "سلام قیمت این مانتو چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0002", "vertical": "clothing", "input": "سایز L این شلوار موجوده؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0003", "vertical": "clothing", "input": "salam, in lebas size M dare?", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0004", "vertical": "clothing", "input": "ارسال به مشهد چند روز طول میکشه؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0005", "vertical": "clothing", "input": "میخوام دوتا از این تیشرت سفارش بدم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0006", "vertical": "clothing", "input": "مانتویی که فرستادید پاره بود، خیلی ناراحتم", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0007", "vertical": "clothing", "input": "اگه دوتا بخرم تخفیف میدین؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0008", "vertical": "clothing", "input": "سلام وقت بخیر", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0009", "vertical": "clothing", "input": "میشه با اپراتور صحبت کنم؟", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0010", "vertical": "clothing", "input": "جنس این پیراهن نخیه؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0011", "vertical": "clothing", "input": "how much is this dress?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0012", "vertical": "clothing", "input": "ghimat in kaapshen chande?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0013", "vertical": "clothing", "input": "رنگ مشکیش رو دارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0014", "vertical": "clothing", "input": "هزینه ارسال پستی چقدره؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0015", "vertical": "clothing", "input": "سفارشم کی میرسه؟ دیروز پرداخت کردم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0016", "vertical": "clothing", "input": "دو هفته‌ست منتظرم هنوز نرسیده، افتضاحه", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0017", "vertical": "clothing", "input": "با یه آدم واقعی میخوام حرف بزنم", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0018", "vertical": "clothing", "input": "سلام ادمین جان", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0019", "vertical": "clothing", "input": "تخفیف دانشجویی دارین؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0020", "vertical": "clothing", "input": "جدول سایز رو بفرستید لطفا", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0021", "vertical": "cosmetics", "input": "این کرم برای پوست چرب خوبه؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0022", "vertical": "cosmetics", "input": "قیمت رژ لب شماره ۱۲ چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0023", "vertical": "cosmetics", "input": "ریمل ضدآب موجود دارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0024", "vertical": "cosmetics", "input": "salam, kei mirese dastam?", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0025", "vertical": "cosmetics", "input": "سرم ویتامین سی رو میخوام سفارش بدم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0026", "vertical": "cosmetics", "input": "کرمی که خریدم پوستم رو حساسیت داد، خیلی بد بود", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0027", "vertical": "cosmetics", "input": "اگه سه تا بگیرم ارزون‌تر حساب میکنید؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0028", "vertical": "cosmetics", "input": "درود", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0029", "vertical": "cosmetics", "input": "لطفا وصلم کنید به پشتیبانی انسانی، با یه آدم", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0030", "vertical": "cosmetics", "input": "اصل بودن محصولات تضمینیه؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0031", "vertical": "cosmetics", "input": "price of the sunscreen?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0032", "vertical": "cosmetics", "input": "in kerem ghimatesh chande?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0033", "vertical": "cosmetics", "input": "کد رنگ ۲۰۳ تموم شده؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0034", "vertical": "cosmetics", "input": "به کیش هم ارسال دارین؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0035", "vertical": "cosmetics", "input": "کد رهگیری سفارشم رو میدین؟", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0036", "vertical": "cosmetics", "input": "بسته‌بندی باز شده بود، چرا انقدر بی‌دقتین", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0037", "vertical": "cosmetics", "input": "operator please", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0038", "vertical": "cosmetics", "input": "سلااام", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0039", "vertical": "cosmetics", "input": "کد تخفیف دارین؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0040", "vertical": "cosmetics", "input": "تاریخ انقضای این شامپو کیه؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0041", "vertical": "home", "input": "قیمت این گلدون سرامیکی چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0042", "vertical": "home", "input": "این فرش ۶ متری موجوده؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0043", "vertical": "home", "input": "ارسال به شهرستان با باربری هست یا پست؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0044", "vertical": "home", "input": "میخوام این آباژور رو بخرم، چطوری سفارش بدم؟", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0045", "vertical": "home", "input": "لیوان‌ها شکسته رسید دستم، اصلا راضی نیستم", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0046", "vertical": "home", "input": "برای خرید عمده تخفیف میدید؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0047", "vertical": "home", "input": "سلام خسته نباشید", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0048", "vertical": "home", "input": "میخوام با مدیر فروشگاه صحبت کنم", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0049", "vertical": "home", "input": "این ظرف‌ها مناسب ماکروویو هستن؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0050", "vertical": "home", "input": "gheymate in tablo chande?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0051", "vertical": "home", "input": "رنگ کرمش رو دوباره میارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0052", "vertical": "home", "input": "چند روزه میرسه تهران؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0053", "vertical": "home", "input": "سفارشم رو میخوام لغو کنم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0054", "vertical": "home", "input": "رنگش با عکس فرق داشت، خیلی بده", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0055", "vertical": "home", "input": "hi", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0056", "vertical": "home", "input": "ابعاد این میز چقدره؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0057", "vertical": "home", "input": "چند میشه این ست قابلمه؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0058", "vertical": "home", "input": "موجودیش کی شارژ میشه؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0059", "vertical": "home", "input": "تخفیف بیشتر نمیشه؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0060", "vertical": "home", "input": "آدرس حضوری دارین؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0061", "vertical": "food", "input": "قیمت یه کیلو زعفرون چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0062", "vertical": "food", "input": "عسل طبیعی موجود دارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0063", "vertical": "food", "input": "به رشت ارسال دارین؟ چند روزه؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0064", "vertical": "food", "input": "دو بسته پسته سفارش میدم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0065", "vertical": "food", "input": "خرمایی که فرستادید کرم زده بود، خیلی ناراحت شدم", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0066", "vertical": "food", "input": "اگه ۵ کیلو بخرم تخفیف داره؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0067", "vertical": "food", "input": "سلام صبح بخیر", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0068", "vertical": "food", "input": "یه نفر جواب بده لطفا، با اپراتور", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0069", "vertical": "food", "input": "این روغن زیتون فرابکره‌ست؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0070", "vertical": "food", "input": "zaferoon gerami chand?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0071", "vertical": "food", "input": "چای لاهیجان تازه اومده؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0072", "vertical": "food", "input": "هزینه ارسال چنده برای شیراز؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0073", "vertical": "food", "input": "سفارشم کجاست؟ کد رهگیری میدین", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0074", "vertical": "food", "input": "وزنش کمتر از چیزی بود که نوشته بودید، کلاهبرداری", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0075", "vertical": "food", "input": "سلام", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0076", "vertical": "food", "input": "ماندگاری این مربا چقدره؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0077", "vertical": "food", "input": "قیمت عمده آجیل چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0078", "vertical": "food", "input": "زعفرون نیم مثقالی دارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0079", "vertical": "food", "input": "یه کم ارزون‌تر حساب کنید", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0080", "vertical": "food", "input": "talk to a human", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0081", "vertical": "digital", "input": "قیمت این هندزفری بلوتوثی چنده؟", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0082", "vertical": "digital", "input": "قاب آیفون ۱۵ موجوده؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0083", "vertical": "digital", "input": "ارسال اکسپرس تهران دارین؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0084", "vertical": "digital", "input": "میخوام این پاوربانک رو سفارش بدم", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0085", "vertical": "digital", "input": "شارژری که خریدم بعد دو روز سوخت، خیلی بده", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0086", "vertical": "digital", "input": "تخفیف همکاری میدین؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0087", "vertical": "digital", "input": "سلام وقتتون بخیر", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0088", "vertical": "digital", "input": "با یک انسان میخوام صحبت کنم نه ربات", "expected": {"intent": "human_request", "handoff": true}}
+{"ref": "v1-0089", "vertical": "digital", "input": "گارانتی داره؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0090", "vertical": "digital", "input": "in charger chande?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0091", "vertical": "digital", "input": "کابل تایپ سی دو متری دارین؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0092", "vertical": "digital", "input": "کی به اصفهان میرسه؟", "expected": {"intent": "shipping", "handoff": false}}
+{"ref": "v1-0093", "vertical": "digital", "input": "فاکتور سفارشم رو میخوام", "expected": {"intent": "order", "handoff": false}}
+{"ref": "v1-0094", "vertical": "digital", "input": "هنوز پولم برنگشته، خیلی بی‌مسئولیتید", "expected": {"intent": "complaint", "handoff": true}}
+{"ref": "v1-0095", "vertical": "digital", "input": "salam", "expected": {"intent": "greeting", "handoff": false}}
+{"ref": "v1-0096", "vertical": "digital", "input": "با سامسونگ A54 سازگاره؟", "expected": {"intent": "other", "handoff": false}}
+{"ref": "v1-0097", "vertical": "digital", "input": "price for the smart watch?", "expected": {"intent": "price_question", "handoff": false}}
+{"ref": "v1-0098", "vertical": "digital", "input": "مشکی‌ش کی موجود میشه؟", "expected": {"intent": "availability", "handoff": false}}
+{"ref": "v1-0099", "vertical": "digital", "input": "اگه نقدی بدم ارزون‌تر میشه؟", "expected": {"intent": "discount_request", "handoff": true}}
+{"ref": "v1-0100", "vertical": "digital", "input": "real person please, not a bot", "expected": {"intent": "human_request", "handoff": true}}

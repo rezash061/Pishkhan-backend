@@ -70,10 +70,12 @@ public sealed record EvalGate(bool Passed, IReadOnlyList<EvalGateCheck> Checks);
 /// <summary>An eval run. <c>status</c>: running, completed, failed.</summary>
 public sealed record EvalRunResponse(
     Guid Id, Guid SetId, string SetName, string Task, string PromptKey, string PromptVersion, string? Route, string Status, int CaseCount, int ErrorCount,
-    decimal? IntentAccuracy, long InputTokens, long OutputTokens, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, EvalGate Gate);
+    decimal? IntentAccuracy, long InputTokens, long OutputTokens, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, EvalGate Gate,
+    decimal? HandoffPrecision = null, decimal? HandoffRecall = null);
 
 public sealed record EvalResultResponse(
-    Guid CaseId, string Ref, string? Vertical, string Input, string? ExpectedIntent, string? PredictedIntent, bool? Correct, string? Route, int LatencyMs, string? Error);
+    Guid CaseId, string Ref, string? Vertical, string Input, string? ExpectedIntent, string? PredictedIntent, bool? Correct, string? Route, int LatencyMs, string? Error,
+    bool? ExpectedHandoff = null, bool? PredictedHandoff = null, string? HandoffReason = null);
 
 public sealed record EvalRunDetail(EvalRunResponse Run, IReadOnlyList<EvalResultResponse> Results);
 
@@ -532,7 +534,8 @@ internal static partial class AiAdminEndpoints
 
         var results = await db.EvalResults.AsNoTracking().Where(r => r.RunId == runId)
             .Join(db.EvalCases.AsNoTracking(), r => r.CaseId, c => c.Id, (r, c) => new EvalResultResponse(
-                c.Id, c.ExternalRef, c.Vertical, c.Input, c.ExpectedIntent, r.PredictedIntent, r.IntentCorrect, r.Route, r.LatencyMs, r.Error))
+                c.Id, c.ExternalRef, c.Vertical, c.Input, c.ExpectedIntent, r.PredictedIntent, r.IntentCorrect, r.Route, r.LatencyMs, r.Error,
+                c.ExpectedHandoff, r.PredictedHandoff, r.HandoffReason))
             .ToListAsync(ct);
         var ordered = results.OrderBy(r => r.Error is null && r.Correct != false).ThenBy(r => r.Ref, StringComparer.Ordinal).ToList();
         return Results.Ok(new EvalRunDetail(ToRun(run.Run, run.SetName, settings.Current.EvalGate), ordered));
@@ -602,7 +605,7 @@ internal static partial class AiAdminEndpoints
 
     private static EvalRunResponse ToRun(EvalRun r, string setName, AiEvalGateOptions gate) =>
         new(r.Id, r.SetId, setName, r.Task, r.PromptKey, r.PromptVersion, r.Route, r.Status, r.CaseCount, r.ErrorCount, r.IntentAccuracy, r.InputTokens,
-            r.OutputTokens, r.StartedAt, r.FinishedAt, Gate(r, gate));
+            r.OutputTokens, r.StartedAt, r.FinishedAt, Gate(r, gate), r.HandoffPrecision, r.HandoffRecall);
 
     private static AiProviderResponse ToProvider(string name, AiSettingsStore.Snapshot snapshot, AiProvider? row)
     {
