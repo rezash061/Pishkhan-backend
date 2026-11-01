@@ -49,6 +49,9 @@ public sealed record SegmentResponse(Guid Id, string Name, SegmentRule Rule, int
 
 public sealed record SegmentPreviewResponse(int ContactCount);
 
+/// <summary>The contact list's filters; <c>consent</c> keeps contacts whose latest decision for that channel (phone, sms, bale) is a grant.</summary>
+public sealed record ContactFilter(string? Q, string? Tag, Guid? SegmentId, Guid? ChannelAccountId, bool? HasPhone, string? Consent);
+
 internal static class CrmEndpoints
 {
     private const int MaxPageSize = 100;
@@ -61,7 +64,7 @@ internal static class CrmEndpoints
 
         contacts.MapGet("/", ListAsync)
             .RequireWorkspacePermission(Permissions.CrmRead)
-            .WithSummary("Contacts, newest first; filter by text (name, username, phone, email), tag, segment, channel account or phone")
+            .WithSummary("Contacts, newest first; filter by text (name, username, phone, email), tag, segment, channel account, phone or consent")
             .Produces<Page<ContactResponse>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -162,49 +165,17 @@ internal static class CrmEndpoints
     // ---- Contacts ----
 
     private static async Task<IResult> ListAsync(
-        Guid workspaceId, string? q, string? tag, Guid? segmentId, Guid? channelAccountId, bool? hasPhone, string? cursor, int? limit,
+        Guid workspaceId, string? q, string? tag, Guid? segmentId, Guid? channelAccountId, bool? hasPhone, string? consent, string? cursor, int? limit,
         ConversationsDbContext db, IClock clock, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxPageSize);
-        var query = db.Contacts.AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(q))
+        var filtered = await FilterAsync(db, workspaceId, new ContactFilter(q, tag, segmentId, channelAccountId, hasPhone, consent), clock.UtcNow, ct);
+        if (filtered.Error is { } error)
         {
-            if (q.Length > 100)
-            {
-                return Invalid("q", "validation.too_long");
-            }
-
-            query = query.Where(c => SearchIds(db, workspaceId, q).Contains(c.Id));
+            return error;
         }
 
-        if (!string.IsNullOrWhiteSpace(tag))
-        {
-            var name = tag.Trim();
-            query = query.Where(c => c.Tags.Contains(name));
-        }
-
-        if (segmentId is { } sid)
-        {
-            var segment = await db.Segments.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sid, ct);
-            if (segment is null)
-            {
-                return Error.NotFound("crm.segment.not_found").ToProblem();
-            }
-
-            query = query.Where(c => SegmentIds(db, workspaceId, ReadRule(segment), clock.UtcNow).Contains(c.Id));
-        }
-
-        if (channelAccountId is { } account)
-        {
-            query = query.Where(c => db.ChannelIdentities.Any(i => i.ContactId == c.Id && i.ChannelAccountId == account));
-        }
-
-        if (hasPhone is { } phone)
-        {
-            var rule = new SegmentRule("all", [new SegmentCondition("has_phone", "is", Value: JsonSerializer.SerializeToElement(phone))]);
-            query = query.Where(c => SegmentIds(db, workspaceId, rule, clock.UtcNow).Contains(c.Id));
-        }
-
+        var query = filtered.Query!;
         if (Cursor.TryRead(cursor, out var at, out var id))
         {
             query = query.Where(c => EF.Functions.LessThan(ValueTuple.Create(c.CreatedAt, c.Id), ValueTuple.Create(at, id)));
@@ -214,6 +185,70 @@ internal static class CrmEndpoints
         var next = rows.Count > take ? Cursor.Write(rows[take - 1].CreatedAt, rows[take - 1].Id) : null;
         var page = rows.Take(take).ToList();
         return Results.Ok(new Page<ContactResponse>(await ToResponsesAsync(db, page, ct), next));
+    }
+
+    /// <summary>The contacts matching the list filters (also used by the Excel export), or the problem with a filter.</summary>
+    internal static async Task<(IQueryable<Contact>? Query, IResult? Error)> FilterAsync(
+        ConversationsDbContext db, Guid workspaceId, ContactFilter filter, DateTimeOffset now, CancellationToken ct)
+    {
+        var query = db.Contacts.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(filter.Q))
+        {
+            if (filter.Q.Length > 100)
+            {
+                return (null, Invalid("q", "validation.too_long"));
+            }
+
+            var q = filter.Q;
+            query = query.Where(c => SearchIds(db, workspaceId, q).Contains(c.Id));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Tag))
+        {
+            var name = filter.Tag.Trim();
+            query = query.Where(c => c.Tags.Contains(name));
+        }
+
+        var conditions = new List<SegmentCondition>();
+        if (filter.SegmentId is { } sid)
+        {
+            var segment = await db.Segments.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sid, ct);
+            if (segment is null)
+            {
+                return (null, Error.NotFound("crm.segment.not_found").ToProblem());
+            }
+
+            var rule = ReadRule(segment);
+            query = query.Where(c => SegmentIds(db, workspaceId, rule, now).Contains(c.Id));
+        }
+
+        if (filter.ChannelAccountId is { } account)
+        {
+            query = query.Where(c => db.ChannelIdentities.Any(i => i.ContactId == c.Id && i.ChannelAccountId == account));
+        }
+
+        if (filter.HasPhone is { } phone)
+        {
+            conditions.Add(new SegmentCondition("has_phone", "is", Value: JsonSerializer.SerializeToElement(phone)));
+        }
+
+        if (!string.IsNullOrEmpty(filter.Consent))
+        {
+            if (!ConsentChannels.All.Contains(filter.Consent))
+            {
+                return (null, Invalid("consent", "validation.consent.channel"));
+            }
+
+            conditions.Add(new SegmentCondition("consent", "granted", Value: JsonSerializer.SerializeToElement(filter.Consent)));
+        }
+
+        if (conditions.Count > 0)
+        {
+            var rule = new SegmentRule("all", conditions);
+            query = query.Where(c => SegmentIds(db, workspaceId, rule, now).Contains(c.Id));
+        }
+
+        return (query, null);
     }
 
     private static async Task<IResult> GetAsync(Guid workspaceId, Guid contactId, ConversationsDbContext db, CancellationToken ct)
@@ -372,7 +407,7 @@ internal static class CrmEndpoints
             """);
     }
 
-    private static IQueryable<Guid> SegmentIds(ConversationsDbContext db, Guid workspaceId, SegmentRule rule, DateTimeOffset now)
+    internal static IQueryable<Guid> SegmentIds(ConversationsDbContext db, Guid workspaceId, SegmentRule rule, DateTimeOffset now)
     {
         var parameters = new List<NpgsqlParameter> { new("ws", workspaceId) };
         // The filter is built only from fixed SQL and @parameters (SegmentSql never inlines a value).

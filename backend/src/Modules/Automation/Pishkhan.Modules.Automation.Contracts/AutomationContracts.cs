@@ -103,6 +103,15 @@ public sealed record RulesChanged(Guid WorkspaceId, Guid RuleId, int Revision) :
 [IntegrationEvent(Topics.FlowPublished)]
 public sealed record FlowPublished(Guid WorkspaceId, Guid FlowId, int Version) : IIntegrationEvent;
 
+/// <summary>
+/// A flow run with questions completed: <see cref="Answers"/> holds each answered question's variable and the customer's normalised answer.
+/// The CRM stores it as a form submission of the flow.
+/// </summary>
+[IntegrationEvent(Topics.FormSubmitted)]
+public sealed record FormSubmitted(
+    Guid WorkspaceId, Guid FlowId, int FlowVersion, string FlowName, Guid RunId, Guid ConversationId, IReadOnlyDictionary<string, string> Answers,
+    DateTimeOffset SubmittedAt) : IIntegrationEvent;
+
 /// <summary>Post a public reply under a comment (outbound group, paced per account). Keyed by media id.</summary>
 [IntegrationEvent(Topics.CommentReplyRequested)]
 public sealed record CommentReplyRequested(Guid ChannelAccountId, string CommentId, string MediaId, string Text, Guid RuleId) : IIntegrationEvent;

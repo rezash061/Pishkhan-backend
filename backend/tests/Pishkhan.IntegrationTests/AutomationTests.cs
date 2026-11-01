@@ -222,6 +222,20 @@ public sealed class AutomationTests(InfraFixture infra, ChannelsHost workers) : 
                 .FirstAsync(x => x.ExternalUserId == customer, Ct)).Tags.Order().SequenceEqual(new[] { "lead", "ordered" })),
             TimeSpan.FromSeconds(15),
             "contact tags");
+
+        // The completed run is a form submission in the CRM.
+        var forms = $"/api/v1/workspaces/{s.WorkspaceId}/crm/forms";
+        await Eventually(
+            async () => (await s.Client.GetFromJsonAsync<JsonElement>(forms, Ct)).GetArrayLength() == 1, TimeSpan.FromSeconds(15), "form submission");
+        var form = (await s.Client.GetFromJsonAsync<JsonElement>(forms, Ct))[0];
+        form.GetProperty("flowName").GetString().ShouldBe("ثبت سفارش");
+        form.GetProperty("submissionCount").GetInt32().ShouldBe(1);
+        form.GetProperty("fields").EnumerateArray().Select(f => f.GetString()).ShouldBe(["name"]);
+        var submission = (await s.Client.GetFromJsonAsync<JsonElement>($"{forms}/{flowId}/submissions", Ct)).GetProperty("items")[0];
+        submission.GetProperty("answers").GetProperty("name").GetString().ShouldBe("مریم از شیراز");
+        var contactSubmissions = await s.Client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{s.WorkspaceId}/contacts/{submission.GetProperty("contactId").GetGuid()}/submissions", Ct);
+        contactSubmissions.GetArrayLength().ShouldBe(1);
+
         var handled = await ConversationsAsync(s.WorkspaceId, db => db.Messages.AsNoTracking()
             .Where(m => m.Direction == MessageDirections.Inbound && m.Text == "قيمت").Select(m => new { m.HandledBy, m.AutomationRuleId }).SingleAsync(Ct));
         handled.HandledBy.ShouldBe(HandledBy.Rule);

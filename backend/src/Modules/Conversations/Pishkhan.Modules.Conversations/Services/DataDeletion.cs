@@ -8,8 +8,8 @@ using Pishkhan.Modules.Conversations.Persistence;
 namespace Pishkhan.Modules.Conversations.Services;
 
 /// <summary>
-/// Meta data deletion: hard-deletes the customer's conversations, messages, channel identities and, when nothing else
-/// links to it, the contact, across every workspace (the request names a channel user, not a workspace). Then confirms.
+/// Meta data deletion: hard-deletes the customer's conversations, messages, form submissions, channel identities and, when nothing else
+/// links to it, the contact with its consents, across every workspace (the request names a channel user, not a workspace). Then confirms.
 /// </summary>
 internal sealed class ConversationsDataDeletionHandler(ConversationsDbContext db, ILogger<ConversationsDataDeletionHandler> logger)
     : IdempotentHandler<DataDeletionRequested, ConversationsDbContext>(db)
@@ -32,8 +32,13 @@ internal sealed class ConversationsDataDeletionHandler(ConversationsDbContext db
         var messageIds = Db.Messages.IgnoreQueryFilters().Where(m => conversationIds.Contains(m.ConversationId)).Select(m => m.Id);
         var deleted = await Db.ExternalMessageKeys.Where(k => messageIds.Contains(k.MessageId)).ExecuteDeleteAsync(cancellationToken);
         deleted += await Db.Messages.IgnoreQueryFilters().Where(m => conversationIds.Contains(m.ConversationId)).ExecuteDeleteAsync(cancellationToken);
+        deleted += await Db.FormSubmissions.IgnoreQueryFilters().Where(f => conversationIds.Contains(f.ConversationId)).ExecuteDeleteAsync(cancellationToken);
         deleted += await conversations.ExecuteDeleteAsync(cancellationToken);
         deleted += await identities.ExecuteDeleteAsync(cancellationToken);
+        var orphans = Db.Contacts.IgnoreQueryFilters()
+            .Where(c => contactIds.Contains(c.Id) && !Db.ChannelIdentities.IgnoreQueryFilters().Any(i => i.ContactId == c.Id)).Select(c => c.Id);
+        deleted += await Db.Consents.IgnoreQueryFilters().Where(k => orphans.Contains(k.ContactId)).ExecuteDeleteAsync(cancellationToken);
+        deleted += await Db.FormSubmissions.IgnoreQueryFilters().Where(f => orphans.Contains(f.ContactId)).ExecuteDeleteAsync(cancellationToken);
         deleted += await Db.Contacts.IgnoreQueryFilters()
             .Where(c => contactIds.Contains(c.Id) && !Db.ChannelIdentities.IgnoreQueryFilters().Any(i => i.ContactId == c.Id))
             .ExecuteDeleteAsync(cancellationToken);

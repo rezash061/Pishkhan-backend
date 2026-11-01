@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
+using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Features;
@@ -27,14 +28,16 @@ public static class ConversationsModule
     public static MessagingBuilder AddConversationsIngestConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<InstagramWebhookReceived, InstagramIngestHandler>("ingest");
 
-    /// <summary>Platform group: privacy requests.</summary>
+    /// <summary>Platform group: privacy requests and contact exports.</summary>
     public static MessagingBuilder AddConversationsPlatformConsumers(this MessagingBuilder messaging) =>
-        messaging.AddConsumer<DataDeletionRequested, ConversationsDataDeletionHandler>("platform");
+        messaging.AddConsumer<DataDeletionRequested, ConversationsDataDeletionHandler>("platform")
+            .AddConsumer<ContactExportRequested, ContactExportHandler>("platform");
 
     /// <summary>Engine group: applies automation decisions; the M0 echo replies stay behind <c>Spike:EchoReplies</c>.</summary>
     public static MessagingBuilder AddConversationsEngineConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<InboundMessageReceived, EchoReplyHandler>("engine")
-        .AddConsumer<ConversationActionsRequested, ConversationActionsHandler>("engine");
+        .AddConsumer<ConversationActionsRequested, ConversationActionsHandler>("engine")
+        .AddConsumer<FormSubmitted, FormSubmittedHandler>("engine");
 
     public static MessagingBuilder AddConversationsOutboundConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
@@ -63,6 +66,7 @@ public static class ConversationsModule
     {
         ConversationEndpoints.Map(app);
         CrmEndpoints.Map(app);
+        CrmRecords.Map(app);
         app.MapHub<InboxHub>(InboxHub.Path);
         return app;
     }

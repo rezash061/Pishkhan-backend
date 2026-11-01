@@ -37,6 +37,12 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
 
     public DbSet<ContactSegment> Segments => Set<ContactSegment>();
 
+    public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
+
+    public DbSet<ContactConsent> Consents => Set<ContactConsent>();
+
+    public DbSet<ContactExport> Exports => Set<ContactExport>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Contact>(b =>
@@ -145,6 +151,45 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.Property(x => x.Name).HasMaxLength(80);
             b.Property(x => x.RuleJson).HasColumnName("rule").HasColumnType("jsonb");
             b.HasIndex(x => new { x.WorkspaceId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<FormSubmission>(b =>
+        {
+            b.ToTable("form_submissions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.FlowName).HasMaxLength(200);
+            b.Property(x => x.Answers).HasColumnType("jsonb").HasConversion(
+                v => JsonSerializer.Serialize(v, EnvelopeJson.Options),
+                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, EnvelopeJson.Options) ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                new ValueComparer<Dictionary<string, string>>(
+                    (a, b) => a!.Count == b!.Count && !a.Except(b).Any(),
+                    v => v.Count,
+                    v => new Dictionary<string, string>(v, StringComparer.Ordinal)));
+            b.HasIndex(x => x.RunId).IsUnique();
+            b.HasIndex(x => new { x.WorkspaceId, x.FlowId, x.SubmittedAt });
+            b.HasIndex(x => x.ContactId);
+            b.HasIndex(x => x.ConversationId);
+        });
+
+        modelBuilder.Entity<ContactConsent>(b =>
+        {
+            b.ToTable("contact_consents");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Channel).HasMaxLength(20);
+            b.Property(x => x.Source).HasMaxLength(20);
+            b.Property(x => x.Evidence).HasMaxLength(500);
+            b.HasIndex(x => new { x.ContactId, x.Channel, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ContactExport>(b =>
+        {
+            b.ToTable("contact_exports");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.FilterJson).HasColumnName("filter").HasColumnType("jsonb");
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.StorageKey).HasMaxLength(200);
+            b.Property(x => x.Error).HasMaxLength(100);
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
         });
 
         modelBuilder.Entity<QuickReplyTemplate>(b =>

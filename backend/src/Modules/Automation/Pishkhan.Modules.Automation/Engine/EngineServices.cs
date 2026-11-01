@@ -319,6 +319,7 @@ internal sealed class FlowEngine(AutomationDbContext db)
 
         db.FlowRuns.Add(run);
         Apply(FlowRunner.Start(version.Graph, run, Context(conversation, settings, now)), run, conversation, plan);
+        Submitted(version.Graph, run, flow.Name, now);
         return run;
     }
 
@@ -326,13 +327,42 @@ internal sealed class FlowEngine(AutomationDbContext db)
     {
         var graph = await GraphAsync(run, ct);
         Apply(FlowRunner.Answer(graph, run, text, payload, Context(conversation, settings, now)), run, conversation, plan);
+        await SubmittedAsync(graph, run, now, ct);
     }
 
     public async Task TimerAsync(FlowRun run, string nodeId, ConversationSnapshot conversation, SettingsView settings, EnginePlan plan, DateTimeOffset now, CancellationToken ct)
     {
         var graph = await GraphAsync(run, ct);
         Apply(FlowRunner.TimerFired(graph, run, nodeId, Context(conversation, settings, now)), run, conversation, plan);
+        await SubmittedAsync(graph, run, now, ct);
     }
+
+    private async Task SubmittedAsync(FlowGraph graph, FlowRun run, DateTimeOffset now, CancellationToken ct)
+    {
+        if (run.Status == FlowRunStatuses.Completed && Answers(graph, run).Count > 0)
+        {
+            var name = await db.Flows.AsNoTracking().Where(f => f.Id == run.FlowId).Select(f => f.Name).FirstOrDefaultAsync(ct) ?? string.Empty;
+            Submitted(graph, run, name, now);
+        }
+    }
+
+    /// <summary>A completed run that asked questions is a form submission (CRM, BE-1.7).</summary>
+    private void Submitted(FlowGraph graph, FlowRun run, string flowName, DateTimeOffset now)
+    {
+        if (run.Status != FlowRunStatuses.Completed || Answers(graph, run) is not { Count: > 0 } answers)
+        {
+            return;
+        }
+
+        db.Publish(
+            new FormSubmitted(run.WorkspaceId, run.FlowId, run.FlowVersion, flowName, run.Id, run.ConversationId, answers, now),
+            run.ConversationId.ToString(), workspaceId: run.WorkspaceId);
+    }
+
+    private static Dictionary<string, string> Answers(FlowGraph graph, FlowRun run) =>
+        graph.Nodes.Where(n => n.Type == FlowNodeTypes.Question && n.Variable is not null && run.Variables.ContainsKey(n.Variable))
+            .Select(n => n.Variable!).Distinct(StringComparer.Ordinal)
+            .ToDictionary(v => v, v => run.Variables[v], StringComparer.Ordinal);
 
     private async Task<FlowGraph> GraphAsync(FlowRun run, CancellationToken ct) =>
         (await db.FlowVersions.AsNoTracking().FirstAsync(v => v.FlowId == run.FlowId && v.Version == run.FlowVersion, ct)).Graph;

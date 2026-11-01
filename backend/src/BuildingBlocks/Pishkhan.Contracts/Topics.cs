@@ -28,6 +28,8 @@ public static class Topics
     public const string FlowPublished = "automation.flow-published.v1";
     public const string CommentReplyRequested = "automation.comment-reply-requested.v1";
     public const string BacklogPageRequested = "automation.backlog-page-requested.v1";
+    public const string FormSubmitted = "automation.form-submitted.v1";
+    public const string ContactExportRequested = "conversations.contact-export-requested.v1";
     public const string FileScanRequested = "files.scan-requested.v1";
     public const string FileScanCompleted = "files.scan-completed.v1";
     public const string KnowledgeSourceChanged = "knowledge.source-changed.v1";
@@ -71,6 +73,8 @@ public static class Topics
         new(FlowPublished, 6, Week, "flow id"),
         new(CommentReplyRequested, 24, Week, "instagram media id"),
         new(BacklogPageRequested, 6, Week, "backlog run id"),
+        new(FormSubmitted, 12, Week, "conversation id"),
+        new(ContactExportRequested, 6, Week, "export id"),
         new(FileScanRequested, 12, Week, "file id"),
         new(FileScanCompleted, 12, Week, "file id"),
         new(KnowledgeSourceChanged, 12, Week, "workspace id"),
