@@ -336,6 +336,75 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
 
                     b.ToTable("sources", "knowledge");
                 });
+
+            modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.UnansweredQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AnswerSourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("answer_source_id");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("FirstAskedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_asked_at");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("LastAskedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_asked_at");
+
+                    b.Property<Guid>("LastConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_conversation_id");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("question");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unanswered_questions");
+
+                    b.HasIndex("WorkspaceId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_unanswered_questions_workspace_id_key");
+
+                    b.HasIndex("WorkspaceId", "Status", "LastAskedAt")
+                        .HasDatabaseName("ix_unanswered_questions_workspace_id_status_last_asked_at");
+
+                    b.ToTable("unanswered_questions", "knowledge");
+                });
 #pragma warning restore 612, 618
         }
     }

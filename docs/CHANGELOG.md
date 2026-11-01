@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.4 part 2: the AI reply pipeline, 2026-11-01)
+- The Workers (ai group) now answer `conversations.reply-requested.v1` (AI on, no rule matched, or a flow handing over with a goal). One run answers the customer's whole turn (the messages since our last reply). It skips a request that is no longer current: a newer message, a reply already sent, the AI paused, the conversation handed off, or the window closed.
+- Pipeline:
+  - Handoff rules in code first: VIP tags, configured keywords, and built-in "talk to a person" phrases.
+  - Then classification (prompt `intent.classify` v2 adds language and sentiment). Human requests, negative complaints and discount requests go to a person.
+  - Then hybrid knowledge retrieval and generation (prompt `agent.reply` v1, JSON `reply`, `confidence`, `answered`) with tools `search_products`, `get_product`, `check_stock`, `request_handoff` and `add_unanswered_question`.
+- Output guard:
+  - Every amount (digits in any script, «هزار/میلیون», number words, Toman or Rial) must match a retrieved fact or a tool result.
+  - Also checked: the never-say list, a link allowlist (links in facts or tools, plus the profile's domains), 1,000 characters, and Persian unless the customer wrote otherwise.
+  - A failed answer is regenerated once and then handed off (`guard_price`, `guard_link`, ...).
+- Combined confidence: half the model's own estimate, a quarter the classifier's, a quarter grounding. Below the workspace threshold the conversation is handed off with the reply as the suggested reply. Two weak answers in a row also hand off. Missing knowledge hands off and records an unanswered question.
+- A handoff sends the profile's handoff message (if set) and hands off with reason `ai:<reason>`. `HandoffRequested` now carries the suggested reply.
+- A sent reply records `billing.usage-recorded.v1` for `ai_messages` and `ai_conversations`. When the plan's `ai_messages` limit is reached, the agent hands off (`plan_limit`) instead of answering.
+- Agent settings and traces (Api, `/api/v1/workspaces/{workspaceId}/agent`):
+  - `GET /profile` (`workspace.settings.read`, defaults until saved) and `PUT /profile` (`workspace.agent.write`).
+  - The profile holds name, tone (friendly, formal, playful), brand voice, reply in the customer's language, never-say list, confidence threshold (0.3 to 0.95, default 0.6), handoff rules (human request, complaint, discount request, repeated low confidence, keywords, VIP tags), handoff message and allowed domains.
+  - `GET /traces?conversationId=&outcome=sent|handed_off|failed&cursor=` and `GET /traces/{id}` (`workspace.agent.write`). A trace has input, intent, language, sentiment, retrieved facts, tool calls, guard issues per attempt, reply or suggestion, confidences, prompts and models, tokens, cost and latency.
+- New tables `agent.agent_profiles`, `agent.ai_traces` and `knowledge.unanswered_questions`. New topic `agent.unanswered-question-raised.v1`: Knowledge counts repeats of the same normalised question. The endpoints for unanswered questions come in part 3.
+- AI gateway: a successful call reports its cost in `pishkhan.cost_irr`. Tests can script the fake provider (`FakeChatScript`).
+
 ### Added (Phase 1, BE-1.4 part 1: knowledge base and hybrid search, 2026-11-01)
 - New Knowledge module (schema `knowledge`, tables `sources` and `chunks`). The migration enables pgvector and adds `embedding vector(1024)` with an HNSW cosine index, plus a generated `tsvector` over normalised text with a GIN index.
 - AI gateway: `IModelRouter.GetEmbeddingGenerator(workspaceId)` uses the first `embed` route (breaker, timeout and usage as for chat). Providers `openai` (OpenAI-compatible embeddings at 1024 dimensions) and `fake` (deterministic, for tests).

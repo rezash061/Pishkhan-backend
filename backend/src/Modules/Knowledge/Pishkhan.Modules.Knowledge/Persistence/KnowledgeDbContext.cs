@@ -16,6 +16,8 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
 
     public DbSet<KnowledgeChunk> Chunks => Set<KnowledgeChunk>();
 
+    public DbSet<UnansweredQuestion> Unanswered => Set<UnansweredQuestion>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<KnowledgeSource>(b =>
@@ -39,6 +41,17 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
             b.Property(x => x.EmbeddingModel).HasMaxLength(100);
             b.HasIndex(x => new { x.SourceId, x.Ordinal });
             b.HasIndex(x => x.WorkspaceId);
+        });
+
+        modelBuilder.Entity<UnansweredQuestion>(b =>
+        {
+            b.ToTable("unanswered_questions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Question).HasMaxLength(UnansweredQuestion.MaxQuestion);
+            b.Property(x => x.Key).HasMaxLength(UnansweredQuestion.MaxQuestion);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique();
+            b.HasIndex(x => new { x.WorkspaceId, x.Status, x.LastAskedAt });
         });
     }
 }

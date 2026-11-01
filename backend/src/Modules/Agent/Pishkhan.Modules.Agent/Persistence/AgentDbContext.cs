@@ -1,5 +1,9 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Agent.Domain;
@@ -27,6 +31,10 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
     public DbSet<PromptVersion> PromptVersions => Set<PromptVersion>();
 
     public DbSet<PromptActivation> PromptActivations => Set<PromptActivation>();
+
+    public DbSet<AgentProfile> Profiles => Set<AgentProfile>();
+
+    public DbSet<AiTrace> Traces => Set<AiTrace>();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
@@ -118,6 +126,53 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             b.Property(x => x.Key).HasMaxLength(100);
             b.Property(x => x.Version).HasMaxLength(40);
         });
+
+        modelBuilder.Entity<AgentProfile>(b =>
+        {
+            b.ToTable("agent_profiles");
+            b.HasKey(x => x.WorkspaceId);
+            b.Property(x => x.Name).HasMaxLength(AgentProfile.MaxName);
+            b.Property(x => x.Tone).HasMaxLength(20);
+            b.Property(x => x.BrandVoice).HasMaxLength(AgentProfile.MaxBrandVoice);
+            b.Property(x => x.HandoffMessage).HasMaxLength(AgentProfile.MaxHandoffMessage);
+            Json(b.Property(x => x.NeverSay));
+            Json(b.Property(x => x.AllowedDomains));
+            Json(b.Property(x => x.Handoff));
+        });
+
+        modelBuilder.Entity<AiTrace>(b =>
+        {
+            b.ToTable("ai_traces");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Goal).HasMaxLength(500);
+            b.Property(x => x.Input).HasMaxLength(AiTrace.MaxText);
+            b.Property(x => x.Reply).HasMaxLength(AiTrace.MaxText);
+            b.Property(x => x.Intent).HasMaxLength(40);
+            b.Property(x => x.Language).HasMaxLength(20);
+            b.Property(x => x.Sentiment).HasMaxLength(20);
+            b.Property(x => x.Outcome).HasMaxLength(20);
+            b.Property(x => x.HandoffReason).HasMaxLength(60);
+            b.Property(x => x.Prompts).HasMaxLength(200);
+            b.Property(x => x.Models).HasMaxLength(400);
+            b.Property(x => x.CostIrr).HasPrecision(18, 2);
+            Json(b.Property(x => x.Facts));
+            Json(b.Property(x => x.ToolCalls));
+            Json(b.Property(x => x.GuardIssues));
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+            b.HasIndex(x => new { x.ConversationId, x.CreatedAt });
+        });
+    }
+
+    private static void Json<T>(PropertyBuilder<T> property)
+        where T : class
+    {
+        property.HasColumnType("jsonb").HasConversion(
+            v => JsonSerializer.Serialize(v, EnvelopeJson.Options),
+            v => JsonSerializer.Deserialize<T>(v, EnvelopeJson.Options)!,
+            new ValueComparer<T>(
+                (a, b) => JsonSerializer.Serialize(a, EnvelopeJson.Options) == JsonSerializer.Serialize(b, EnvelopeJson.Options),
+                v => JsonSerializer.Serialize(v, EnvelopeJson.Options).GetHashCode(StringComparison.Ordinal),
+                v => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(v, EnvelopeJson.Options), EnvelopeJson.Options)!));
     }
 }
 

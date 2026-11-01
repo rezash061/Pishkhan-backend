@@ -7640,6 +7640,227 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/agent/profile": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "The AI agent's persona, guardrails and handoff rules (defaults until saved)",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Save the AI agent's settings",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/agent/traces": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "What the agent did for each customer turn, newest first; filter by conversation or outcome",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfTraceSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/agent/traces/{traceId}": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "One trace: classification, retrieved facts, tool calls, guard issues, confidence and usage",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/audit": {
       "get": {
         "tags": [
@@ -8109,6 +8330,85 @@
           },
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "AgentProfileDto": {
+        "required": [
+          "name",
+          "tone",
+          "brandVoice",
+          "replyInCustomerLanguage",
+          "neverSay",
+          "confidenceThreshold",
+          "handoff",
+          "handoffMessage",
+          "allowedDomains"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string"
+          },
+          "brandVoice": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replyInCustomerLanguage": {
+            "type": "boolean"
+          },
+          "neverSay": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidenceThreshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "handoff": {
+            "$ref": "#/components/schemas/HandoffRulesDto"
+          },
+          "handoffMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allowedDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AgentProfileResponse": {
+        "required": [
+          "profile",
+          "isDefault",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/AgentProfileDto"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -9973,6 +10273,43 @@
           }
         }
       },
+      "HandoffRulesDto": {
+        "required": [
+          "humanRequest",
+          "complaint",
+          "discountRequest",
+          "repeatedLowConfidence",
+          "keywords",
+          "vipTags"
+        ],
+        "type": "object",
+        "properties": {
+          "humanRequest": {
+            "type": "boolean"
+          },
+          "complaint": {
+            "type": "boolean"
+          },
+          "discountRequest": {
+            "type": "boolean"
+          },
+          "repeatedLowConfidence": {
+            "type": "boolean"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "vipTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "IFormFile": {
         "type": "string",
         "format": "binary"
@@ -10958,6 +11295,27 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SourceResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PageOfTraceSummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceSummary"
             }
           },
           "nextCursor": {
@@ -12829,6 +13187,336 @@
           }
         }
       },
+      "TraceDetail": {
+        "required": [
+          "id",
+          "conversationId",
+          "messageId",
+          "flowRunId",
+          "goal",
+          "input",
+          "intent",
+          "language",
+          "sentiment",
+          "classifierConfidence",
+          "facts",
+          "toolCalls",
+          "guardIssues",
+          "reply",
+          "selfConfidence",
+          "confidence",
+          "threshold",
+          "outcome",
+          "handoffReason",
+          "prompts",
+          "models",
+          "inputTokens",
+          "outputTokens",
+          "costIrr",
+          "latencyMs",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "flowRunId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "goal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "input": {
+            "type": "string"
+          },
+          "intent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sentiment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "classifierConfidence": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceFact"
+            }
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceToolCall"
+            }
+          },
+          "guardIssues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceGuardIssue"
+            }
+          },
+          "reply": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "selfConfidence": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "handoffReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "prompts": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "models": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "costIrr": {
+            "type": "number",
+            "format": "double"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TraceFact": {
+        "required": [
+          "chunkId",
+          "sourceId",
+          "sourceKind",
+          "title",
+          "score",
+          "similarity"
+        ],
+        "type": "object",
+        "properties": {
+          "chunkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "similarity": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "TraceGuardIssue": {
+        "required": [
+          "attempt",
+          "kind",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "TraceSummary": {
+        "required": [
+          "id",
+          "conversationId",
+          "messageId",
+          "input",
+          "intent",
+          "outcome",
+          "handoffReason",
+          "reply",
+          "confidence",
+          "threshold",
+          "latencyMs",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "input": {
+            "type": "string"
+          },
+          "intent": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "handoffReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reply": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TraceToolCall": {
+        "required": [
+          "name",
+          "arguments",
+          "result",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "string"
+          },
+          "result": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "TriggerConfig": {
         "type": "object",
         "properties": {
@@ -13236,6 +13924,9 @@
     },
     {
       "name": "Knowledge"
+    },
+    {
+      "name": "Agent"
     },
     {
       "name": "Audit"

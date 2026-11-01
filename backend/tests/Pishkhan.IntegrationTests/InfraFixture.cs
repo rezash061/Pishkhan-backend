@@ -79,6 +79,8 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Ai:Providers:fake:Kind"] = "fake",
             ["Ai:Routes:classify:0:Provider"] = "fake",
             ["Ai:Routes:classify:0:Model"] = "fake-classifier",
+            ["Ai:Routes:generate_reply:0:Provider"] = "fake",
+            ["Ai:Routes:generate_reply:0:Model"] = "fake-writer",
             ["Ai:Routes:embed:0:Provider"] = "fake",
             ["Ai:Routes:embed:0:Model"] = "fake-embed",
             ["Ai:Prompts:intent.classify:1"] = "Reply with json: {\"intent\": ...}",

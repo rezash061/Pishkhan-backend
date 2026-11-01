@@ -7,6 +7,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.AI\Pishkhan.AI.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Persian\Pishkhan.Persian.csproj" />
     <ProjectReference Include="..\Pishkhan.Modules.Knowledge.Contracts\Pishkhan.Modules.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="..\..\Agent\Pishkhan.Modules.Agent.Contracts\Pishkhan.Modules.Agent.Contracts.csproj" />
     <ProjectReference Include="..\..\Catalog\Pishkhan.Modules.Catalog.Contracts\Pishkhan.Modules.Catalog.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
   </ItemGroup>

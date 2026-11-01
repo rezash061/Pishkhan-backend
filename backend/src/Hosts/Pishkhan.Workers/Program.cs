@@ -60,7 +60,8 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddNotificationsConsumers()
     .AddAnalyticsConsumers()
     .AddBillingConsumers()
-    .AddKnowledgeConsumers());
+    .AddKnowledgeConsumers()
+    .AddAgentConsumers());
 
 if (groups.IsEnabled("platform"))
 {

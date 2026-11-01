@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Pishkhan.AI;
+using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Agent.Evals;
 using Pishkhan.Modules.Agent.Features;
 using Pishkhan.Modules.Agent.Persistence;
+using Pishkhan.Modules.Agent.Replies;
+using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Agent.Services;
 
 namespace Pishkhan.Modules.Agent;
@@ -29,7 +32,19 @@ public static class AgentModule
         }
         services.AddPishkhanAi(configuration);
         services.AddScoped<EvalService>();
+        services.AddScoped<ReplyPipeline>();
         return services;
+    }
+
+    /// <summary>AI group: the reply pipeline (<c>conversations.reply-requested.v1</c>).</summary>
+    public static MessagingBuilder AddAgentConsumers(this MessagingBuilder messaging) => messaging
+        .AddConsumer<ReplyRequested, ReplyRequestedHandler>("ai");
+
+    /// <summary>Api: the agent's settings and traces under <c>/workspaces/{id}/agent</c>.</summary>
+    public static IEndpointRouteBuilder MapAgentEndpoints(this IEndpointRouteBuilder app)
+    {
+        AgentEndpoints.Map(app);
+        return app;
     }
 
     /// <summary>AdminApi, with <see cref="MapAgentAdminEndpoints"/>: the audit writer, which needs the Backoffice staff directory.</summary>
