@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Tenancy;
+using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
@@ -27,6 +28,10 @@ internal static class ConversationLookup
             identity = ChannelIdentity.Create(workspaceId, contact.Id, channelAccountId, externalUserId, now);
             db.Contacts.Add(contact);
             db.ChannelIdentities.Add(identity);
+            if (channelKind == ChannelKinds.Instagram)
+            {
+                db.Publish(new ContactProfileRequested(workspaceId, contact.Id, channelAccountId, externalUserId), contact.Id.ToString(), workspaceId: workspaceId);
+            }
         }
 
         var conversation = db.Conversations.Local.FirstOrDefault(c => c.ChannelAccountId == channelAccountId && c.ContactId == identity.ContactId)

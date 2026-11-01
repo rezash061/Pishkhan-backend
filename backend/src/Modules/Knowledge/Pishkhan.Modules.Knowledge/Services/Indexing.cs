@@ -94,7 +94,11 @@ internal sealed class KnowledgeIndexer(KnowledgeDbContext db, IModelRouter route
 }
 
 /// <summary>AI group: (re)indexes a source when its revision is still the latest.</summary>
-internal sealed class KnowledgeSourceChangedHandler(KnowledgeDbContext db, KnowledgeIndexer indexer)
+/// <remarks>
+/// A file or URL source first gets its text: the document's (once it is clean) or the page's, fetched again on every re-index. When that
+/// fails the source is <c>failed</c> with the reason and its previous chunks stay; the owner fixes it and re-indexes.
+/// </remarks>
+internal sealed class KnowledgeSourceChangedHandler(KnowledgeDbContext db, KnowledgeIndexer indexer, KnowledgeContentReader reader, ILogger<KnowledgeSourceChangedHandler> logger)
     : IdempotentHandler<KnowledgeSourceChanged, KnowledgeDbContext>(db)
 {
     protected override async Task HandleOnceAsync(KnowledgeSourceChanged message, EventEnvelope envelope, CancellationToken cancellationToken)
@@ -103,6 +107,26 @@ internal sealed class KnowledgeSourceChangedHandler(KnowledgeDbContext db, Knowl
         if (source is null || source.Revision != message.Revision)
         {
             return;
+        }
+
+        if (source.Kind is KnowledgeSourceKinds.File or KnowledgeSourceKinds.Url)
+        {
+            try
+            {
+                var extracted = await reader.ReadAsync(source, cancellationToken);
+                source.Body = extracted.Text;
+                if (extracted.Title is { } title && source.Url is { } url && source.Title == KnowledgeSource.DefaultUrlTitle(url))
+                {
+                    source.Title = title.Length <= KnowledgeSource.MaxTitle ? title : title[..KnowledgeSource.MaxTitle];
+                }
+            }
+            catch (KnowledgeExtractionException ex)
+            {
+                logger.LogInformation("Knowledge source {SourceId} gave no text: {Code}", source.Id, ex.Code);
+                source.Status = KnowledgeStatuses.Failed;
+                source.Error = ex.Code;
+                return;
+            }
         }
 
         await indexer.IndexAsync(source, cancellationToken);

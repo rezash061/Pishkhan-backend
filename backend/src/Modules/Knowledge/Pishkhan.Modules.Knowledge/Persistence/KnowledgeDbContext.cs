@@ -28,6 +28,7 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
             b.Property(x => x.Title).HasMaxLength(KnowledgeSource.MaxTitle);
             b.Property(x => x.Question).HasMaxLength(KnowledgeSource.MaxQuestion);
             b.Property(x => x.Body).HasMaxLength(KnowledgeSource.MaxBody);
+            b.Property(x => x.Url).HasMaxLength(KnowledgeSource.MaxUrl);
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.Error).HasMaxLength(200);
             b.HasIndex(x => new { x.WorkspaceId, x.Kind, x.CreatedAt });

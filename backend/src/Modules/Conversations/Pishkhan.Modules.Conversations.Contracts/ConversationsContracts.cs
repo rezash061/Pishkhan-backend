@@ -175,3 +175,7 @@ public sealed record MessageSnapshot(Guid Id, DateTimeOffset CreatedAt, string D
 /// <summary>Builds a contacts Excel export (platform group) and notifies the member who asked.</summary>
 [IntegrationEvent(Topics.ContactExportRequested)]
 public sealed record ContactExportRequested(Guid ExportId, Guid WorkspaceId) : IIntegrationEvent;
+
+/// <summary>A new customer wrote to an Instagram account: the outbound group reads their profile (name, username, picture).</summary>
+[IntegrationEvent(Topics.ContactProfileRequested)]
+public sealed record ContactProfileRequested(Guid WorkspaceId, Guid ContactId, Guid ChannelAccountId, string ExternalUserId) : IIntegrationEvent;

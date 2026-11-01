@@ -13,7 +13,13 @@ public static class KnowledgeSourceKinds
     /// <summary>Written from a catalog product, kept in step by <c>catalog.product-changed.v1</c>.</summary>
     public const string Product = "product";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Faq, Text, Product };
+    /// <summary>An uploaded document (PDF, DOCX or plain text, purpose <c>knowledge_document</c>), its text extracted once it is scanned clean.</summary>
+    public const string File = "file";
+
+    /// <summary>A public web page, fetched through the SSRF-safe client; re-indexing fetches it again.</summary>
+    public const string Url = "url";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Faq, Text, Product, File, Url };
 }
 
 /// <summary>A source was created, changed or asked to re-index; the AI group (re)builds its chunks and embeddings.</summary>

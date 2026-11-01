@@ -9,6 +9,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Files.Contracts;
 using Pishkhan.Modules.Conversations.Realtime;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
@@ -28,8 +29,11 @@ public sealed record ConversationResponse(
     DateTimeOffset? LastInboundAt, DateTimeOffset? LastOutboundAt, DateTimeOffset? WindowExpiresAt, DateTimeOffset? HumanAgentUntil, int UnreadCount, string? LastMessagePreview,
     HandoffInfo? Handoff);
 
-/// <summary>Who the customer is. Instagram gives the username on comments and the profile fetch; it can be null for a first DM.</summary>
-public sealed record ConversationContact(Guid Id, string? DisplayName, string? Username);
+/// <summary>
+/// Who the customer is. Instagram gives the username on comments and the profile fetch; it can be null for a first DM.
+/// <c>profilePicUrl</c> is our copy of the Instagram profile picture (scanned and re-encoded), a signed URL valid for 6 hours; null until fetched.
+/// </summary>
+public sealed record ConversationContact(Guid Id, string? DisplayName, string? Username, Uri? ProfilePicUrl);
 
 public sealed record HandoffInfo(string Reason, string? SuggestedReply, DateTimeOffset? At);
 
@@ -165,8 +169,9 @@ internal static class ConversationEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    internal static ConversationResponse ToResponse(Conversation c, Contact? contact) => new(
-        c.Id, c.ChannelAccountId, c.ChannelKind, c.ContactId, new ConversationContact(c.ContactId, contact?.DisplayName, contact?.Username), c.Status, c.AssigneeId,
+    internal static ConversationResponse ToResponse(Conversation c, Contact? contact, IReadOnlyDictionary<Guid, Uri>? avatars = null) => new(
+        c.Id, c.ChannelAccountId, c.ChannelKind, c.ContactId,
+        new ConversationContact(c.ContactId, contact?.DisplayName, contact?.Username, contact?.AvatarFileId is { } avatar ? avatars?.GetValueOrDefault(avatar) : null), c.Status, c.AssigneeId,
         c.AiPaused, c.LastInboundAt, c.LastOutboundAt, c.WindowExpiresAt, c.LastInboundAt + Conversation.HumanAgentWindow, c.UnreadCount, c.LastMessagePreview,
         c.HandoffReason is { } reason ? new HandoffInfo(reason, c.HandoffSuggestedReply, c.HandedOffAt) : null);
 
@@ -183,12 +188,24 @@ internal static class ConversationEndpoints
         return m.ContentJson is not null && m.ToContent(null).Attachment is { } outbound ? [new MessageAttachment(outbound.Type, outbound.Url.ToString())] : [];
     }
 
-    private static async Task<ConversationResponse> WithContactAsync(ConversationsDbContext db, Conversation c, CancellationToken ct) =>
-        ToResponse(c, await db.Contacts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == c.ContactId, ct));
+    private static async Task<ConversationResponse> WithContactAsync(ConversationsDbContext db, IFileService files, Conversation c, CancellationToken ct)
+    {
+        var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == c.ContactId, ct);
+        return ToResponse(c, contact, await AvatarsAsync(files, [contact], ct));
+    }
+
+    /// <summary>Signed URLs of the contacts' profile pictures that are clean (one storage call for a page).</summary>
+    internal static async Task<IReadOnlyDictionary<Guid, Uri>> AvatarsAsync(IFileService files, IEnumerable<Contact?> contacts, CancellationToken ct)
+    {
+        var ids = contacts.Select(c => c?.AvatarFileId).OfType<Guid>().Distinct().ToList();
+        return ids.Count == 0 ? new Dictionary<Guid, Uri>() : await files.GetCleanUrlsAsync(ids, AvatarUrlLifetime, ct);
+    }
+
+    internal static readonly TimeSpan AvatarUrlLifetime = TimeSpan.FromHours(6);
 
     private static async Task<IResult> ListAsync(
         Guid workspaceId, string? status, string? assignee, Guid? channelAccountId, bool? unread, string? q, string? cursor, int? limit,
-        ConversationsDbContext db, ICurrentUser caller, CancellationToken ct)
+        ConversationsDbContext db, IFileService files, ICurrentUser caller, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 30, 1, MaxPageSize);
         var query = db.Conversations.AsNoTracking();
@@ -260,13 +277,14 @@ internal static class ConversationEndpoints
         var page = rows.Take(take).ToList();
         var contactIds = page.Select(c => c.ContactId).Distinct().ToList();
         var contacts = await db.Contacts.AsNoTracking().Where(x => contactIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
-        return Results.Ok(new Page<ConversationResponse>([.. page.Select(c => ToResponse(c, contacts.GetValueOrDefault(c.ContactId)))], next));
+        var avatars = await AvatarsAsync(files, contacts.Values, ct);
+        return Results.Ok(new Page<ConversationResponse>([.. page.Select(c => ToResponse(c, contacts.GetValueOrDefault(c.ContactId), avatars))], next));
     }
 
-    private static async Task<IResult> GetAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, IFileService files, CancellationToken ct)
     {
         var c = await db.Conversations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == conversationId, ct);
-        return c is null ? Error.NotFound().ToProblem() : Results.Ok(await WithContactAsync(db, c, ct));
+        return c is null ? Error.NotFound().ToProblem() : Results.Ok(await WithContactAsync(db, files, c, ct));
     }
 
     private static async Task<IResult> MessagesAsync(Guid workspaceId, Guid conversationId, string? cursor, int? limit, ConversationsDbContext db, CancellationToken ct)
@@ -318,7 +336,7 @@ internal static class ConversationEndpoints
         return Results.Json(ToResponse(message), statusCode: StatusCodes.Status202Accepted);
     }
 
-    private static async Task<IResult> AssignAsync(Guid workspaceId, Guid conversationId, AssignRequest request, ConversationsDbContext db, IWorkspaceAccessResolver access, IInboxNotifier notifier, CancellationToken ct)
+    private static async Task<IResult> AssignAsync(Guid workspaceId, Guid conversationId, AssignRequest request, ConversationsDbContext db, IFileService files, IWorkspaceAccessResolver access, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)
@@ -337,11 +355,11 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(await WithContactAsync(db, conversation, ct));
+        return Results.Ok(await WithContactAsync(db, files, conversation, ct));
     }
 
     private static async Task<IResult> ChangeStatusAsync(
-        Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, ICurrentUser caller, IInboxNotifier notifier, IClock clock, CancellationToken ct)
+        Guid workspaceId, Guid conversationId, ChangeStatusRequest request, ConversationsDbContext db, IFileService files, ICurrentUser caller, IInboxNotifier notifier, IClock clock, CancellationToken ct)
     {
         if (!ConversationStatuses.All.Contains(request.Status))
         {
@@ -361,7 +379,7 @@ internal static class ConversationEndpoints
             : conversation.ChangeStatus(request.Status);
         if (!changed)
         {
-            return Results.Ok(await WithContactAsync(db, conversation, ct));
+            return Results.Ok(await WithContactAsync(db, files, conversation, ct));
         }
 
         if (handedOff)
@@ -375,10 +393,10 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(await WithContactAsync(db, conversation, ct));
+        return Results.Ok(await WithContactAsync(db, files, conversation, ct));
     }
 
-    private static async Task<IResult> AiPauseAsync(Guid workspaceId, Guid conversationId, AiPauseRequest request, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)
+    private static async Task<IResult> AiPauseAsync(Guid workspaceId, Guid conversationId, AiPauseRequest request, ConversationsDbContext db, IFileService files, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)
@@ -392,10 +410,10 @@ internal static class ConversationEndpoints
             await notifier.ConversationUpdatedAsync(conversation, ct);
         }
 
-        return Results.Ok(await WithContactAsync(db, conversation, ct));
+        return Results.Ok(await WithContactAsync(db, files, conversation, ct));
     }
 
-    private static async Task<IResult> MarkReadAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, IInboxNotifier notifier, CancellationToken ct)
+    private static async Task<IResult> MarkReadAsync(Guid workspaceId, Guid conversationId, ConversationsDbContext db, IFileService files, IInboxNotifier notifier, CancellationToken ct)
     {
         var conversation = await db.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conversation is null)

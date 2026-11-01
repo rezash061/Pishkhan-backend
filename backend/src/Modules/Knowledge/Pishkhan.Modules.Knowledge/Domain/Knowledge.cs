@@ -20,6 +20,7 @@ public sealed class KnowledgeSource : Entity<Guid>, ITenantOwned
     public const int MaxQuestion = 300;
     public const int MaxAnswer = 2_000;
     public const int MaxBody = 50_000;
+    public const int MaxUrl = 2_000;
 
     public Guid WorkspaceId { get; init; }
 
@@ -31,10 +32,16 @@ public sealed class KnowledgeSource : Entity<Guid>, ITenantOwned
     /// <summary>The question of a FAQ entry.</summary>
     public string? Question { get; set; }
 
-    /// <summary>A FAQ's answer, or the text of a text or product source.</summary>
+    /// <summary>A FAQ's answer, or the text of a text or product source; for a file or URL source, the text extracted from it.</summary>
     public string Body { get; set; } = string.Empty;
 
     public Guid? ProductId { get; init; }
+
+    /// <summary>The uploaded document of a <c>file</c> source.</summary>
+    public Guid? FileId { get; init; }
+
+    /// <summary>The page of a <c>url</c> source.</summary>
+    public string? Url { get; set; }
 
     /// <summary>A disabled source is not retrieved; its chunks stay.</summary>
     public bool Enabled { get; set; } = true;
@@ -53,8 +60,11 @@ public sealed class KnowledgeSource : Entity<Guid>, ITenantOwned
 
     public Guid? CreatedBy { get; init; }
 
-    public static KnowledgeSource Create(Guid workspaceId, string kind, string title, string? question, string body, Guid? productId, Guid? createdBy, DateTimeOffset now) => new()
+    public static KnowledgeSource Create(
+        Guid workspaceId, string kind, string title, string? question, string body, Guid? productId, Guid? createdBy, DateTimeOffset now, Guid? fileId = null, string? url = null) => new()
     {
+        FileId = fileId,
+        Url = url,
         Id = Uuid.NewV7(now),
         WorkspaceId = workspaceId,
         Kind = kind,
@@ -65,6 +75,9 @@ public sealed class KnowledgeSource : Entity<Guid>, ITenantOwned
         CreatedBy = createdBy,
         CreatedAt = now,
     };
+
+    /// <summary>The title of a URL source added without one, until the page's own title replaces it.</summary>
+    public static string DefaultUrlTitle(string url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : url;
 
     /// <summary>Marks the content changed; returns the new revision to index.</summary>
     public int Touch()

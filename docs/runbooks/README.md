@@ -11,7 +11,7 @@ Closed beta (BE-1.15). Each runbook says how to tell what is wrong, what the sys
 
 Conventions:
 
-- Hosts: `Api` (panel and public API, SignalR), `Ingress` (Meta webhooks), `Workers` (one deployment per group: `ingest`, `engine`, `ai`, `outbound`, `media`, `platform`), `AdminApi`, `Migrator`.
+- Hosts: `Api` (panel and public API, SignalR; see [deployment notes](../deployment.md) for the same-origin hub), `Ingress` (Meta webhooks), `Workers` (one deployment per group: `ingest`, `engine`, `ai`, `outbound`, `media`, `platform`), `AdminApi`, `Migrator`.
 - Health: `GET /health/live` (process) and `GET /health/ready` (Postgres, both Redis instances, Kafka, ClamAV; ClamAV and the cache Redis report Degraded, not Unhealthy).
 - Metrics are in the `Pishkhan` meter: `pishkhan.instagram.api.errors`, `pishkhan.messaging.dead_lettered`, `pishkhan.outbox.relayed`, `pishkhan.av.scan.results`, `pishkhan.timers.fired`.
 - Tell sellers about anything they can see through the status banner and an in-app notification. Never message customers on a seller's behalf.
