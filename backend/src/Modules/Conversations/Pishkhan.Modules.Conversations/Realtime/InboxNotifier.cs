@@ -21,6 +21,8 @@ public sealed record HandoffPayload(Guid ConversationId, string Reason, string? 
 
 public sealed record ChannelStatusPayload(Guid ChannelAccountId, string Status, string? Reason);
 
+public sealed record NotificationCreatedPayload(Guid WorkspaceId, Guid Id, string Kind, string Title, string? Body, string? Link, DateTimeOffset CreatedAt);
+
 /// <summary>Pushes inbox events to SignalR groups. Through the Redis backplane every Api replica's clients receive them.</summary>
 public interface IInboxNotifier
 {
@@ -131,4 +133,14 @@ internal sealed class RealtimeChannelStatusHandler(IInboxNotifier notifier) : II
 {
     public Task HandleAsync(ChannelStatusChanged message, EventEnvelope envelope, CancellationToken cancellationToken) =>
         notifier.ChannelStatusAsync(message.WorkspaceId, new ChannelStatusPayload(message.ChannelAccountId, message.Status, message.Reason), cancellationToken);
+}
+
+/// <summary>Api host, <c>realtime</c> group: a new in-app notification, to the user's open panels.</summary>
+internal sealed class RealtimeNotificationHandler(IHubContext<InboxHub> hub) : IIntegrationEventHandler<Pishkhan.Modules.Notifications.Contracts.NotificationCreated>
+{
+    public Task HandleAsync(Pishkhan.Modules.Notifications.Contracts.NotificationCreated message, EventEnvelope envelope, CancellationToken cancellationToken) =>
+        hub.Clients.Group(InboxGroups.User(message.UserId)).SendAsync(
+            InboxEvents.NotificationCreated,
+            new NotificationCreatedPayload(message.WorkspaceId, message.NotificationId, message.Kind, message.Title, message.Body, message.Link, message.CreatedAt),
+            cancellationToken);
 }

@@ -58,7 +58,8 @@ public static class ConversationsModule
         .AddHostConsumer<OutboundMessageCompleted, RealtimeOutboundCompletedHandler>(RealtimeGroup)
         .AddHostConsumer<MessagesRead, RealtimeReadHandler>(RealtimeGroup)
         .AddHostConsumer<HandoffRequested, RealtimeHandoffHandler>(RealtimeGroup)
-        .AddHostConsumer<ChannelStatusChanged, RealtimeChannelStatusHandler>(RealtimeGroup);
+        .AddHostConsumer<ChannelStatusChanged, RealtimeChannelStatusHandler>(RealtimeGroup)
+        .AddHostConsumer<Pishkhan.Modules.Notifications.Contracts.NotificationCreated, RealtimeNotificationHandler>(RealtimeGroup);
 
     public const string RealtimeGroup = "realtime";
 

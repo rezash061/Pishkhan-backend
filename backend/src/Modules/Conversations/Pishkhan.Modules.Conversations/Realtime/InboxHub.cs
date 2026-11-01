@@ -16,6 +16,9 @@ public static class InboxEvents
     public const string MessageStatus = "message.status";
     public const string HandoffRequested = "handoff.requested";
     public const string ChannelStatus = "channel.status";
+
+    /// <summary>A new in-app notification for the connected user (any of their workspaces; the payload names it).</summary>
+    public const string NotificationCreated = "notification.created";
 }
 
 internal static class InboxGroups
@@ -23,17 +26,31 @@ internal static class InboxGroups
     public static string Workspace(Guid workspaceId) => $"ws:{workspaceId:N}";
 
     public static string Conversation(Guid conversationId) => $"conv:{conversationId:N}";
+
+    public static string User(Guid userId) => $"user:{userId:N}";
 }
 
 /// <summary>
 /// The panel's live inbox. Connect with a 5-minute realtime token (<c>POST /api/v1/auth/realtime-token</c>), then call
-/// <c>JoinWorkspace</c> for the inbox list and channel banners and <c>JoinConversation</c> for an open conversation.
+/// <c>JoinWorkspace</c> for the inbox list and channel banners and <c>JoinConversation</c> for an open conversation. Every connection
+/// also receives the user's own <c>notification.created</c> events.
 /// Membership and the <c>inbox.read</c> permission are checked on every join; the server only pushes, clients never send events.
 /// </summary>
 [Authorize(Policy = AuthPolicies.Realtime)]
 public sealed class InboxHub(IWorkspaceAccessResolver access, ITenantContext tenant, ConversationsDbContext db) : Hub
 {
     public const string Path = "/hubs/inbox";
+
+    /// <summary>Every connection joins its user's group, for that user's notifications.</summary>
+    public override async Task OnConnectedAsync()
+    {
+        if (Guid.TryParse(Context.User?.FindFirst(PishkhanClaims.Subject)?.Value ?? Context.UserIdentifier, out var userId))
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, InboxGroups.User(userId), Context.ConnectionAborted);
+        }
+
+        await base.OnConnectedAsync();
+    }
 
     public async Task JoinWorkspace(Guid workspaceId)
     {

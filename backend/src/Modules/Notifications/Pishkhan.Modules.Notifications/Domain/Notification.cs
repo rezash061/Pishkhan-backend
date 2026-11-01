@@ -58,7 +58,7 @@ public sealed class NotificationPreference : ITenantOwned
 
     public bool InApp { get; private set; }
 
-    /// <summary>Web push. Stored now; used once push subscriptions exist.</summary>
+    /// <summary>Web push, to the user's subscribed browsers.</summary>
     public bool Push { get; private set; }
 
     public bool Sms { get; private set; }
@@ -133,4 +133,51 @@ public static class NotificationCatalog
     /// <summary>A preference row (or the defaults), with SMS off where the kind does not offer it.</summary>
     public static ChannelChoice Effective(NotificationKind kind, NotificationPreference? preference) =>
         preference is null ? kind.Defaults : new ChannelChoice(preference.InApp, preference.Push, preference.Sms && kind.SmsAvailable);
+}
+
+/// <summary>
+/// One browser's web push subscription for a user (not per workspace: one browser gets the user's notifications from all their
+/// workspaces). Keys are the browser's <c>p256dh</c> and <c>auth</c>, base64url.
+/// </summary>
+public sealed class PushSubscription : Entity<Guid>
+{
+    public const int MaxEndpoint = 1_000;
+    public const int MaxPerUser = 10;
+    public const int MaxFailures = 5;
+
+    private PushSubscription()
+    {
+    }
+
+    public Guid UserId { get; private set; }
+
+    public string Endpoint { get; private set; } = string.Empty;
+
+    public string P256dh { get; private set; } = string.Empty;
+
+    public string Auth { get; private set; } = string.Empty;
+
+    public string? UserAgent { get; private set; }
+
+    public DateTimeOffset? LastDeliveredAt { get; private set; }
+
+    public int Failures { get; private set; }
+
+    public static PushSubscription Create(Guid userId, string endpoint, string p256dh, string auth, string? userAgent, DateTimeOffset now) =>
+        new() { Id = Uuid.NewV7(now), UserId = userId, Endpoint = endpoint, P256dh = p256dh, Auth = auth, UserAgent = userAgent, CreatedAt = now };
+
+    /// <summary>The same browser subscribing again (new keys, or another user signing in on it).</summary>
+    public void Renew(Guid userId, string p256dh, string auth, string? userAgent)
+    {
+        (UserId, P256dh, Auth, UserAgent, Failures) = (userId, p256dh, auth, userAgent, 0);
+    }
+
+    public void Delivered(DateTimeOffset now)
+    {
+        LastDeliveredAt = now;
+        Failures = 0;
+    }
+
+    /// <summary>Counts a failure; true when it should be dropped.</summary>
+    public bool Failed() => ++Failures >= MaxFailures;
 }

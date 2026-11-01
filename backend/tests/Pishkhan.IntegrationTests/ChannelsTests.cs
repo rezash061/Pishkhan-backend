@@ -134,6 +134,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             ["Timers:IdleDelay"] = "00:00:00.100",
             ["Website:RevalidateUrl"] = FakeWebsite.Url,
             ["Website:RevalidateSecret"] = FakeWebsite.Secret,
+            ["Notifications:HandoffSmsAfter"] = "00:00:03",
         });
         builder.AddPishkhanPlatform("it-channels");
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
@@ -144,6 +145,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         builder.Services.AddSingleton<IAntivirusScanner, CleanScanner>();
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddHttpClient("website").ConfigurePrimaryHttpMessageHandler(() => new FakeWebsite());
+        builder.Services.AddHttpClient("webpush").ConfigurePrimaryHttpMessageHandler(() => new FakePushService());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
             .AddCacheInvalidation()
             .AddConversationsIngestConsumers()

@@ -78,7 +78,7 @@ public sealed class RealtimeTests(InfraFixture infra, ChannelsHost workers) : IA
             })
             .Build();
         var inbox = new Inbox(connection);
-        foreach (var name in new[] { InboxEvents.ConversationUpdated, InboxEvents.MessageCreated, InboxEvents.MessageStatus, InboxEvents.HandoffRequested, InboxEvents.ChannelStatus })
+        foreach (var name in new[] { InboxEvents.ConversationUpdated, InboxEvents.MessageCreated, InboxEvents.MessageStatus, InboxEvents.HandoffRequested, InboxEvents.ChannelStatus, InboxEvents.NotificationCreated })
         {
             connection.On<JsonElement>(name, payload => inbox.Received.Enqueue((name, payload)));
         }
@@ -157,6 +157,11 @@ public sealed class RealtimeTests(InfraFixture infra, ChannelsHost workers) : IA
         }
 
         await onB.WaitForAsync(InboxEvents.ChannelStatus, p => p.GetProperty("channelAccountId").GetGuid() == accountId);
+
+        // The owner's in-app notification about it reaches their own connections, without joining anything.
+        var notification = await onA.WaitForAsync(InboxEvents.NotificationCreated, p => p.GetProperty("workspaceId").GetGuid() == ws);
+        notification.GetProperty("kind").GetString().ShouldBe("channel");
+        notification.GetProperty("link").GetString().ShouldBe("/channels");
     }
 
     [Fact]

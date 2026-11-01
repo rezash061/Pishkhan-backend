@@ -68,6 +68,8 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Secrets:Keys:it"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ["Secrets:BlindIndexKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ["Altcha:Enabled"] = "false",
+            ["WebPush:PublicKey"] = FakePushService.VapidPublicKey,
+            ["WebPush:PrivateKey"] = FakePushService.VapidPrivateKey,
             ["Sms:Provider"] = "dev",
             ["Workers:Groups:0"] = "*",
             ["Spike:EchoReplies"] = "true",

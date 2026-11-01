@@ -19,8 +19,8 @@ public sealed record NotificationResponse(Guid Id, string Kind, string Title, st
 public sealed record NotificationsPage(IReadOnlyList<NotificationResponse> Items, string? NextCursor, int UnreadCount);
 
 /// <summary>
-/// One kind and the channels on for the caller. <c>smsAvailable</c> false means the kind never sends SMS. <c>push</c> is stored
-/// and used once web push is available.
+/// One kind and the channels on for the caller. <c>smsAvailable</c> false means the kind never sends SMS. <c>push</c> goes to the
+/// browsers subscribed under <c>/me/push-subscriptions</c>. A handoff's SMS is sent only if it is still waiting after 10 minutes.
 /// </summary>
 public sealed record PreferenceResponse(string Kind, string Label, bool InApp, bool Push, bool Sms, bool SmsAvailable);
 
