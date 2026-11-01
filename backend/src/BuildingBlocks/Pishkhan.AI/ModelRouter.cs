@@ -15,6 +15,18 @@ namespace Pishkhan.AI;
 public interface IModelRouter
 {
     IChatClient GetChatClient(string task, Guid? workspaceId = null);
+
+    /// <summary>
+    /// Embeddings of <see cref="AiTasks.Embed"/>, always <see cref="Embeddings.Dimensions"/> long. Only the first route is used: vectors from
+    /// different models are not comparable, so a model change means re-indexing, not falling back.
+    /// </summary>
+    IEmbeddingGenerator<string, Embedding<float>> GetEmbeddingGenerator(Guid? workspaceId = null);
+}
+
+public static class Embeddings
+{
+    /// <summary>The size of every stored vector (the knowledge index's column type).</summary>
+    public const int Dimensions = 1024;
 }
 
 /// <summary>Back office: checks that a provider answers, before or after saving it.</summary>
@@ -45,8 +57,46 @@ internal sealed class ModelRouter(
     public const string HttpClientName = "ai";
     private readonly ConcurrentDictionary<string, (string Fingerprint, IChatClient Client)> _clients = new(StringComparer.Ordinal);
 
+    private readonly ConcurrentDictionary<string, (string Fingerprint, IEmbeddingGenerator<string, Embedding<float>> Generator)> _embedders = new(StringComparer.Ordinal);
+
     public IChatClient GetChatClient(string task, Guid? workspaceId = null) =>
         new FallbackChatClient(task, workspaceId, this, loggers.CreateLogger<FallbackChatClient>());
+
+    public IEmbeddingGenerator<string, Embedding<float>> GetEmbeddingGenerator(Guid? workspaceId = null) => new RoutedEmbeddingGenerator(workspaceId, this);
+
+    internal IEmbeddingGenerator<string, Embedding<float>> EmbedderFor(AiRouteOptions route)
+    {
+        if (!Options.Providers.TryGetValue(route.Provider, out var provider))
+        {
+            throw new InvalidOperationException($"AI provider '{route.Provider}' is not configured.");
+        }
+
+        var fingerprint = $"{provider.Kind}|{provider.BaseUrl}|{provider.ApiKey?.GetHashCode(StringComparison.Ordinal)}";
+        return _embedders.AddOrUpdate(
+            route.Key,
+            _ => (fingerprint, CreateEmbedder(provider, route)),
+            (_, existing) => existing.Fingerprint == fingerprint ? existing : (fingerprint, CreateEmbedder(provider, route))).Generator;
+    }
+
+    private IEmbeddingGenerator<string, Embedding<float>> CreateEmbedder(AiProviderOptions provider, AiRouteOptions route)
+    {
+        if (string.Equals(provider.Kind, "fake", StringComparison.OrdinalIgnoreCase))
+        {
+            return new FakeEmbeddingGenerator(route.Model);
+        }
+
+        var clientOptions = new OpenAIClientOptions
+        {
+            Transport = new HttpClientPipelineTransport(httpClients.CreateClient(HttpClientName)),
+            RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
+        };
+        if (provider.BaseUrl is { Length: > 0 } baseUrl)
+        {
+            clientOptions.Endpoint = new Uri(baseUrl);
+        }
+
+        return new OpenAI.Embeddings.EmbeddingClient(route.Model, new ApiKeyCredential(provider.ApiKey ?? "unused"), clientOptions).AsIEmbeddingGenerator(Embeddings.Dimensions);
+    }
 
     internal IReadOnlyList<AiRouteOptions> RoutesFor(string task) =>
         settings.Current.Routes.TryGetValue(task, out var routes) && routes.Count > 0 ? routes : throw new NoRouteException(task);
@@ -197,6 +247,123 @@ internal sealed class FallbackChatClient(string task, Guid? workspaceId, ModelRo
             ? decimal.Round((input * price.InputPerMillion + output * price.OutputPerMillion) / 1_000_000m, 0)
             : 0m;
         router.Usage.Record(new AiUsage(task, workspaceId, route.Provider, route.Model, input, output, cost, latency, outcome));
+    }
+}
+
+/// <summary>The first <see cref="AiTasks.Embed"/> route, with its timeout, circuit breaker and usage metering.</summary>
+internal sealed class RoutedEmbeddingGenerator(Guid? workspaceId, ModelRouter router) : IEmbeddingGenerator<string, Embedding<float>>
+{
+    public async Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+        IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var route = router.RoutesFor(AiTasks.Embed)[0];
+        if (router.Breakers.IsOpen(route.Provider, router.Clock.UtcNow))
+        {
+            throw new AllRoutesFailedException(AiTasks.Embed, new InvalidOperationException("The embedding provider's circuit is open."));
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(route.TimeoutSeconds));
+        var started = Stopwatch.GetTimestamp();
+        var request = options?.Clone() ?? new EmbeddingGenerationOptions();
+        request.ModelId = route.Model;
+        request.Dimensions = Embeddings.Dimensions;
+        try
+        {
+            var result = await router.EmbedderFor(route).GenerateAsync(values, request, timeout.Token);
+            router.Breakers.Success(route.Provider);
+            Record(route, result.Usage?.InputTokenCount ?? 0, Stopwatch.GetElapsedTime(started), "ok");
+            return result;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is not NoRouteException)
+        {
+            router.Breakers.Failure(route.Provider, router.Clock.UtcNow, router.Options);
+            Record(route, 0, Stopwatch.GetElapsedTime(started), ex is OperationCanceledException ? "timeout" : "error");
+            throw new AllRoutesFailedException(AiTasks.Embed, ex);
+        }
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
+
+    public void Dispose()
+    {
+    }
+
+    private void Record(AiRouteOptions route, long input, TimeSpan latency, string outcome)
+    {
+        var cost = router.Options.Prices.TryGetValue(route.Key, out var price) ? decimal.Round(input * price.InputPerMillion / 1_000_000m, 0) : 0m;
+        router.Usage.Record(new AiUsage(AiTasks.Embed, workspaceId, route.Provider, route.Model, input, 0, cost, latency, outcome));
+    }
+}
+
+/// <summary>
+/// Deterministic embeddings for development and tests: each normalised word (and its 3-letter prefix) is hashed into the vector,
+/// which is then L2-normalised, so texts sharing words are close by cosine. Model <c>fail</c> always throws.
+/// </summary>
+internal sealed class FakeEmbeddingGenerator(string model) : IEmbeddingGenerator<string, Embedding<float>>
+{
+    public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+        IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        if (model == "fail")
+        {
+            throw new HttpRequestException("Fake provider failure.");
+        }
+
+        var list = values.ToList();
+        var result = new GeneratedEmbeddings<Embedding<float>>(list.Select(v => new Embedding<float>(Vector(v)) { ModelId = model }))
+        {
+            Usage = new UsageDetails { InputTokenCount = list.Sum(v => (long)Math.Max(1, v.Length / 4)) },
+        };
+        return Task.FromResult(result);
+    }
+
+    public static float[] Vector(string text)
+    {
+        var vector = new float[Embeddings.Dimensions];
+        foreach (var word in Pishkhan.Persian.PersianNormalizer.Normalize(text).Split(Separators, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var token = word.ToLowerInvariant();
+            vector[Bucket(token)] += 1f;
+            if (token.Length > 3)
+            {
+                vector[Bucket(token[..3])] += 0.5f;
+            }
+        }
+
+        var norm = MathF.Sqrt(vector.Sum(x => x * x));
+        if (norm > 0)
+        {
+            for (var i = 0; i < vector.Length; i++)
+            {
+                vector[i] /= norm;
+            }
+        }
+        else
+        {
+            vector[0] = 1f;
+        }
+
+        return vector;
+    }
+
+    private static readonly char[] Separators = [' ', '\n', '\t', '.', '،', ',', '؟', '?', '!', '؛', ';', ':', '(', ')', '«', '»', '"', '\u200c'];
+
+    private static int Bucket(string token)
+    {
+        var hash = 2166136261u;
+        foreach (var c in token)
+        {
+            hash = (hash ^ c) * 16777619u;
+        }
+
+        return (int)(hash % Embeddings.Dimensions);
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose()
+    {
     }
 }
 

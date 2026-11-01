@@ -5,6 +5,7 @@
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Audit\Pishkhan.Modules.Audit\Pishkhan.Modules.Audit.csproj" />
     <ProjectReference Include="..\..\Modules\Billing\Pishkhan.Modules.Billing\Pishkhan.Modules.Billing.csproj" />
+    <ProjectReference Include="..\..\Modules\Knowledge\Pishkhan.Modules.Knowledge\Pishkhan.Modules.Knowledge.csproj" />
     <ProjectReference Include="..\..\Modules\Analytics\Pishkhan.Modules.Analytics\Pishkhan.Modules.Analytics.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Pishkhan.Modules.Files\Pishkhan.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />

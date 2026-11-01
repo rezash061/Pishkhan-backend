@@ -44,6 +44,10 @@
     <Project Path="src/Modules/Channels/Pishkhan.Modules.Channels.Contracts/Pishkhan.Modules.Channels.Contracts.csproj" />
     <Project Path="src/Modules/Channels/Pishkhan.Modules.Channels/Pishkhan.Modules.Channels.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Knowledge/">
+    <Project Path="src/Modules/Knowledge/Pishkhan.Modules.Knowledge.Contracts/Pishkhan.Modules.Knowledge.Contracts.csproj" />
+    <Project Path="src/Modules/Knowledge/Pishkhan.Modules.Knowledge/Pishkhan.Modules.Knowledge.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Billing/">
     <Project Path="src/Modules/Billing/Pishkhan.Modules.Billing.Contracts/Pishkhan.Modules.Billing.Contracts.csproj" />
     <Project Path="src/Modules/Billing/Pishkhan.Modules.Billing/Pishkhan.Modules.Billing.csproj" />

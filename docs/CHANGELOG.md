@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.4 part 1: knowledge base and hybrid search, 2026-11-01)
+- New Knowledge module (schema `knowledge`, tables `sources` and `chunks`). The migration enables pgvector and adds `embedding vector(1024)` with an HNSW cosine index, plus a generated `tsvector` over normalised text with a GIN index.
+- AI gateway: `IModelRouter.GetEmbeddingGenerator(workspaceId)` uses the first `embed` route (breaker, timeout and usage as for chat). Providers `openai` (OpenAI-compatible embeddings at 1024 dimensions) and `fake` (deterministic, for tests).
+- Endpoints under `/api/v1/workspaces/{workspaceId}/knowledge` (`workspace.knowledge.write`):
+  - `GET /sources?kind=&q=&status=&cursor=` and `POST /sources` (`faq` with question and answer, or `text` with title and body; 201; 409 `knowledge.limit` at 5,000 sources).
+  - `GET`, `PUT` and `DELETE /sources/{id}`, and `POST /sources/{id}/reindex` (202). Product sources can only be enabled or disabled; other edits answer 400 and delete answers 409 `knowledge.product_managed`.
+  - `POST /search` takes `query` and `limit` and returns hits (chunk, source, kind, title, text, score, similarity, productId).
+- Indexing runs in the Workers (ai group, `knowledge.source-changed.v1`): Persian-aware sentence chunking (about 450 tokens with 50 overlap), embeddings in batches of 32. A failed embedding marks the source `failed` with `knowledge.embedding_failed` or `knowledge.no_embedding_route` and keeps the previous chunks.
+- Active catalog products become knowledge sources automatically (title, description, Toman price, variants and stock). Draft, archived and deleted products are removed.
+- Search fuses vector and full-text results with Reciprocal Rank Fusion, and falls back to full text when embeddings are unavailable.
+- Deferred: file uploads (PDF, DOCX) and URL sources.
+
 ### Added (Phase 1, BE-1.7 part 2: form submissions, consents and the contacts export, 2026-11-01)
 - Form submissions: a completed flow run that answered questions publishes `automation.form-submitted.v1` (`FormSubmitted`: flow, version, name, run, conversation, answers by question variable). The Workers store it per run on the conversation's contact (`form_submissions`).
   - `GET /api/v1/workspaces/{workspaceId}/crm/forms` lists the flows that collected answers, with the latest name, the number of submissions, the last submission and the answer keys.

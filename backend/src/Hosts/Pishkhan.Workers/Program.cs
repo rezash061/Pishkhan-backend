@@ -8,6 +8,7 @@ using Pishkhan.Modules.Analytics;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Billing;
+using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Conversations;
@@ -38,7 +39,8 @@ services
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
-    .AddBillingModule(configuration);
+    .AddBillingModule(configuration)
+    .AddKnowledgeModule(configuration);
 
 var groups = configuration.GetSection(WorkerGroupOptions.Section).Get<WorkerGroupOptions>() ?? new WorkerGroupOptions();
 services.AddPishkhanMessaging(configuration, "workers", m => m
@@ -57,7 +59,8 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAuditConsumers()
     .AddNotificationsConsumers()
     .AddAnalyticsConsumers()
-    .AddBillingConsumers());
+    .AddBillingConsumers()
+    .AddKnowledgeConsumers());
 
 if (groups.IsEnabled("platform"))
 {
