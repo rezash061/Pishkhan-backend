@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MassTransit;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -475,5 +478,52 @@ public sealed class AgentRepliesTests(InfraFixture infra, ChannelsHost workers) 
         var dismissed = await s.Client.PostAsync($"{unansweredUrl}/{id}/dismiss", null, Ct);
         (await dismissed.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("status").GetString().ShouldBe("dismissed");
         (await s.Client.PostAsync($"{unansweredUrl}/{Guid.NewGuid()}/dismiss", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task The_website_demo_chats_with_the_demo_shop_within_its_limits()
+    {
+        var (s, _) = await ShopAsync();
+        await using var site = _api.WithWebHostBuilder(b => b.UseSetting("DemoChat:WorkspaceId", s.WorkspaceId.ToString()).UseSetting("DemoChat:MessagesPerSession", "3"));
+        site.Services.GetRequiredService<FakeChatScript>().Respond = Respond;
+        var visitor = site.CreateClient();
+        var session = Guid.NewGuid();
+        async Task<JsonElement> SayAsync(string message)
+        {
+            var response = await visitor.PostAsJsonAsync("/api/v1/public/demo-chat", new { sessionId = session, message, altcha = "x" }, Ct);
+            var text = await response.Content.ReadAsStringAsync(Ct);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, text);
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+
+        (await visitor.PostAsJsonAsync("/api/v1/public/demo-chat", new { sessionId = session, message = new string('x', 501) }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await _api.CreateClient().PostAsJsonAsync("/api/v1/public/demo-chat", new { sessionId = session, message = "سلام" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        // The demo shop's knowledge answers, with its sources; a question for a person gets the demo's handoff line.
+        var answered = await SayAsync("ارسال به شیراز چند روزه؟");
+        answered.GetProperty("reply").GetString().ShouldBe(Shipping);
+        answered.GetProperty("handedOff").GetBoolean().ShouldBeFalse();
+        answered.GetProperty("confidence").GetDouble().ShouldBeInRange(0.6, 1);
+        answered.GetProperty("sources").EnumerateArray().Select(x => x.GetString()).ShouldContain("ارسال به شهرستان چند روز طول می‌کشد؟");
+        answered.GetProperty("remaining").GetInt32().ShouldBe(2);
+        var handoff = await SayAsync("این کیف خراب بود، خیلی ناراحتم");
+        handoff.GetProperty("handedOff").GetBoolean().ShouldBeTrue();
+        handoff.GetProperty("reply").GetString().ShouldBe(AgentProfile.DefaultHandoffMessage);
+        (await SayAsync("سلام")).GetProperty("remaining").GetInt32().ShouldBe(0);
+
+        var limited = await visitor.PostAsJsonAsync("/api/v1/public/demo-chat", new { sessionId = session, message = "سلام" }, Ct);
+        limited.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        (await limited.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("title").GetString().ShouldBe("demo.limit");
+
+        // Nothing is stored: no traces, no conversation.
+        (await s.Client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{s.WorkspaceId}/agent/traces", Ct)).GetProperty("items").GetArrayLength().ShouldBe(0);
+
+        // As ApiFactory.DisposeAsync: let the second host's bus finish starting before it stops.
+        var bus = site.Services.GetRequiredService<IBusControl>();
+        var watch = Stopwatch.StartNew();
+        while (bus.CheckHealth().Status != BusHealthStatus.Healthy && watch.Elapsed < TimeSpan.FromSeconds(60))
+        {
+            await Task.Delay(100, Ct);
+        }
     }
 }

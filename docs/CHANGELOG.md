@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.13 part 1: website revalidation webhook and demo chat, 2026-11-01)
+- Website revalidation webhook:
+  - New event `content.site-revalidation-requested.v1` (`tags`, `paths`). The Workers (platform group, Content module, now in the Workers host) answer it with `POST {Website:RevalidateUrl}` and body `{"tags":[...],"paths":[...]}`.
+  - The call is signed as the site's `lib/hmac.ts` expects: `X-Pishkhan-Timestamp` (unix seconds) and `X-Pishkhan-Signature: sha256=<hex HMAC-SHA256(Website:RevalidateSecret, "<timestamp>.<body>")>`. A failed call is retried by the consumer, then dead-lettered.
+  - With no `Website:RevalidateUrl` nothing is called. Deploys set it, with the same secret as the site's `REVALIDATE_SECRET`.
+  - Publishing a plan, or archiving a published one, now also asks the site to revalidate the `plans` tag.
+- Demo chat: `POST /api/v1/public/demo-chat` with `{ sessionId, message (≤ 500), altcha? }`.
+  - It runs the reply pipeline against the demo shop's workspace (`DemoChat:WorkspaceId`), with that shop's knowledge and products. Without it the answer is 404 `demo.unavailable`.
+  - It returns `{ reply, confidence, sources (knowledge titles used), remaining, handedOff }`. When the agent would hand off, `reply` is the shop's handoff message, or a line saying a person would take over here.
+  - ALTCHA is needed on a session's first message. The limits are 10 messages per session (429 `demo.limit`), 30 per IP per hour and 3,000 per day (429 `demo.rate_limited`). They are configurable under `DemoChat`.
+  - Nothing is stored in the database. A session's last messages stay in Redis for 6 hours as context.
+
 ### Added (Phase 1, BE-1.4 part 3: test mode, unanswered questions and eval set v1, 2026-11-01)
 - Test mode: `POST /api/v1/workspaces/{workspaceId}/agent/sandbox` (`workspace.agent.write`).
   - It takes `text`, optional `history` (up to 20 `{role: customer|agent, text}`), `tags` (to try the VIP rule) and `goal`.
