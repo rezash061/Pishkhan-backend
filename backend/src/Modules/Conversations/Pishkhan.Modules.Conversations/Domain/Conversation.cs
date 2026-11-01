@@ -62,6 +62,22 @@ public sealed class Contact : AggregateRoot<Guid>, ITenantOwned
         return true;
     }
 
+    public void Rename(string? displayName) => DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+
+    /// <summary>Replaces the labels (the panel sends the whole set).</summary>
+    public void SetTags(IEnumerable<string> tags) => Tags = [.. tags.Distinct(StringComparer.Ordinal).Take(MaxTags)];
+
+    public bool RemoveField(string key)
+    {
+        if (!Fields.ContainsKey(key))
+        {
+            return false;
+        }
+
+        Fields = new Dictionary<string, string>(Fields.Where(kv => kv.Key != key), StringComparer.Ordinal);
+        return true;
+    }
+
     /// <summary>Fills in the username the first time a channel tells us (a comment carries it; a DM does not).</summary>
     public void LearnUsername(string? username)
     {

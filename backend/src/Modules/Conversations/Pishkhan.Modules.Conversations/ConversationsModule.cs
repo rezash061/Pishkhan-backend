@@ -62,6 +62,7 @@ public static class ConversationsModule
     public static IEndpointRouteBuilder MapConversationsEndpoints(this IEndpointRouteBuilder app)
     {
         ConversationEndpoints.Map(app);
+        CrmEndpoints.Map(app);
         app.MapHub<InboxHub>(InboxHub.Path);
         return app;
     }

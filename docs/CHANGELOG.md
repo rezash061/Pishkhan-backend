@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.7 part 1: contacts, tags, custom fields and segments, 2026-11-01)
+- Contacts in the panel (Conversations module, `workspace.crm.read`; changes need `workspace.crm.write`):
+  - `GET /api/v1/workspaces/{workspaceId}/contacts?q=&tag=&segmentId=&channelAccountId=&hasPhone=&cursor=&limit=` returns contacts newest first, paged by cursor. `q` matches name, username or email, or a phone in any spelling. Each contact carries tags, fields, the channel accounts they wrote to, and `lastSeenAt` (their last message).
+  - `GET .../contacts/{contactId}` adds their conversations.
+  - `PATCH .../contacts/{contactId}` takes `displayName` or `clearDisplayName`, `tags` (replaces the set) and `fields` (merged; null removes a value). A value for a defined field must fit its type.
+- Custom fields: `GET|POST .../crm/fields`, `PUT|DELETE .../crm/fields/{fieldId}`.
+  - Each field has a `key` (lowercase, at most 40 characters, fixed once created), `label`, `type` and `sortOrder`.
+  - `type` is `text`, `number`, `date` (yyyy-MM-dd), `boolean`, `email`, `phone` (stored as E.164) or `select` (with `options`).
+  - At most 50 fields. A key that is taken answers 409 `crm.field.key_taken`. Deleting a definition keeps the contacts' values.
+- Tags:
+  - `GET .../crm/tags` lists every tag defined or in use, with `defined` and `contactCount`. Automation and the inbox can add tags nobody defined.
+  - `PUT .../crm/tags/{name}` sets `color` (gray, red, orange, yellow, green, teal, blue, purple or pink) and `description`.
+  - `POST .../crm/tags/{name}/rename` (`newName`) renames the tag on every contact. Renaming onto an existing tag merges the two, and the existing tag's look is kept.
+  - `DELETE .../crm/tags/{name}` removes the tag from every contact.
+- Segments:
+  - `GET|POST .../crm/segments` and `PUT|DELETE .../crm/segments/{segmentId}` manage saved segments; a list or save returns each segment's current `contactCount`. A name that is taken answers 409 `crm.segment.name_taken`.
+  - `POST .../crm/segments/preview` counts the matches of a rule without saving it.
+  - A rule is `{ match: all|any, conditions: [{ field, op, key?, value? }] }` with up to 20 conditions, evaluated to parameterised SQL. Conditions:
+    - `tag`: has, not_has.
+    - `field` (with `key`): eq, neq, contains, exists, not_exists, gt, lt (numbers or dates).
+    - `name` and `username`: contains, exists, not_exists.
+    - `channel_account`: eq, neq.
+    - `last_seen` and `created`: within_days, not_within_days.
+    - `has_phone`: is.
+  - Errors name the condition, for example `rule.conditions[0].op`.
+- Migration `CrmTagsFieldsSegments` adds `contact_tags`, `contact_fields` and `contact_segments`. Form submissions, consent records and the Excel export follow in part 2.
+
 ### Added (Phase 1, BE-1.12 part 3: AI admin and the workspace plan, 2026-10-31)
 - AI settings in the back office (Agent module, migration `AiSettings`: `ai_providers`, `ai_routes`, `prompt_versions`, `prompt_activations`). They are merged over configuration: a provider saved there replaces the configured one of that name (a disabled one is removed), a task with routes there uses only those, saved prompt versions are added to the configured ones, and an activation picks the active version. Every host reloads them every `Ai:Settings:RefreshSeconds` (default 15); the host that saves a change reloads at once. New `IAiSettings` in `Pishkhan.AI`, which the model router and the prompt registry now read.
 - `/admin/v1/ai` (reading: SuperAdmin, AIOps, ReadOnly):

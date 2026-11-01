@@ -31,6 +31,12 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
 
     public DbSet<PrivateReplyKey> PrivateReplyKeys => Set<PrivateReplyKey>();
 
+    public DbSet<ContactTag> ContactTags => Set<ContactTag>();
+
+    public DbSet<ContactFieldDefinition> ContactFields => Set<ContactFieldDefinition>();
+
+    public DbSet<ContactSegment> Segments => Set<ContactSegment>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Contact>(b =>
@@ -109,6 +115,36 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.Text).HasMaxLength(2000);
             b.HasIndex(x => new { x.ConversationId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ContactTag>(b =>
+        {
+            b.ToTable("contact_tags");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Name).HasMaxLength(ContactTag.MaxName);
+            b.Property(x => x.Color).HasMaxLength(20);
+            b.Property(x => x.Description).HasMaxLength(200);
+            b.HasIndex(x => new { x.WorkspaceId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ContactFieldDefinition>(b =>
+        {
+            b.ToTable("contact_fields");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Key).HasMaxLength(40);
+            b.Property(x => x.Label).HasMaxLength(60);
+            b.Property(x => x.Type).HasMaxLength(20);
+            b.Property(x => x.Options).HasDefaultValueSql("'{}'");
+            b.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique();
+        });
+
+        modelBuilder.Entity<ContactSegment>(b =>
+        {
+            b.ToTable("contact_segments");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Name).HasMaxLength(80);
+            b.Property(x => x.RuleJson).HasColumnName("rule").HasColumnType("jsonb");
+            b.HasIndex(x => new { x.WorkspaceId, x.Name }).IsUnique();
         });
 
         modelBuilder.Entity<QuickReplyTemplate>(b =>
