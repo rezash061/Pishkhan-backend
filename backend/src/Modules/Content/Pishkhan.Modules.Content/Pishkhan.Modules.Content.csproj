@@ -4,7 +4,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Web\Pishkhan.Web.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Persian\Pishkhan.Persian.csproj" />
     <ProjectReference Include="..\Pishkhan.Modules.Content.Contracts\Pishkhan.Modules.Content.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Backoffice\Pishkhan.Modules.Backoffice.Contracts\Pishkhan.Modules.Backoffice.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />

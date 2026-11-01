@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pishkhan.Infrastructure.Application;
+using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
@@ -20,7 +21,8 @@ using Pishkhan.Web.OpenApi;
 namespace Pishkhan.Modules.Content;
 
 /// <summary>
-/// Website content and public forms (backend plan 9.16): leads (waitlist and contact form) and the website's revalidation webhook.
+/// Website content and public forms (backend plan 9.16): the CMS (pages, blog, help, case studies, legal, FAQs, categories, redirects,
+/// scheduled publishing and previews), leads (waitlist and contact form) and the website's revalidation webhook.
 /// </summary>
 public static class ContentModule
 {
@@ -32,16 +34,32 @@ public static class ContentModule
         services.AddOptions<WebsiteOptions>().Bind(configuration.GetSection(WebsiteOptions.Section));
         services.AddHttpClient(SiteRevalidationHandler.ClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddHandlersFrom(typeof(ContentModule).Assembly);
+        services.AddScoped<ContentPublisher>();
+        services.AddScoped<ScheduledPublishJob>();
         return services;
     }
+
+    /// <summary>AdminApi, with <see cref="MapContentAdminEndpoints"/>: the staff names for audit entries (Backoffice staff directory).</summary>
+    public static IServiceCollection AddContentBackoffice(this IServiceCollection services)
+    {
+        services.AddScoped<StaffActor>();
+        return services;
+    }
+
+    /// <summary>Workers (platform group): publishes scheduled entries every minute.</summary>
+    public static readonly IReadOnlyList<RecurringJob> Jobs =
+    [
+        new(typeof(ScheduledPublishJob), "content.scheduled-publish", "0 * * * * ?"),
+    ];
 
     /// <summary>Workers (platform group): calls the website's signed revalidation webhook after a publish.</summary>
     public static MessagingBuilder AddContentConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<SiteRevalidationRequested, SiteRevalidationHandler>("platform");
 
-    /// <summary>Api: <c>POST /api/v1/public/leads</c>.</summary>
+    /// <summary>Api: <c>POST /api/v1/public/leads</c> and the website's CMS reads under <c>/api/v1/public</c>.</summary>
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)
     {
+        ContentPublic.Map(app);
         app.MapPublicApi().WithTags("Website")
             .MapPost("/leads", (LeadRequest request, ICommandHandler<LeadRequest, LeadAccepted> handler, CancellationToken ct) =>
                 Send(handler.HandleAsync(request, ct), r => Results.Json(r, statusCode: StatusCodes.Status201Created)))
@@ -53,9 +71,10 @@ public static class ContentModule
         return app;
     }
 
-    /// <summary>AdminApi: <c>GET /admin/v1/leads</c> for sales and support follow-up.</summary>
+    /// <summary>AdminApi: <c>GET /admin/v1/leads</c> for sales and support follow-up, and the CMS under <c>/admin/v1/content</c>.</summary>
     public static IEndpointRouteBuilder MapContentAdminEndpoints(this IEndpointRouteBuilder app)
     {
+        ContentAdmin.Map(app);
         app.MapAdminApi().WithTags("Leads")
             .MapGet("/leads", ([AsParameters] ListLeadsQuery query, IQueryHandler<ListLeadsQuery, PagedResult<LeadResponse>> handler, CancellationToken ct) =>
                 Send(handler.HandleAsync(query, ct), r => Results.Ok(r)))

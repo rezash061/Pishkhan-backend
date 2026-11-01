@@ -16,6 +16,12 @@ public sealed class ContentDbContext(DbContextOptions<ContentDbContext> options,
 
     public DbSet<Lead> Leads => Set<Lead>();
 
+    public DbSet<ContentEntry> Entries => Set<ContentEntry>();
+
+    public DbSet<ContentCategory> Categories => Set<ContentCategory>();
+
+    public DbSet<ContentRedirect> Redirects => Set<ContentRedirect>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Lead>(b =>
@@ -40,6 +46,51 @@ public sealed class ContentDbContext(DbContextOptions<ContentDbContext> options,
                     v => new Dictionary<string, string>(v, StringComparer.Ordinal)));
             b.HasIndex(x => new { x.PhoneBidx, x.Type, x.CreatedAt });
             b.HasIndex(x => new { x.CreatedAt, x.Id }).IsDescending(true, true);
+        });
+
+        modelBuilder.Entity<ContentEntry>(b =>
+        {
+            b.ToTable("entries");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Slug).HasMaxLength(ContentEntry.MaxSlug);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Title).HasMaxLength(ContentEntry.MaxTitle);
+            b.Property(x => x.Description).HasMaxLength(ContentEntry.MaxDescription);
+            b.Property(x => x.Category).HasMaxLength(ContentEntry.MaxSlug);
+            b.Property(x => x.Author).HasMaxLength(ContentEntry.MaxAuthor);
+            b.Property(x => x.LiveCategory).HasMaxLength(ContentEntry.MaxSlug);
+            b.Property(x => x.Body).HasColumnType("jsonb");
+            b.Property(x => x.Data).HasColumnType("jsonb");
+            b.Property(x => x.Published).HasColumnType("jsonb").HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, EnvelopeJson.Options),
+                v => v == null ? null : JsonSerializer.Deserialize<EntryContent>(v, EnvelopeJson.Options));
+            b.Ignore(x => x.Draft);
+            b.Ignore(x => x.HasUnpublishedChanges);
+            b.Property(x => x.Revision).IsConcurrencyToken();
+            b.HasIndex(x => new { x.Kind, x.Slug }).IsUnique();
+            b.HasIndex(x => new { x.Kind, x.Status, x.LiveCategory, x.FirstPublishedAt });
+            b.HasIndex(x => x.ScheduledAt).HasFilter("scheduled_at IS NOT NULL");
+        });
+
+        modelBuilder.Entity<ContentCategory>(b =>
+        {
+            b.ToTable("categories");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Slug).HasMaxLength(ContentEntry.MaxSlug);
+            b.Property(x => x.Title).HasMaxLength(ContentCategory.MaxTitle);
+            b.Property(x => x.Description).HasMaxLength(ContentCategory.MaxDescription);
+            b.HasIndex(x => new { x.Kind, x.Slug }).IsUnique();
+        });
+
+        modelBuilder.Entity<ContentRedirect>(b =>
+        {
+            b.ToTable("redirects");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.FromPath).HasMaxLength(ContentRedirect.MaxPath);
+            b.Property(x => x.ToPath).HasMaxLength(ContentRedirect.MaxPath);
+            b.HasIndex(x => x.FromPath).IsUnique();
         });
     }
 }

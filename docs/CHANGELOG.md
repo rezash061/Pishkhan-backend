@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.13 part 2: website CMS, 2026-11-01)
+- CMS entries (Content module, new tables `content.entries`, `content.categories` and `content.redirects`). Kinds are `page`, `post`, `help`, `case_study`, `legal` and `faq`.
+  - Each entry has a draft and a published copy. Editors save the draft, and the site keeps showing the published copy until the next publish.
+  - `body` is an array of blocks with allowed `type`s, and plain-text strings only. Link and image fields must be https or a site path.
+  - `data` holds kind-specific fields (seoTitle, cover, keywords, version, consent, metrics, tags).
+  - Slugs are Latin or Persian words joined by hyphens. A slug is fixed once the entry has been published.
+- Back office (`/admin/v1/content`, ContentEditor or SuperAdmin to write; Support and ReadOnly read):
+  - Entries: list, get, create, save draft (`revision` gives 409 `content.stale`), publish now or with `at`, cancel the schedule, archive, delete (never-published only), and a one-hour preview token.
+  - Blog and help categories, and redirects.
+  - Publishing is refused for a case study without `data.consent: true` (409 `content.consent_required`) and for a post or help article without a category (409 `content.category_required`).
+  - Entry changes are audited.
+- Scheduled publishing: the Workers' platform job `content.scheduled-publish` publishes drafts whose time has come, every minute.
+- Every publish, archive, category change or redirect change drops the `content` cache tag on all hosts. It also asks the website to revalidate the tags `content` and `content:{kind}`, the entry's paths (`/blog/{slug}`, `/help/{category}/{slug}`, `/{slug}`, ...) and `/sitemap.xml`.
+- Public reads under `/api/v1/public` (published entries only, cached, Website tag):
+  - `pages/{slug}`, `legal/{slug}`, `posts?category=&cursor=&limit=`, `posts/{slug}`, `help?category=`, `help/{slug}`, `help/search?q=` (Persian-normalised, every word must match, title matches first), `case-studies`, `case-studies/{slug}`, `faqs?tag=`, `categories?kind=blog|help` and `redirects`.
+  - `preview?token=` returns the draft for the site's preview mode.
+
 ### Added (Phase 1, BE-1.13 part 1: website revalidation webhook and demo chat, 2026-11-01)
 - Website revalidation webhook:
   - New event `content.site-revalidation-requested.v1` (`tags`, `paths`). The Workers (platform group, Content module, now in the Workers host) answer it with `POST {Website:RevalidateUrl}` and body `{"tags":[...],"paths":[...]}`.
