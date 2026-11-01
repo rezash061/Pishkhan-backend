@@ -10,6 +10,7 @@ using Pishkhan.Modules.Agent.Domain;
 using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Knowledge.Contracts;
+using Pishkhan.Modules.Orders.Contracts;
 using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 
@@ -160,7 +161,8 @@ internal sealed record ReplyInput(
 /// one regeneration, and the confidence check. It decides; the caller sends, records usage and saves the trace.
 /// </summary>
 internal sealed class ReplyPipeline(
-    IModelRouter router, IPromptRegistry prompts, IKnowledgeSearch knowledge, ICatalogQueries catalog, IClock clock, ILogger<ReplyPipeline> logger)
+    IModelRouter router, IPromptRegistry prompts, IKnowledgeSearch knowledge, ICatalogQueries catalog, IOrderCommands orders, IClock clock,
+    ILogger<ReplyPipeline> logger)
 {
     public const string ClassifyPrompt = "intent.classify";
     public const string ReplyPrompt = "agent.reply";
@@ -241,7 +243,8 @@ internal sealed class ReplyPipeline(
         trace.Facts = [.. hits.Select(h => new TraceFact(h.ChunkId, h.SourceId, h.SourceKind, h.Title, Math.Round(h.Score, 5), h.Similarity is { } s ? Math.Round(s, 4) : null))];
 
         // Generate, guard, and regenerate once.
-        var tools = new AgentTools(catalog);
+        // A real message has an id; the test chat and the demo pass Guid.Empty and never save an order.
+        var tools = new AgentTools(catalog, orders, conversation, live: input.MessageId != Guid.Empty);
         var template = prompts.Get(ReplyPrompt);
         usage.Prompt(template);
         var messages = new List<ChatMessage> { new(ChatRole.System, template.Render(Values(profile, conversation, hits, input.Goal, clock.UtcNow))) };

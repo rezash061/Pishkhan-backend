@@ -19,6 +19,7 @@ using Pishkhan.Modules.Analytics;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
+using Pishkhan.Modules.Orders;
 using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Knowledge;
@@ -148,7 +149,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         });
         builder.AddPishkhanPlatform("it-channels");
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
-            .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration)
+            .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration).AddOrdersModule(builder.Configuration)
             .AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration).AddAnalyticsModule(builder.Configuration)
             .AddNotificationsModule(builder.Configuration).AddBillingModule(builder.Configuration).AddAgentModule(builder.Configuration).AddAgentReplies().AddKnowledgeModule(builder.Configuration)
             .AddContentModule(builder.Configuration);

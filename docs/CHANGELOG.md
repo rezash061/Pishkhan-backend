@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.1: orders, 2026-11-01)
+- New Orders module (`orders` schema). Migration `InitialOrders`. Decisions are in ADR 0010.
+- Statuses: `draft → awaiting_payment → paid → preparing → shipped → delivered → completed`, plus `cancelled`, `refunded` and `returned`.
+  - Only the allowed moves are accepted. Each order lists them as `nextStatuses`, and any other move is 409 `orders.status_move_invalid`.
+  - `awaiting_payment` needs items and a total above zero.
+  - Only a draft can be edited (409 `orders.not_editable`). An order awaiting payment can be moved back to `draft` to change it.
+- Order numbers count up per workspace. Numbers are unique, but a failed request can leave a gap.
+- Catalog lines are always priced from the catalog: the product must be active and in stock, and a request cannot override the price. Panel orders can also have custom lines with a `title` and `unitPrice`.
+  - Line errors: `orders.product_not_found`, `orders.variant_required`, `orders.variant_not_found`, `orders.out_of_stock`, `orders.quantity_invalid` and `orders.price_missing`. Each is reported on `items[i]`.
+- The customer's mobile number is encrypted and has a blind index, so orders can be searched by an exact mobile number.
+- Addresses:
+  - Stored as province code, province, city, line and postal code.
+  - Can be sent as structured fields, or as `text` to be split.
+  - Postal codes are validated (`orders.postal_code_invalid`) and provinces must be known (`orders.province_unknown`).
+  - `missing` lists what an order still lacks for shipping: `address`, `city`, `postalCode` and `phone`.
+- Endpoints, all under `/workspaces/{id}/orders`:
+  - `GET` lists orders. Filters: `status` (repeatable), `contactId`, `conversationId`, `number` and `phone`. Cursor paging.
+  - `POST` creates a draft. It accepts `Idempotency-Key`. It takes a `conversationId` or a `contactId`.
+  - `GET` and `PUT /{orderId}`.
+  - `POST /{orderId}/status` takes `{status, note}`.
+  - `POST /{orderId}/notes`.
+  - `GET /{orderId}/timeline` returns created, edited, status-change and note entries, each with its actor (`user`, `ai` or `system`).
+  - `GET /{orderId}/invoice` returns Persian digits, Jalali dates and amounts in Toman.
+  - `GET /provinces`.
+  - `POST /parse-address`.
+- New permissions:
+  - `workspace.orders.read`: owner, admin, agent and viewer.
+  - `workspace.orders.write`: owner, admin and agent.
+- Every status change by a user writes an audit entry, `order.status_changed`.
+- `orders.order-status-changed.v1` (`OrderStatusChanged`) is published when an order is created (with `fromStatus` null) and on every status change.
+- Stock: the Catalog module takes counted stock when an order is paid. It puts the stock back when a paid order is cancelled, refunded or returned. Stock never goes below zero.
+- AI tool `create_order`:
+  - Saves the conversation's draft order, with catalog prices only and one AI draft per conversation. Calling it again updates that draft.
+  - Takes the customer's name, mobile, address text and a note.
+  - Returns the order number, the lines, the total in Toman and what is still missing.
+  - In the test chat and the demo it only prices the lines.
+- Reply prompt `agent.reply` version 2 (now active) tells the model when to call `create_order`. Version 1 is kept, so the change can be rolled back in the admin AI settings.
+- `IConversationQueries.GetContactAsync`.
+- `Pishkhan.Persian`:
+  - `IranianProvinces`: the 31 provinces with their larger cities.
+  - `AddressParser`: splits a pasted address into province, city, postal code, mobile and the rest of the line.
+- Not in this package: the `order_status_changed` automation trigger (still listed as coming later) and payment links (BE-2.2).
+
 ### Added (user-panel gaps: knowledge files and URLs, contact pictures, 2026-11-01)
 - Knowledge sources from uploaded documents and web pages:
   - `POST /workspaces/{id}/knowledge/sources` takes `kind: "file"` with `fileId` (an upload with purpose `knowledge_document`: PDF, DOCX or TXT, scanned clean) or `kind: "url"` with `url` (https, public host). Anything else is 400 on `fileId` or `url`.

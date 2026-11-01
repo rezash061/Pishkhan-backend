@@ -10,6 +10,7 @@ using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
+using Pishkhan.Modules.Orders;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
@@ -36,6 +37,7 @@ services
     .AddConversationsModule(configuration)
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
+    .AddOrdersModule(configuration)
     .AddAgentModule(configuration).AddAgentReplies()
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)

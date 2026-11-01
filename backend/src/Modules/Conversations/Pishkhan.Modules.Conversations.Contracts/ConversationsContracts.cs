@@ -167,7 +167,12 @@ public interface IConversationQueries
 
     /// <summary>The conversation's last <paramref name="limit"/> messages, oldest first.</summary>
     Task<IReadOnlyList<MessageSnapshot>> RecentMessagesAsync(Guid conversationId, int limit, CancellationToken cancellationToken);
+
+    /// <summary>A contact of the current workspace, or null.</summary>
+    Task<ContactSnapshot?> GetContactAsync(Guid contactId, CancellationToken cancellationToken);
 }
+
+public sealed record ContactSnapshot(Guid Id, string? DisplayName, string? Username);
 
 /// <summary>A stored message as the AI agent reads it. <see cref="Text"/> is null for media without a caption.</summary>
 public sealed record MessageSnapshot(Guid Id, DateTimeOffset CreatedAt, string Direction, string Kind, string? Text, string? HandledBy, string Status);

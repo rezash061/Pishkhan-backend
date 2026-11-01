@@ -16,6 +16,8 @@ public static class Permissions
     public const string KnowledgeWrite = "workspace.knowledge.write";
     public const string CatalogRead = "workspace.catalog.read";
     public const string CatalogWrite = "workspace.catalog.write";
+    public const string OrdersRead = "workspace.orders.read";
+    public const string OrdersWrite = "workspace.orders.write";
     public const string CrmRead = "workspace.crm.read";
     public const string CrmWrite = "workspace.crm.write";
     public const string FilesUpload = "workspace.files.upload";
@@ -29,7 +31,7 @@ public static class Permissions
     public static readonly IReadOnlyList<string> All =
     [
         SettingsRead, SettingsWrite, MembersRead, MembersManage, BillingManage, ChannelsManage, InboxRead, InboxReply,
-        AutomationWrite, AgentWrite, KnowledgeWrite, CatalogRead, CatalogWrite, CrmRead, CrmWrite, FilesUpload, FilesRead,
+        AutomationWrite, AgentWrite, KnowledgeWrite, CatalogRead, CatalogWrite, OrdersRead, OrdersWrite, CrmRead, CrmWrite, FilesUpload, FilesRead,
         AnalyticsRead, WorkspaceDelete, AuditRead,
     ];
 }
@@ -49,12 +51,12 @@ public static class WorkspaceRoles
         [Admin] = Permissions.All.Except([Permissions.BillingManage, Permissions.WorkspaceDelete, Permissions.AuditRead]).ToHashSet(StringComparer.Ordinal),
         [Agent] = new HashSet<string>(StringComparer.Ordinal)
         {
-            Permissions.SettingsRead, Permissions.InboxRead, Permissions.InboxReply, Permissions.CatalogRead, Permissions.CrmRead,
-            Permissions.CrmWrite, Permissions.FilesUpload, Permissions.FilesRead, Permissions.MembersRead,
+            Permissions.SettingsRead, Permissions.InboxRead, Permissions.InboxReply, Permissions.CatalogRead, Permissions.OrdersRead,
+            Permissions.OrdersWrite, Permissions.CrmRead, Permissions.CrmWrite, Permissions.FilesUpload, Permissions.FilesRead, Permissions.MembersRead,
         },
         [Viewer] = new HashSet<string>(StringComparer.Ordinal)
         {
-            Permissions.SettingsRead, Permissions.InboxRead, Permissions.CatalogRead, Permissions.CrmRead, Permissions.FilesRead,
+            Permissions.SettingsRead, Permissions.InboxRead, Permissions.CatalogRead, Permissions.OrdersRead, Permissions.CrmRead, Permissions.FilesRead,
             Permissions.MembersRead, Permissions.AnalyticsRead,
         },
     };

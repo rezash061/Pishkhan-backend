@@ -14,6 +14,7 @@ using Pishkhan.Modules.Analytics.Persistence;
 using Pishkhan.Modules.Audit.Persistence;
 using Pishkhan.Modules.Automation.Persistence;
 using Pishkhan.Modules.Catalog.Persistence;
+using Pishkhan.Modules.Orders.Persistence;
 using Pishkhan.Modules.Backoffice;
 using Pishkhan.Modules.Backoffice.Contracts;
 using Pishkhan.Modules.Backoffice.Persistence;
@@ -44,6 +45,7 @@ services.AddModuleDbContext<AgentDbContext>(AgentDbContext.SchemaName);
 services.AddModuleDbContext<AutomationDbContext>(AutomationDbContext.SchemaName);
 services.AddModuleDbContext<ContentDbContext>(ContentDbContext.SchemaName);
 services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.SchemaName);
+services.AddModuleDbContext<OrdersDbContext>(OrdersDbContext.SchemaName);
 services.AddModuleDbContext<AuditDbContext>(AuditDbContext.SchemaName);
 services.AddModuleDbContext<NotificationsDbContext>(NotificationsDbContext.SchemaName);
 services.AddModuleDbContext<AnalyticsDbContext>(AnalyticsDbContext.SchemaName);
@@ -94,7 +96,7 @@ static async Task MigrateAsync(IServiceProvider services, IConfiguration configu
     Type[] contexts =
     [
         typeof(PlatformDbContext), typeof(IdentityDbContext), typeof(TenancyDbContext), typeof(BackofficeDbContext),
-        typeof(FilesDbContext), typeof(ChannelsDbContext), typeof(ConversationsDbContext), typeof(AgentDbContext), typeof(AutomationDbContext), typeof(CatalogDbContext),
+        typeof(FilesDbContext), typeof(ChannelsDbContext), typeof(ConversationsDbContext), typeof(AgentDbContext), typeof(AutomationDbContext), typeof(CatalogDbContext), typeof(OrdersDbContext),
         typeof(AuditDbContext), typeof(ContentDbContext), typeof(NotificationsDbContext), typeof(AnalyticsDbContext), typeof(BillingDbContext), typeof(KnowledgeDbContext),
     ];
     await using (var scope = services.CreateAsyncScope())

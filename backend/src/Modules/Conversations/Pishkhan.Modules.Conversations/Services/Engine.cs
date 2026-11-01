@@ -155,6 +155,9 @@ internal sealed class ConversationQueries(ConversationsDbContext db) : IConversa
             k.DisplayName, k.Username, k.Tags, k.Fields, c.ChannelKind);
     }
 
+    public async Task<ContactSnapshot?> GetContactAsync(Guid contactId, CancellationToken cancellationToken) =>
+        await db.Contacts.AsNoTracking().Where(k => k.Id == contactId).Select(k => new ContactSnapshot(k.Id, k.DisplayName, k.Username)).FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<MessageSnapshot>> RecentMessagesAsync(Guid conversationId, int limit, CancellationToken cancellationToken)
     {
         var rows = await db.Messages.AsNoTracking()
