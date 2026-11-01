@@ -79,6 +79,8 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Ai:Providers:fake:Kind"] = "fake",
             ["Ai:Routes:classify:0:Provider"] = "fake",
             ["Ai:Routes:classify:0:Model"] = "fake-classifier",
+            ["Ai:Routes:embed:0:Provider"] = "fake",
+            ["Ai:Routes:embed:0:Model"] = "fake-embed",
             ["Ai:Prompts:intent.classify:1"] = "Reply with json: {\"intent\": ...}",
             ["Serilog:MinimumLevel:Default"] = "Warning",
         };
@@ -124,6 +126,7 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Analytics.Persistence.AnalyticsDbContext>("analytics");
         await Migrate<Modules.Notifications.Persistence.NotificationsDbContext>("notifications");
         await Migrate<Modules.Billing.Persistence.BillingDbContext>("billing");
+        await Migrate<Modules.Knowledge.Persistence.KnowledgeDbContext>("knowledge");
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();

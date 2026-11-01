@@ -9,6 +9,12 @@ public static class AiExtensions
 {
     public static IServiceCollection AddPishkhanAi(this IServiceCollection services, IConfiguration configuration)
     {
+        // Several modules need the gateway; register it once.
+        if (services.Any(d => d.ServiceType == typeof(ModelRouter)))
+        {
+            return services;
+        }
+
         services.AddOptions<AiOptions>().Bind(configuration.GetSection(AiOptions.Section));
         services.TryAddSingleton<IClock, SystemClock>();
         services.TryAddSingleton<IAiUsageSink, MetricsUsageSink>();

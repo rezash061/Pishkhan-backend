@@ -20,6 +20,7 @@ using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Billing;
+using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
@@ -134,7 +135,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
             .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration)
             .AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration).AddAnalyticsModule(builder.Configuration)
-            .AddNotificationsModule(builder.Configuration).AddBillingModule(builder.Configuration);
+            .AddNotificationsModule(builder.Configuration).AddBillingModule(builder.Configuration).AddKnowledgeModule(builder.Configuration);
         builder.Services.AddSingleton<IAntivirusScanner, CleanScanner>();
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
@@ -153,7 +154,8 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
             .AddAuditConsumers()
             .AddNotificationsConsumers()
             .AddAnalyticsConsumers()
-            .AddBillingConsumers());
+            .AddBillingConsumers()
+            .AddKnowledgeConsumers());
         builder.Services.AddOutboxRelay(builder.Configuration);
         builder.Services.AddHostedService<TimerDispatcher>();
         Host = builder.Build();
