@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Storage;
+using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
@@ -100,7 +101,9 @@ internal static class CrmRecords
         crm.MapGet("/forms/{flowId:guid}/submissions", SubmissionsAsync)
             .RequireWorkspacePermission(Permissions.CrmRead)
             .WithSummary("A flow's submissions, newest first")
-            .Produces<Page<FormSubmissionResponse>>();
+            .WithDescription("404 when the flow is not in this workspace and has no submissions here (a deleted flow keeps its submissions).")
+            .Produces<Page<FormSubmissionResponse>>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     // ---- Forms ----
@@ -122,8 +125,14 @@ internal static class CrmRecords
         return Results.Ok(result);
     }
 
-    private static async Task<IResult> SubmissionsAsync(Guid workspaceId, Guid flowId, string? cursor, int? limit, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> SubmissionsAsync(
+        Guid workspaceId, Guid flowId, string? cursor, int? limit, ConversationsDbContext db, IFlowQueries flows, CancellationToken ct)
     {
+        if (!await db.FormSubmissions.AnyAsync(s => s.FlowId == flowId, ct) && !await flows.FlowExistsAsync(flowId, ct))
+        {
+            return Error.NotFound().ToProblem();
+        }
+
         var take = Math.Clamp(limit ?? 50, 1, 100);
         var query = db.FormSubmissions.AsNoTracking().Where(s => s.FlowId == flowId);
         if (Cursor.TryRead(cursor, out var at, out var id))

@@ -12,7 +12,7 @@ using Pishkhan.Infrastructure.Sms;
 namespace Pishkhan.IntegrationTests;
 
 /// <summary>The Api host in memory against the shared containers.</summary>
-public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Program>
+public sealed class ApiFactory(InfraFixture infra, IReadOnlyDictionary<string, string?>? overrides = null) : WebApplicationFactory<Program>
 {
     private bool _created;
 
@@ -53,7 +53,7 @@ public sealed class ApiFactory(InfraFixture infra) : WebApplicationFactory<Progr
         });
 
         // UseSetting lands before Program reads configuration (minimal hosting applies ConfigureAppConfiguration only at Build).
-        foreach (var (key, value) in infra.Settings)
+        foreach (var (key, value) in infra.Settings.Concat(overrides ?? new Dictionary<string, string?>()))
         {
             builder.UseSetting(key, value);
         }

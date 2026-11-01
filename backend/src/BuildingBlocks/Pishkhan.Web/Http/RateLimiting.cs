@@ -13,11 +13,18 @@ public static class RateLimitPolicies
     /// <summary>Authenticated panel calls, per user.</summary>
     public const string User = "per-user";
 
-    /// <summary>Anonymous public endpoints, per IP.</summary>
+    /// <summary>
+    /// Anonymous public endpoints, per IP. Reads (GET, cached and cheap; the website's server fetches them for every visitor during a
+    /// build) get <see cref="RateLimitOptions.PublicReadsPerMinute"/>; writes (lead forms, token refresh, OTP request) the stricter
+    /// <see cref="RateLimitOptions.PublicPerMinute"/>.
+    /// </summary>
     public const string Public = "per-ip-public";
 
-    /// <summary>Auth endpoints (OTP request, login), per IP. Per-phone limits are enforced in the handler.</summary>
+    /// <summary>Auth endpoints (OTP verify, password login), per IP. Per-phone and per-account limits are enforced in the handlers.</summary>
     public const string Auth = "per-ip-auth";
+
+    /// <summary>Authenticated back-office calls, per staff member.</summary>
+    public const string Staff = "per-staff";
 
     /// <summary>Uploads, per user.</summary>
     public const string Upload = "per-user-upload";
@@ -61,17 +68,34 @@ public sealed class RedisSlidingWindowLimiter(RedisSlidingWindow window, string 
     }
 }
 
+/// <summary>
+/// API rate limits (backend plan 3.6), tuned for the closed beta (BE-1.15). Iranian mobile carriers put many subscribers behind one
+/// carrier-grade NAT address, so per-IP limits are set for a shared address and the per-phone and per-account limits in the handlers do
+/// the fine-grained work.
+/// </summary>
 public sealed class RateLimitOptions
 {
     public const string Section = "RateLimits";
 
+    /// <summary>Panel calls per user. A busy inbox polls nothing (SignalR pushes), so 600 leaves room for bulk edits and exports.</summary>
     public int UserPerMinute { get; set; } = 600;
 
+    /// <summary>Panel calls per workspace, all members together, counted once membership is checked (so outsiders cannot use it up).</summary>
+    public int WorkspacePerMinute { get; set; } = 3_000;
+
+    /// <summary>Anonymous writes per IP: lead forms, token refresh, OTP requests.</summary>
     public int PublicPerMinute { get; set; } = 60;
 
-    public int AuthPerHour { get; set; } = 20;
+    /// <summary>Anonymous reads per IP: plans, CMS pages, help search.</summary>
+    public int PublicReadsPerMinute { get; set; } = 600;
+
+    /// <summary>Sign-ins per IP (OTP verify, password, support session, staff login). Per-phone attempts are capped in the handlers.</summary>
+    public int AuthPerHour { get; set; } = 120;
 
     public int UploadPerMinute { get; set; } = 30;
+
+    /// <summary>Back-office calls per staff member.</summary>
+    public int StaffPerMinute { get; set; } = 600;
 }
 
 public static class RateLimitingExtensions
@@ -81,6 +105,7 @@ public static class RateLimitingExtensions
         services.AddSingleton<RedisSlidingWindow>();
         services.AddSingleton<RedisTokenBucket>();
         var o = Microsoft.Extensions.Configuration.ConfigurationBinder.Get<RateLimitOptions>(configuration.GetSection(RateLimitOptions.Section)) ?? new RateLimitOptions();
+        services.AddSingleton(o);
         services.AddRateLimiter(r =>
         {
             r.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -95,8 +120,11 @@ public static class RateLimitingExtensions
             };
             r.AddPolicy(RateLimitPolicies.User, ctx => Partition(ctx, "user", UserKey(ctx), o.UserPerMinute, TimeSpan.FromMinutes(1)));
             r.AddPolicy(RateLimitPolicies.Upload, ctx => Partition(ctx, "upload", UserKey(ctx), o.UploadPerMinute, TimeSpan.FromMinutes(1)));
-            r.AddPolicy(RateLimitPolicies.Public, ctx => Partition(ctx, "public", IpKey(ctx), o.PublicPerMinute, TimeSpan.FromMinutes(1)));
+            r.AddPolicy(RateLimitPolicies.Public, ctx => HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method)
+                ? Partition(ctx, "public-read", IpKey(ctx), o.PublicReadsPerMinute, TimeSpan.FromMinutes(1))
+                : Partition(ctx, "public", IpKey(ctx), o.PublicPerMinute, TimeSpan.FromMinutes(1)));
             r.AddPolicy(RateLimitPolicies.Auth, ctx => Partition(ctx, "auth", IpKey(ctx), o.AuthPerHour, TimeSpan.FromHours(1)));
+            r.AddPolicy(RateLimitPolicies.Staff, ctx => Partition(ctx, "staff", UserKey(ctx), o.StaffPerMinute, TimeSpan.FromMinutes(1)));
         });
         return services;
     }
@@ -106,6 +134,20 @@ public static class RateLimitingExtensions
 
     private static string UserKey(HttpContext ctx) =>
         ctx.User.FindFirst(PishkhanClaims.Subject)?.Value ?? IpKey(ctx);
+
+    /// <summary>The per-workspace limit, checked by <c>RequireWorkspacePermission</c> after the membership check. Null when allowed.</summary>
+    public static async Task<IResult?> CheckWorkspaceLimitAsync(HttpContext ctx, Guid workspaceId)
+    {
+        var o = ctx.RequestServices.GetRequiredService<RateLimitOptions>();
+        var decision = await ctx.RequestServices.GetRequiredService<RedisSlidingWindow>().TryHitAsync($"api:workspace:{workspaceId:N}", o.WorkspacePerMinute, TimeSpan.FromMinutes(1));
+        if (decision.Allowed)
+        {
+            return null;
+        }
+
+        ctx.Response.Headers.RetryAfter = ((int)Math.Ceiling(decision.RetryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Results.Problem(statusCode: 429, type: ProblemTypes.RateLimited, title: "common.rate_limited");
+    }
 
     private static string IpKey(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }

@@ -21,7 +21,7 @@ public static class WorkspaceAccessExtensions
 
     /// <summary>
     /// For routes under <c>/workspaces/{workspaceId}</c>: a non-member gets 404 (the workspace's existence is not revealed),
-    /// a member without the permission gets 403. On success the tenant context is set for the request.
+    /// a member without the permission gets 403, a workspace over its per-workspace rate limit 429. On success the tenant context is set.
     /// </summary>
     public static TBuilder RequireWorkspacePermission<TBuilder>(this TBuilder builder, string permission)
         where TBuilder : IEndpointConventionBuilder
@@ -44,6 +44,11 @@ public static class WorkspaceAccessExtensions
             if (!access.Permissions.Contains(permission))
             {
                 return SharedKernel.Error.Forbidden().ToProblem();
+            }
+
+            if (await RateLimitingExtensions.CheckWorkspaceLimitAsync(http, workspaceId) is { } limited)
+            {
+                return limited;
             }
 
             http.RequestServices.GetRequiredService<ITenantContext>().SetWorkspace(workspaceId);

@@ -7,6 +7,7 @@ using Npgsql;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
+using DotNet.Testcontainers.Containers;
 using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
@@ -39,6 +40,13 @@ public sealed class InfraFixture : IAsyncLifetime
 
     public string PostgresConnectionString => _postgres.GetConnectionString();
 
+    /// <summary>Copies a file into the PostgreSQL container (for the backup scripts).</summary>
+    public Task CopyToPostgresAsync(byte[] content, string path, CancellationToken ct) =>
+        _postgres.CopyAsync(content, path, ct: ct);
+
+    /// <summary>Runs a command inside the PostgreSQL container, where pg_dump and pg_restore match the server.</summary>
+    public Task<ExecResult> ExecInPostgresAsync(IList<string> command, CancellationToken ct) => _postgres.ExecAsync(command, ct);
+
     public const string InstagramAppSecret = "it-app-secret";
 
     public Dictionary<string, string?> Settings { get; private set; } = [];
@@ -57,9 +65,10 @@ public sealed class InfraFixture : IAsyncLifetime
             ["Kafka:CreateTopicsIfMissing"] = "true",
             ["Kafka:PartitionsOverride"] = "3",
             ["Kafka:ReplicationFactor"] = "1",
-            // Every test signs users and staff in from one address; the production limits (20 an hour per IP, for requests and for OTPs) would trip mid-run.
+            // Every test signs users and staff in from one address; the production limits (120 sign-ins and 20 OTPs an hour per IP) would trip mid-run.
             ["RateLimits:AuthPerHour"] = "1000",
             ["RateLimits:PublicPerMinute"] = "1000",
+            ["RateLimits:PublicReadsPerMinute"] = "10000",
             ["Identity:OtpPerIpPerHour"] = "1000",
             ["Identity:OtpResendCooldown"] = "00:00:01",
             ["Storage:Provider"] = "filesystem",

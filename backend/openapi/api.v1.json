@@ -4539,6 +4539,7 @@
           "Contacts"
         ],
         "summary": "A flow's submissions, newest first",
+        "description": "404 when the flow is not in this workspace and has no submissions here (a deleted flow keeps its submissions).",
         "parameters": [
           {
             "name": "workspaceId",
@@ -4581,6 +4582,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PageOfFormSubmissionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }

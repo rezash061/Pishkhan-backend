@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.15: beta hardening, 2026-11-01)
+- Cross-tenant access suite (`CrossTenantTests`). It walks every route the Api host maps under `/workspaces/{workspaceId}` (about 100 route and method pairs) and seeds one resource of each kind in workspace B:
+  - A non-member calling any of B's routes gets 404.
+  - A member of A calling A's routes with B's IDs gets 404.
+  - B still finds all its resources afterwards.
+  - A route parameter the suite cannot seed fails the test, so new endpoints are covered automatically.
+  - Revoking another user's session is also checked.
+- Rate limits tuned (`RateLimits` section):
+  - New per-workspace limit, `WorkspacePerMinute` (3,000). It is counted after the membership check, so outsiders cannot use up a workspace's budget, and answers 429 `common.rate_limited` with `Retry-After`.
+  - New per-staff limit on the authenticated back office, `StaffPerMinute` (600).
+  - Public reads (GET) have their own per-IP budget, `PublicReadsPerMinute` (600), so the website's server can fetch pages while building. Public writes stay at `PublicPerMinute` (60).
+  - Sign-ins per IP raised from 20 to 120 an hour (`AuthPerHour`), because Iranian mobile carriers put many users behind one address. Per-phone and per-account attempt limits are unchanged, and so is the OTP request limit (20 an hour per IP).
+- Backups: `infra/backup/backup.sh` (pg_dump custom format with a checksum and retention), `restore.sh` (refuses an existing target, checks the checksum) and `verify.sql` (exact rows per table).
+  - `BackupRestoreTests` dumps the live test database while other tests write to it, restores it into a new database, and compares tables, columns, indexes, extensions, every module's migrations and the seeded data.
+- On-call runbooks in `docs/runbooks/`: Meta outage, Kafka lag and DLQ replay, ClamAV down, backup and restore.
+
+### Fixed (BE-1.15)
+- `GET /workspaces/{id}/crm/forms/{flowId}/submissions` answered 200 with an empty page for a flow of another workspace. It now answers 404 unless the flow exists in this workspace or has submissions here. A deleted flow keeps its submissions. This uses the new `IFlowQueries` in Automation.Contracts.
+- Dev JWT keys: two hosts starting at the same moment could read a half-written key file, or sign with different keys. The key is now written aside and moved into place, and the first host wins.
+
 ### Added (Phase 1, BE-1.14: notifications v1 completed, 2026-11-01)
 - Web push (VAPID, RFC 8292; payloads encrypted with `aes128gcm`, RFC 8291, checked against the RFC's test vector):
   - `GET /api/v1/me/push/key` returns the VAPID public key. It is 404 `push.unavailable` when `WebPush:PublicKey`/`PrivateKey` are not set.

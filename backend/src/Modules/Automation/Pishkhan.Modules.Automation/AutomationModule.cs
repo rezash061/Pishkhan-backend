@@ -20,6 +20,7 @@ public static class AutomationModule
         services.AddModuleDbContext<AutomationDbContext>(AutomationDbContext.SchemaName);
         services.AddScoped<AutomationCache>();
         services.AddScoped<FlowEngine>();
+        services.AddScoped<IFlowQueries, FlowQueries>();
         return services;
     }
 
