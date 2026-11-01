@@ -7,6 +7,7 @@ using Pishkhan.Modules.Analytics;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Billing;
+using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Channels;
@@ -43,6 +44,7 @@ services
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
     .AddBillingModule(configuration)
+    .AddAgentModule(configuration)
     .AddKnowledgeModule(configuration)
     .DecorateHandlers();
 services.AddPishkhanRealtime();
@@ -64,6 +66,7 @@ app.MapContentEndpoints();
 app.MapCatalogEndpoints();
 app.MapBillingEndpoints();
 app.MapKnowledgeEndpoints();
+app.MapAgentEndpoints();
 app.MapAuditEndpoints();
 app.MapNotificationsEndpoints();
 app.MapAnalyticsEndpoints();

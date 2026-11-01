@@ -52,7 +52,8 @@ internal sealed class ModelRouter(
     IAiUsageSink usage,
     CircuitBreakers breakers,
     IClock clock,
-    ILoggerFactory loggers) : IModelRouter, IAiProviderProbe
+    ILoggerFactory loggers,
+    FakeChatScript fakeScript) : IModelRouter, IAiProviderProbe
 {
     public const string HttpClientName = "ai";
     private readonly ConcurrentDictionary<string, (string Fingerprint, IChatClient Client)> _clients = new(StringComparer.Ordinal);
@@ -145,7 +146,7 @@ internal sealed class ModelRouter(
     {
         if (string.Equals(provider.Kind, "fake", StringComparison.OrdinalIgnoreCase))
         {
-            return new FakeChatClient(route.Model);
+            return new FakeChatClient(route.Model, fakeScript);
         }
 
         var clientOptions = new OpenAIClientOptions
@@ -194,11 +195,11 @@ internal sealed class FallbackChatClient(string task, Guid? workspaceId, ModelRo
             {
                 var response = await router.ClientFor(route).GetResponseAsync(list, Apply(route, options), timeout.Token);
                 router.Breakers.Success(route.Provider);
-                Record(route, response.Usage, Stopwatch.GetElapsedTime(started), "ok");
                 activity?.SetTag("gen_ai.usage.input_tokens", response.Usage?.InputTokenCount);
                 activity?.SetTag("gen_ai.usage.output_tokens", response.Usage?.OutputTokenCount);
                 response.AdditionalProperties ??= [];
                 response.AdditionalProperties["pishkhan.route"] = route.Key;
+                response.AdditionalProperties["pishkhan.cost_irr"] = Record(route, response.Usage, Stopwatch.GetElapsedTime(started), "ok");
                 return response;
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is not NoRouteException)
@@ -239,7 +240,7 @@ internal sealed class FallbackChatClient(string task, Guid? workspaceId, ModelRo
         return result;
     }
 
-    private void Record(AiRouteOptions route, UsageDetails? details, TimeSpan latency, string outcome)
+    private decimal Record(AiRouteOptions route, UsageDetails? details, TimeSpan latency, string outcome)
     {
         var input = details?.InputTokenCount ?? 0;
         var output = details?.OutputTokenCount ?? 0;
@@ -247,6 +248,7 @@ internal sealed class FallbackChatClient(string task, Guid? workspaceId, ModelRo
             ? decimal.Round((input * price.InputPerMillion + output * price.OutputPerMillion) / 1_000_000m, 0)
             : 0m;
         router.Usage.Record(new AiUsage(task, workspaceId, route.Provider, route.Model, input, output, cost, latency, outcome));
+        return cost;
     }
 }
 
@@ -389,10 +391,19 @@ internal sealed class CircuitBreakers
 }
 
 /// <summary>
+/// Tests script the fake provider here: <see cref="Respond"/> gets the route's model, the messages and the options, and returns the
+/// response, or null for the default fake behaviour. It is never set outside tests.
+/// </summary>
+public sealed class FakeChatScript
+{
+    public Func<string, IList<ChatMessage>, ChatOptions?, ChatResponse?>? Respond { get; set; }
+}
+
+/// <summary>
 /// Deterministic provider for development, tests and dummy eval runs. A system prompt containing <c>json</c> gets
 /// <c>{"intent":"other","confidence":0.5}</c>; otherwise the last user message is echoed. Model <c>fail</c> always throws.
 /// </summary>
-internal sealed class FakeChatClient(string model) : IChatClient
+internal sealed class FakeChatClient(string model, FakeChatScript script) : IChatClient
 {
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -402,6 +413,13 @@ internal sealed class FakeChatClient(string model) : IChatClient
         }
 
         var list = messages.ToList();
+        if (script.Respond?.Invoke(model, list, options) is { } scripted)
+        {
+            scripted.ModelId ??= model;
+            scripted.Usage ??= new UsageDetails { InputTokenCount = list.Sum(m => (long)Math.Max(1, m.Text.Length / 4)), OutputTokenCount = Math.Max(1, scripted.Text.Length / 4) };
+            return Task.FromResult(scripted);
+        }
+
         var wantsJson = list.Any(m => m.Role == ChatRole.System && m.Text.Contains("json", StringComparison.OrdinalIgnoreCase));
         var lastUser = list.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? string.Empty;
         var text = wantsJson ? """{"intent":"other","confidence":0.5}""" : lastUser;

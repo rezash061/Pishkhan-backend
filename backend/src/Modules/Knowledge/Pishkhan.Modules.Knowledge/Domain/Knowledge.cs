@@ -100,3 +100,56 @@ public sealed class KnowledgeChunk : ITenantOwned
 
     public DateTimeOffset CreatedAt { get; init; }
 }
+
+public static class UnansweredStatuses
+{
+    public const string Open = "open";
+
+    /// <summary>The owner answered it; the answer became a FAQ source (<see cref="UnansweredQuestion.AnswerSourceId"/>).</summary>
+    public const string Answered = "answered";
+
+    public const string Dismissed = "dismissed";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Open, Answered, Dismissed };
+}
+
+/// <summary>
+/// A customer question the AI could not answer from the knowledge. Repeats of the same normalised question add to <see cref="Count"/>;
+/// a question asked again after it was answered or dismissed is open again.
+/// </summary>
+public sealed class UnansweredQuestion : Entity<Guid>, ITenantOwned
+{
+    public const int MaxQuestion = 500;
+
+    public Guid WorkspaceId { get; init; }
+
+    /// <summary>The latest wording, as the customer wrote it.</summary>
+    public string Question { get; set; } = string.Empty;
+
+    /// <summary>Normalised (<c>PersianNormalizer</c>, lower case, no punctuation): the identity of the question in its workspace.</summary>
+    public string Key { get; init; } = string.Empty;
+
+    public int Count { get; set; } = 1;
+
+    public string Status { get; set; } = UnansweredStatuses.Open;
+
+    public DateTimeOffset FirstAskedAt { get; init; }
+
+    public DateTimeOffset LastAskedAt { get; set; }
+
+    public Guid LastConversationId { get; set; }
+
+    public Guid? AnswerSourceId { get; set; }
+
+    public static UnansweredQuestion Create(Guid workspaceId, string question, string key, Guid conversationId, DateTimeOffset askedAt) => new()
+    {
+        Id = Uuid.NewV7(askedAt),
+        WorkspaceId = workspaceId,
+        Question = question,
+        Key = key,
+        FirstAskedAt = askedAt,
+        LastAskedAt = askedAt,
+        LastConversationId = conversationId,
+        CreatedAt = askedAt,
+    };
+}

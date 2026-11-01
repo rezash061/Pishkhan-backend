@@ -190,6 +190,72 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.AgentProfile", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("AllowedDomains")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_domains");
+
+                    b.Property<string>("BrandVoice")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("brand_voice");
+
+                    b.Property<double>("ConfidenceThreshold")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence_threshold");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Handoff")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("handoff");
+
+                    b.Property<string>("HandoffMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("handoff_message");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NeverSay")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("never_say");
+
+                    b.Property<bool>("ReplyInCustomerLanguage")
+                        .HasColumnType("boolean")
+                        .HasColumnName("reply_in_customer_language");
+
+                    b.Property<string>("Tone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("WorkspaceId")
+                        .HasName("pk_agent_profiles");
+
+                    b.ToTable("agent_profiles", "agent");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.AiProvider", b =>
                 {
                     b.Property<string>("Name")
@@ -313,6 +379,144 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasDatabaseName("ix_ai_routes_task_position");
 
                     b.ToTable("ai_routes", "agent");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.AiTrace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<double?>("ClassifierConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("classifier_confidence");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<decimal>("CostIrr")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cost_irr");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Facts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("facts");
+
+                    b.Property<Guid?>("FlowRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flow_run_id");
+
+                    b.Property<string>("Goal")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("goal");
+
+                    b.Property<string>("GuardIssues")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("guard_issues");
+
+                    b.Property<string>("HandoffReason")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("handoff_reason");
+
+                    b.Property<string>("Input")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("input");
+
+                    b.Property<long>("InputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("input_tokens");
+
+                    b.Property<string>("Intent")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("intent");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("language");
+
+                    b.Property<int>("LatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("latency_ms");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Models")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("models");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<long>("OutputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_tokens");
+
+                    b.Property<string>("Prompts")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("prompts");
+
+                    b.Property<string>("Reply")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("reply");
+
+                    b.Property<double?>("SelfConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("self_confidence");
+
+                    b.Property<string>("Sentiment")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("sentiment");
+
+                    b.Property<double>("Threshold")
+                        .HasColumnType("double precision")
+                        .HasColumnName("threshold");
+
+                    b.Property<string>("ToolCalls")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tool_calls");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_traces");
+
+                    b.HasIndex("ConversationId", "CreatedAt")
+                        .HasDatabaseName("ix_ai_traces_conversation_id_created_at");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_ai_traces_workspace_id_created_at");
+
+                    b.ToTable("ai_traces", "agent");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Agent.Domain.EvalCase", b =>

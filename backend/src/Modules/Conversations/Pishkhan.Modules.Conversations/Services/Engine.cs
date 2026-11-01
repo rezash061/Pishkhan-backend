@@ -86,9 +86,9 @@ internal sealed class ConversationActionsHandler(ConversationsDbContext db, ITen
                     conversation.SetAiPaused(true);
                     break;
                 case ConversationActionKinds.Handoff:
-                    if (conversation.HandOff(action.Reason ?? "automation", null, now))
+                    if (conversation.HandOff(action.Reason ?? "automation", action.SuggestedReply, now))
                     {
-                        Db.Publish(new HandoffRequested(conversation.Id, conversation.HandoffReason!, null, null), conversation.Id.ToString());
+                        Db.Publish(new HandoffRequested(conversation.Id, conversation.HandoffReason!, null, conversation.HandoffSuggestedReply), conversation.Id.ToString());
                     }
 
                     break;
@@ -147,6 +147,18 @@ internal sealed class ConversationQueries(ConversationsDbContext db) : IConversa
         var (c, k) = (row.Conversation, row.Contact);
         return new ConversationSnapshot(
             c.Id, c.WorkspaceId, c.ChannelAccountId, c.ContactId, c.ExternalUserId, c.Status, c.AiPaused, c.LastInboundAt, c.WindowExpiresAt,
-            k.DisplayName, k.Username, k.Tags, k.Fields);
+            k.DisplayName, k.Username, k.Tags, k.Fields, c.ChannelKind);
+    }
+
+    public async Task<IReadOnlyList<MessageSnapshot>> RecentMessagesAsync(Guid conversationId, int limit, CancellationToken cancellationToken)
+    {
+        var rows = await db.Messages.AsNoTracking()
+            .Where(m => m.ConversationId == conversationId)
+            .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
+            .Take(limit)
+            .Select(m => new MessageSnapshot(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.HandledBy, m.Status))
+            .ToListAsync(cancellationToken);
+        rows.Reverse();
+        return rows;
     }
 }

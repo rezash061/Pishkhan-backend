@@ -33,6 +33,7 @@ public static class Topics
     public const string FileScanRequested = "files.scan-requested.v1";
     public const string FileScanCompleted = "files.scan-completed.v1";
     public const string KnowledgeSourceChanged = "knowledge.source-changed.v1";
+    public const string UnansweredQuestionRaised = "agent.unanswered-question-raised.v1";
     public const string ProductChanged = "catalog.product-changed.v1";
     public const string PricesUpdated = "catalog.prices-updated.v1";
     public const string CatalogImportRequested = "catalog.import-requested.v1";
@@ -78,6 +79,7 @@ public static class Topics
         new(FileScanRequested, 12, Week, "file id"),
         new(FileScanCompleted, 12, Week, "file id"),
         new(KnowledgeSourceChanged, 12, Week, "workspace id"),
+        new(UnansweredQuestionRaised, 6, Week, "workspace id"),
         new(ProductChanged, 12, Week, "workspace id"),
         new(PricesUpdated, 12, Week, "workspace id"),
         new(CatalogImportRequested, 6, Week, "import id"),

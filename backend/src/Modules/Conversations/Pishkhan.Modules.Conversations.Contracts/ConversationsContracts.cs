@@ -103,7 +103,8 @@ public sealed record ConversationAction(
     string? Tag = null,
     string? Field = null,
     string? Value = null,
-    string? Reason = null)
+    string? Reason = null,
+    string? SuggestedReply = null)
 {
     public static ConversationAction Send(OutboundContent content) => new(ConversationActionKinds.Send, content);
 
@@ -146,7 +147,8 @@ public sealed record ConversationSnapshot(
     string? ContactName,
     string? ContactUsername,
     IReadOnlyList<string> Tags,
-    IReadOnlyDictionary<string, string> Fields)
+    IReadOnlyDictionary<string, string> Fields,
+    string ChannelKind = "")
 {
     public bool IsWindowOpen(DateTimeOffset now) => WindowExpiresAt > now;
 }
@@ -162,7 +164,13 @@ public interface IConversationQueries
     Task<ConversationSnapshot?> GetAsync(Guid conversationId, CancellationToken cancellationToken);
 
     Task<ConversationSnapshot?> FindAsync(Guid channelAccountId, string externalUserId, CancellationToken cancellationToken);
+
+    /// <summary>The conversation's last <paramref name="limit"/> messages, oldest first.</summary>
+    Task<IReadOnlyList<MessageSnapshot>> RecentMessagesAsync(Guid conversationId, int limit, CancellationToken cancellationToken);
 }
+
+/// <summary>A stored message as the AI agent reads it. <see cref="Text"/> is null for media without a caption.</summary>
+public sealed record MessageSnapshot(Guid Id, DateTimeOffset CreatedAt, string Direction, string Kind, string? Text, string? HandledBy, string Status);
 
 /// <summary>Builds a contacts Excel export (platform group) and notifies the member who asked.</summary>
 [IntegrationEvent(Topics.ContactExportRequested)]

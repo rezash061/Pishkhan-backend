@@ -19,6 +19,7 @@ public static class AiExtensions
         services.TryAddSingleton<IClock, SystemClock>();
         services.TryAddSingleton<IAiUsageSink, MetricsUsageSink>();
         services.AddSingleton<CircuitBreakers>();
+        services.TryAddSingleton<FakeChatScript>();
         services.TryAddSingleton<IAiSettings, ConfigAiSettings>();
         services.AddSingleton<ModelRouter>();
         services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
