@@ -4,6 +4,7 @@ using Pishkhan.Infrastructure.Health;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Backoffice;
+using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
@@ -30,6 +31,7 @@ services
     .AddIdentityDirectory()
     .AddChannelsDirectory()
     .AddBillingModule(configuration).AddBillingBackoffice()
+    .AddAgentModule(configuration).AddAgentBackoffice()
     .DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
 
@@ -43,6 +45,7 @@ app.MapAuditAdminEndpoints();
 app.MapTenancyAdminEndpoints();
 app.MapIdentityAdminEndpoints();
 app.MapBillingAdminEndpoints();
+app.MapAgentAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>

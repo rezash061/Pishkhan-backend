@@ -13,6 +13,20 @@ public static class AiTasks
 }
 
 /// <summary>
+/// The AI configuration in effect now. The default reads <see cref="AiOptions"/> from configuration; the Agent module replaces it
+/// with configuration merged with what staff set in the back office (providers, routes, prompts), reloaded without a restart.
+/// </summary>
+public interface IAiSettings
+{
+    AiOptions Current { get; }
+}
+
+internal sealed class ConfigAiSettings(Microsoft.Extensions.Options.IOptionsMonitor<AiOptions> options) : IAiSettings
+{
+    public AiOptions Current => options.CurrentValue;
+}
+
+/// <summary>
 /// Model gateway configuration (section <c>Ai</c>). Read through <c>IOptionsMonitor</c>, so changing a route in configuration
 /// switches the model without a code change or restart. Backoffice's <c>ai_model_routes</c> will feed the same shape in Phase 1.
 /// </summary>
@@ -38,6 +52,18 @@ public sealed class AiOptions
     public int CircuitBreakerFailures { get; set; } = 5;
 
     public int CircuitBreakerSeconds { get; set; } = 30;
+
+    /// <summary>What an eval run must reach before its prompt version can be activated (admin plan 4.5).</summary>
+    public AiEvalGateOptions EvalGate { get; set; } = new();
+}
+
+public sealed class AiEvalGateOptions
+{
+    public decimal MinIntentAccuracy { get; set; } = 0.85m;
+
+    public decimal MaxErrorRate { get; set; } = 0.05m;
+
+    public int MinCases { get; set; } = 1;
 }
 
 public sealed class AiProviderOptions

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Pishkhan.Infrastructure.Persistence;
+using Pishkhan.Modules.Billing.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Identity.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
@@ -34,8 +35,15 @@ public sealed record AdminWorkspaceSummary(
 
 public sealed record AdminWorkspaceMember(Guid UserId, string? DisplayName, string? MaskedPhone, string Role, DateTimeOffset JoinedAt);
 
+/// <summary>
+/// The workspace's plan now. <c>source</c>: subscription (granted plan or trial), free (the published free plan) or none (no free
+/// plan is published). The billing endpoint (<c>GET /admin/v1/workspaces/{id}/billing</c>) has the subscription history and usage.
+/// </summary>
+public sealed record AdminWorkspacePlan(string Source, Guid? PlanId, string? Code, string? Name, int? Version, bool Trial, DateTimeOffset? EndsAt);
+
+/// <summary><c>planId</c> is the current plan version's id (the same as <c>plan.planId</c>).</summary>
 public sealed record AdminWorkspaceDetail(
-    Guid Id, string Name, string Slug, string Industry, string TimeZone, string Status, Guid? PlanId, DateTimeOffset CreatedAt,
+    Guid Id, string Name, string Slug, string Industry, string TimeZone, string Status, Guid? PlanId, AdminWorkspacePlan Plan, DateTimeOffset CreatedAt,
     DateTimeOffset? DeletionRequestedAt, DateTimeOffset? DeletionScheduledFor, DateTimeOffset? DeletedAt, AdminWorkspaceOwner? Owner,
     IReadOnlyList<AdminWorkspaceMember> Members, IReadOnlyList<AdminWorkspaceChannel> Channels, int PendingInvitations);
 
@@ -139,7 +147,8 @@ internal static class AdminWorkspaceEndpoints
         return Results.Ok(new PagedResult<AdminWorkspaceSummary>(items, total, page, pageSize));
     }
 
-    private static async Task<IResult> GetAsync(Guid workspaceId, TenancyDbContext db, IUserDirectory users, IChannelDirectory channels, CancellationToken ct)
+    private static async Task<IResult> GetAsync(
+        Guid workspaceId, TenancyDbContext db, IUserDirectory users, IChannelDirectory channels, IEntitlements entitlements, CancellationToken ct)
     {
         var workspace = await db.Workspaces.AsNoTracking().FirstOrDefaultAsync(w => w.Id == workspaceId, ct);
         if (workspace is null)
@@ -153,9 +162,11 @@ internal static class AdminWorkspaceEndpoints
             .CountAsync(i => i.WorkspaceId == workspaceId && i.Status == InvitationStatus.Pending, ct);
         var accounts = await channels.ListForWorkspacesAsync([workspaceId], ct);
         var owner = members.FirstOrDefault(m => m.Role == WorkspaceRoles.Owner);
+        var plan = await entitlements.GetAsync(workspaceId, ct);
 
         return Results.Ok(new AdminWorkspaceDetail(
-            workspace.Id, workspace.Name, workspace.Slug, workspace.Industry, workspace.TimeZone, Workspace.StatusName(workspace.Status), workspace.PlanId,
+            workspace.Id, workspace.Name, workspace.Slug, workspace.Industry, workspace.TimeZone, Workspace.StatusName(workspace.Status), plan.PlanId,
+            new AdminWorkspacePlan(plan.Source, plan.PlanId, plan.PlanCode, plan.PlanName, plan.PlanVersion, plan.Trial, plan.EndsAt),
             workspace.CreatedAt, workspace.DeletionRequestedAt, workspace.DeletionScheduledFor, workspace.DeletedAt,
             owner is null ? null : Owner(people, owner.UserId),
             [.. members.Select(m => new AdminWorkspaceMember(m.UserId, people.GetValueOrDefault(m.UserId)?.DisplayName, people.GetValueOrDefault(m.UserId)?.MaskedPhone, m.Role, m.CreatedAt))],

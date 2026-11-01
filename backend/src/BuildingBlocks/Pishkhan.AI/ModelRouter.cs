@@ -17,6 +17,13 @@ public interface IModelRouter
     IChatClient GetChatClient(string task, Guid? workspaceId = null);
 }
 
+/// <summary>Back office: checks that a provider answers, before or after saving it.</summary>
+public interface IAiProviderProbe
+{
+    /// <summary>Sends one tiny request to <paramref name="model"/>. Returns null on success, else the error.</summary>
+    Task<string?> TestAsync(AiProviderOptions provider, string model, CancellationToken cancellationToken);
+}
+
 public sealed class NoRouteException(string task) : Exception($"No AI route is configured for task '{task}'.")
 {
     public string Task { get; } = task;
@@ -28,12 +35,12 @@ public sealed class AllRoutesFailedException(string task, Exception inner) : Exc
 }
 
 internal sealed class ModelRouter(
-    IOptionsMonitor<AiOptions> options,
+    IAiSettings settings,
     IHttpClientFactory httpClients,
     IAiUsageSink usage,
     CircuitBreakers breakers,
     IClock clock,
-    ILoggerFactory loggers) : IModelRouter
+    ILoggerFactory loggers) : IModelRouter, IAiProviderProbe
 {
     public const string HttpClientName = "ai";
     private readonly ConcurrentDictionary<string, (string Fingerprint, IChatClient Client)> _clients = new(StringComparer.Ordinal);
@@ -42,9 +49,9 @@ internal sealed class ModelRouter(
         new FallbackChatClient(task, workspaceId, this, loggers.CreateLogger<FallbackChatClient>());
 
     internal IReadOnlyList<AiRouteOptions> RoutesFor(string task) =>
-        options.CurrentValue.Routes.TryGetValue(task, out var routes) && routes.Count > 0 ? routes : throw new NoRouteException(task);
+        settings.Current.Routes.TryGetValue(task, out var routes) && routes.Count > 0 ? routes : throw new NoRouteException(task);
 
-    internal AiOptions Options => options.CurrentValue;
+    internal AiOptions Options => settings.Current;
 
     internal IAiUsageSink Usage => usage;
 
@@ -66,6 +73,22 @@ internal sealed class ModelRouter(
             _ => (fingerprint, Create(provider, route)),
             (_, existing) => existing.Fingerprint == fingerprint ? existing : (fingerprint, Create(provider, route)));
         return cached.Client;
+    }
+
+    public async Task<string?> TestAsync(AiProviderOptions provider, string model, CancellationToken cancellationToken)
+    {
+        using var client = Create(provider, new AiRouteOptions { Provider = "probe", Model = model });
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        try
+        {
+            await client.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")], new ChatOptions { ModelId = model, MaxOutputTokens = 1 }, timeout.Token);
+            return null;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ex is OperationCanceledException ? "timeout" : ex.GetType().Name + ": " + ex.Message;
+        }
     }
 
     private IChatClient Create(AiProviderOptions provider, AiRouteOptions route)

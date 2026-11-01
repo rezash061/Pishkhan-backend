@@ -20,6 +20,14 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
 
     public DbSet<EvalResult> EvalResults => Set<EvalResult>();
 
+    public DbSet<AiProvider> AiProviders => Set<AiProvider>();
+
+    public DbSet<AiRoute> AiRoutes => Set<AiRoute>();
+
+    public DbSet<PromptVersion> PromptVersions => Set<PromptVersion>();
+
+    public DbSet<PromptActivation> PromptActivations => Set<PromptActivation>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<EvalSet>(b =>
@@ -68,6 +76,47 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             b.HasIndex(x => x.RunId);
             b.HasOne<EvalRun>().WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Cascade);
             b.HasOne<EvalCase>().WithMany().HasForeignKey(x => x.CaseId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AiProvider>(b =>
+        {
+            b.ToTable("ai_providers");
+            b.HasKey(x => x.Name);
+            b.Property(x => x.Name).HasMaxLength(40);
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.BaseUrl).HasMaxLength(500);
+            b.Property(x => x.LastTestError).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<AiRoute>(b =>
+        {
+            b.ToTable("ai_routes");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Task).HasMaxLength(40);
+            b.Property(x => x.Provider).HasMaxLength(40);
+            b.Property(x => x.Model).HasMaxLength(200);
+            b.Property(x => x.InputPricePerMillion).HasPrecision(18, 2);
+            b.Property(x => x.OutputPricePerMillion).HasPrecision(18, 2);
+            b.HasIndex(x => new { x.Task, x.Position }).IsUnique();
+        });
+
+        modelBuilder.Entity<PromptVersion>(b =>
+        {
+            b.ToTable("prompt_versions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Key).HasMaxLength(100);
+            b.Property(x => x.Version).HasMaxLength(40);
+            b.Property(x => x.BaseVersion).HasMaxLength(40);
+            b.Property(x => x.Text).HasMaxLength(20000);
+            b.HasIndex(x => new { x.Key, x.Version }).IsUnique();
+        });
+
+        modelBuilder.Entity<PromptActivation>(b =>
+        {
+            b.ToTable("prompt_activations");
+            b.HasKey(x => x.Key);
+            b.Property(x => x.Key).HasMaxLength(100);
+            b.Property(x => x.Version).HasMaxLength(40);
         });
     }
 }
