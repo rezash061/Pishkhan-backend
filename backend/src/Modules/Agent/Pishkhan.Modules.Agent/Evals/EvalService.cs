@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Pishkhan.AI;
 using Pishkhan.Modules.Agent.Domain;
 using Pishkhan.Modules.Agent.Persistence;
+using Pishkhan.Modules.Agent.Replies;
 using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 
@@ -30,7 +31,7 @@ public sealed record EvalImportExpected(string? Intent, bool? Handoff, IReadOnly
 
 public sealed record EvalImportReport(int Imported, int Updated, IReadOnlyList<string> Errors);
 
-public sealed record EvalRunReport(Guid RunId, int Cases, int Errors, decimal? IntentAccuracy, string? Route);
+public sealed record EvalRunReport(Guid RunId, int Cases, int Errors, decimal? IntentAccuracy, string? Route, decimal? HandoffPrecision = null, decimal? HandoffRecall = null);
 
 public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptRegistry prompts, IClock clock, ILogger<EvalService> logger)
 {
@@ -152,11 +153,13 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
 
         var client = router.GetChatClient(AiTasks.Classify);
         var routes = new Dictionary<string, int>(StringComparer.Ordinal);
-        int scored = 0, correct = 0;
+        int scored = 0, correct = 0, predictedHandoffs = 0, expectedHandoffs = 0, truePositives = 0;
+        var rules = new HandoffRules();
         foreach (var c in cases)
         {
             var started = Stopwatch.GetTimestamp();
-            string? output = null, predicted = null, error = null, route = null;
+            string? output = null, predicted = null, error = null, route = null, handoffReason = null;
+            bool? handoff = null;
             try
             {
                 var response = await client.GetResponseAsync(
@@ -166,6 +169,9 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
                 output = response.Text;
                 route = response.AdditionalProperties?.TryGetValue("pishkhan.route", out var r) == true ? r?.ToString() : null;
                 predicted = ReadIntent(output);
+                var input = PersianNormalizer.Normalize(c.Input);
+                handoffReason = HandoffPolicy.Before(input, [], rules) ?? HandoffPolicy.After(Classification.Parse(output), rules);
+                handoff = handoffReason is not null;
                 run.InputTokens += response.Usage?.InputTokenCount ?? 0;
                 run.OutputTokens += response.Usage?.OutputTokenCount ?? 0;
             }
@@ -183,6 +189,14 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
                 correct += ok ? 1 : 0;
             }
 
+            bool? handoffCorrect = c.ExpectedHandoff is { } expected && handoff is { } got ? expected == got : null;
+            if (handoffCorrect is not null)
+            {
+                predictedHandoffs += handoff == true ? 1 : 0;
+                expectedHandoffs += c.ExpectedHandoff == true ? 1 : 0;
+                truePositives += handoff == true && c.ExpectedHandoff == true ? 1 : 0;
+            }
+
             if (route is not null)
             {
                 routes[route] = routes.GetValueOrDefault(route) + 1;
@@ -196,6 +210,9 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
                 Output = output is { Length: > 8000 } ? output[..8000] : output,
                 PredictedIntent = predicted,
                 IntentCorrect = isCorrect,
+                PredictedHandoff = handoff,
+                HandoffReason = handoffReason,
+                HandoffCorrect = handoffCorrect,
                 Route = route,
                 LatencyMs = (int)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                 Error = error is { Length: > 1000 } ? error[..1000] : error,
@@ -204,11 +221,13 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
 
         run.CaseCount = cases.Count;
         run.IntentAccuracy = scored == 0 ? null : decimal.Round((decimal)correct / scored, 4);
+        run.HandoffPrecision = predictedHandoffs == 0 ? null : decimal.Round((decimal)truePositives / predictedHandoffs, 4);
+        run.HandoffRecall = expectedHandoffs == 0 ? null : decimal.Round((decimal)truePositives / expectedHandoffs, 4);
         run.Route = routes.Count == 0 ? null : routes.MaxBy(kv => kv.Value).Key;
         run.Status = "completed";
         run.FinishedAt = clock.UtcNow;
         await db.SaveChangesAsync(ct);
-        return new EvalRunReport(run.Id, run.CaseCount, run.ErrorCount, run.IntentAccuracy, run.Route);
+        return new EvalRunReport(run.Id, run.CaseCount, run.ErrorCount, run.IntentAccuracy, run.Route, run.HandoffPrecision, run.HandoffRecall);
     }
 
     private static string? ReadIntent(string? output)

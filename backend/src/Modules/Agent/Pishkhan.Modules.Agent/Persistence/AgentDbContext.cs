@@ -69,6 +69,8 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             b.Property(x => x.Route).HasMaxLength(200);
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.IntentAccuracy).HasPrecision(5, 4);
+            b.Property(x => x.HandoffPrecision).HasPrecision(5, 4);
+            b.Property(x => x.HandoffRecall).HasPrecision(5, 4);
             b.HasIndex(x => new { x.SetId, x.StartedAt });
             b.HasOne<EvalSet>().WithMany().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -79,6 +81,7 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.Output).HasMaxLength(8000);
             b.Property(x => x.PredictedIntent).HasMaxLength(40);
+            b.Property(x => x.HandoffReason).HasMaxLength(40);
             b.Property(x => x.Route).HasMaxLength(200);
             b.Property(x => x.Error).HasMaxLength(1000);
             b.HasIndex(x => x.RunId);

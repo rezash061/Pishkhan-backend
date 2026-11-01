@@ -44,6 +44,7 @@ public static class AgentModule
     public static IEndpointRouteBuilder MapAgentEndpoints(this IEndpointRouteBuilder app)
     {
         AgentEndpoints.Map(app);
+        AgentSandbox.Map(app);
         return app;
     }
 

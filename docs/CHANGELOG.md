@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.4 part 3: test mode, unanswered questions and eval set v1, 2026-11-01)
+- Test mode: `POST /api/v1/workspaces/{workspaceId}/agent/sandbox` (`workspace.agent.write`).
+  - It takes `text`, optional `history` (up to 20 `{role: customer|agent, text}`), `tags` (to try the VIP rule) and `goal`.
+  - It runs the same reply pipeline in the Api and returns `outcome`, `messages` (what the customer would receive), `handoffReason`, `suggestedReply`, `unansweredQuestion` and the full `trace`.
+  - Nothing is sent, stored or metered. It is limited to 20 messages per minute per workspace (429 `agent.sandbox.rate_limited`).
+- Unanswered questions (`workspace.knowledge.write`):
+  - `GET /api/v1/workspaces/{workspaceId}/knowledge/unanswered?status=open|answered|dismissed&cursor=` lists them, most recently asked first, with `count`.
+  - `POST .../unanswered/{id}/answer` takes `answer` and an optional `question` wording. It creates a FAQ source that is indexed in the background and marks the question answered (201; 409 `knowledge.unanswered.already_answered`).
+  - `POST .../unanswered/{id}/dismiss` hides one. A question asked again opens again.
+- Eval set v1 (`tools/Pishkhan.EvalRunner/samples/v1.jsonl`): 100 synthetic Persian, Finglish and English DMs across clothing, cosmetics, home, food and digital accessories. Every intent and its expected handoff is labelled. It is a seed until consented launch-shop conversations replace it.
+- Classifier eval runs now also score the reply pipeline's handoff rules: `handoffPrecision` and `handoffRecall` per run, and `expectedHandoff`, `predictedHandoff` and `handoffReason` per result. They show in the admin API and the EvalRunner output. A migration adds the columns.
+
 ### Added (Phase 1, BE-1.4 part 2: the AI reply pipeline, 2026-11-01)
 - The Workers (ai group) now answer `conversations.reply-requested.v1` (AI on, no rule matched, or a flow handing over with a goal). One run answers the customer's whole turn (the messages since our last reply). It skips a request that is no longer current: a newer message, a reply already sent, the AI paused, the conversation handed off, or the window closed.
 - Pipeline:

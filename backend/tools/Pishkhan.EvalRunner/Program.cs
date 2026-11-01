@@ -42,5 +42,6 @@ if (args[0] == "import")
 }
 
 var run = await evals.RunClassifyAsync(args[1], args.Length > 2 ? args[2] : null, cts.Token);
-Console.WriteLine($"run {run.RunId}: {run.Cases} cases, {run.Errors} errors, intent accuracy {run.IntentAccuracy?.ToString("P1", System.Globalization.CultureInfo.InvariantCulture) ?? "n/a"}, route {run.Route}");
+var pct = (decimal? v) => v?.ToString("P1", System.Globalization.CultureInfo.InvariantCulture) ?? "n/a";
+Console.WriteLine($"run {run.RunId}: {run.Cases} cases, {run.Errors} errors, intent accuracy {pct(run.IntentAccuracy)}, handoff precision {pct(run.HandoffPrecision)}, recall {pct(run.HandoffRecall)}, route {run.Route}");
 return run.Errors == 0 ? 0 : 1;

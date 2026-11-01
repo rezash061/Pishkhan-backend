@@ -244,11 +244,11 @@ internal static class AgentEndpoints
     private static async Task<IResult> GetTraceAsync(Guid workspaceId, Guid traceId, AgentDbContext db, CancellationToken ct)
     {
         var t = await db.Traces.AsNoTracking().FirstOrDefaultAsync(x => x.Id == traceId, ct);
-        return t is null
-            ? Error.NotFound().ToProblem()
-            : Results.Ok(new TraceDetail(
-                t.Id, t.ConversationId, t.MessageId, t.FlowRunId, t.Goal, t.Input, t.Intent, t.Language, t.Sentiment, t.ClassifierConfidence, t.Facts, t.ToolCalls,
-                t.GuardIssues, t.Reply, t.SelfConfidence, t.Confidence, t.Threshold, t.Outcome, t.HandoffReason, t.Prompts, t.Models, t.InputTokens, t.OutputTokens,
-                t.CostIrr, t.LatencyMs, t.CreatedAt));
+        return t is null ? Error.NotFound().ToProblem() : Results.Ok(ToDetail(t));
     }
+
+    public static TraceDetail ToDetail(AiTrace t) => new(
+        t.Id, t.ConversationId, t.MessageId, t.FlowRunId, t.Goal, t.Input, t.Intent, t.Language, t.Sentiment, t.ClassifierConfidence, t.Facts, t.ToolCalls,
+        t.GuardIssues, t.Reply, t.SelfConfidence, t.Confidence, t.Threshold, t.Outcome, t.HandoffReason, t.Prompts, t.Models, t.InputTokens, t.OutputTokens,
+        t.CostIrr, t.LatencyMs, t.CreatedAt);
 }

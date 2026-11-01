@@ -34,6 +34,7 @@ public static class KnowledgeModule
     public static IEndpointRouteBuilder MapKnowledgeEndpoints(this IEndpointRouteBuilder app)
     {
         KnowledgeEndpoints.Map(app);
+        UnansweredEndpoints.Map(app);
         return app;
     }
 }

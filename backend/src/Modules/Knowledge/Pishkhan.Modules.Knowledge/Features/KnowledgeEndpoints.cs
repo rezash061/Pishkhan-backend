@@ -80,7 +80,7 @@ internal static class KnowledgeEndpoints
             .WithStandardProblems();
     }
 
-    private static SourceResponse ToResponse(KnowledgeSource s) => new(
+    internal static SourceResponse ToResponse(KnowledgeSource s) => new(
         s.Id, s.Kind, s.Title, s.Question, s.Body, s.ProductId, s.Enabled, s.Status, s.Revision, s.IndexedRevision, s.ChunkCount, s.Error, s.IndexedAt,
         s.CreatedAt, s.UpdatedAt);
 

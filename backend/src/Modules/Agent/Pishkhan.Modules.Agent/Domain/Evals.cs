@@ -65,6 +65,12 @@ public sealed class EvalRun
 
     public decimal? IntentAccuracy { get; set; }
 
+    /// <summary>Of the cases the pipeline would hand off (code rules plus the classified intent), the share that expected a handoff.</summary>
+    public decimal? HandoffPrecision { get; set; }
+
+    /// <summary>Of the cases that expected a handoff, the share the pipeline would hand off.</summary>
+    public decimal? HandoffRecall { get; set; }
+
     public long InputTokens { get; set; }
 
     public long OutputTokens { get; set; }
@@ -87,6 +93,13 @@ public sealed class EvalResult
     public string? PredictedIntent { get; init; }
 
     public bool? IntentCorrect { get; init; }
+
+    /// <summary>Whether the reply pipeline's handoff rules would hand this case off, and why (<c>human_request</c>, <c>complaint</c>, ...).</summary>
+    public bool? PredictedHandoff { get; init; }
+
+    public string? HandoffReason { get; init; }
+
+    public bool? HandoffCorrect { get; init; }
 
     public string? Route { get; init; }
 

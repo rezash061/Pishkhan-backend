@@ -601,6 +601,15 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("error");
 
+                    b.Property<bool?>("HandoffCorrect")
+                        .HasColumnType("boolean")
+                        .HasColumnName("handoff_correct");
+
+                    b.Property<string>("HandoffReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("handoff_reason");
+
                     b.Property<bool?>("IntentCorrect")
                         .HasColumnType("boolean")
                         .HasColumnName("intent_correct");
@@ -613,6 +622,10 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("character varying(8000)")
                         .HasColumnName("output");
+
+                    b.Property<bool?>("PredictedHandoff")
+                        .HasColumnType("boolean")
+                        .HasColumnName("predicted_handoff");
 
                     b.Property<string>("PredictedIntent")
                         .HasMaxLength(40)
@@ -657,6 +670,16 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
+
+                    b.Property<decimal?>("HandoffPrecision")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("handoff_precision");
+
+                    b.Property<decimal?>("HandoffRecall")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("handoff_recall");
 
                     b.Property<long>("InputTokens")
                         .HasColumnType("bigint")
