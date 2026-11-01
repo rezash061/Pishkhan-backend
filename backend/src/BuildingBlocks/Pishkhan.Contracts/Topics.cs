@@ -50,6 +50,7 @@ public static class Topics
     public const string NotificationRequested = "notifications.notification-requested.v1";
     public const string AuditEntryRecorded = "audit.entry-recorded.v1";
     public const string AnalyticsEventRecorded = "analytics.event-recorded.v1";
+    public const string SiteRevalidationRequested = "content.site-revalidation-requested.v1";
     public const string CacheInvalidated = "platform.cache-invalidated.v1";
     public const string TimerFired = "platform.timer-fired.v1";
 
@@ -96,6 +97,7 @@ public static class Topics
         new(NotificationRequested, 12, Week, "user id"),
         new(AuditEntryRecorded, 12, Week, "workspace id"),
         new(AnalyticsEventRecorded, 24, Week, "workspace id"),
+        new(SiteRevalidationRequested, 3, Week, "first tag or path"),
         new(CacheInvalidated, 6, TimeSpan.FromDays(1), "cache tag"),
         new(TimerFired, 12, Week, "timer kind"),
         .. ConsumerGroups.Select(g => new TopicDefinition(Dlq(g), 6, TwoWeeks, "original key")),

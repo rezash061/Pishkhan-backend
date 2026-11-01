@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -6,6 +7,7 @@ using MassTransit;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Pishkhan.Infrastructure.Caching;
+using Pishkhan.Modules.Content.Services;
 using Pishkhan.Web.Auth;
 
 namespace Pishkhan.IntegrationTests;
@@ -129,6 +131,7 @@ public sealed class PlansTests(InfraFixture infra, ChannelsHost workers) : IAsyn
         var published = await stepped.PostAsJsonAsync($"/admin/v1/plans/{v1Id}/publish", new { reason = "عرضه پلن رشد" }, Ct);
         published.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await Json(published)).GetProperty("status").GetString().ShouldBe("published");
+        var calledAfter = DateTimeOffset.UtcNow.AddSeconds(-5);
         var onSite = (await EventuallyPublic(code, p => p is not null, "the published plan on the price list"))!.Value;
         onSite.GetProperty("name").GetString().ShouldBe("رشد ویژه");
         onSite.GetProperty("monthly").GetProperty("amount").GetInt64().ShouldBe(12_900_000);
@@ -137,6 +140,19 @@ public sealed class PlansTests(InfraFixture infra, ChannelsHost workers) : IAsyn
         onSite.GetProperty("channelAccounts").GetInt32().ShouldBe(3);
         onSite.GetProperty("seats").GetInt32().ShouldBe(5);
         onSite.GetProperty("features")[0].GetProperty("limit").GetString().ShouldBe("۵۰۰ رسید");
+
+        // The website is told to refresh its pricing pages, signed with the shared secret.
+        var watch = Stopwatch.StartNew();
+        while (!FakeWebsite.Calls.Any(c => c.At >= calledAfter) && watch.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(100, Ct);
+        }
+
+        var call = FakeWebsite.Calls.Last(c => c.At >= calledAfter);
+        call.Body.ShouldBe("""{"tags":["plans"],"paths":[]}""");
+        long.Parse(call.Timestamp, CultureInfo.InvariantCulture).ShouldBeInRange(DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds(), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        call.Signature.ShouldBe(SiteSignature.Sign(FakeWebsite.Secret, long.Parse(call.Timestamp, CultureInfo.InvariantCulture), call.Body));
+        call.Signature.ShouldStartWith("sha256=");
 
         // A published version is fixed; a new version starts as a copy, one draft at a time.
         (await finance.PutAsJsonAsync($"/admin/v1/plans/{v1Id}", Plan("x", 1), Ct)).StatusCode.ShouldBe(HttpStatusCode.Conflict);

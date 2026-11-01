@@ -140,6 +140,67 @@
           }
         }
       }
+    },
+    "/api/v1/public/demo-chat": {
+      "post": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "The website's live demo: one visitor message to the demo shop's AI agent",
+        "description": "ALTCHA is needed on the first message of a session (400 `validation.altcha.invalid`). After `remaining` reaches 0 the answer is 429 `demo.limit`; too many messages from one IP or in a day is 429 `demo.rate_limited`; 404 `demo.unavailable` when no demo shop is configured.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoChatResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -195,6 +256,61 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "DemoChatRequest": {
+        "required": [
+          "sessionId",
+          "message",
+          "altcha"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": "string"
+          },
+          "altcha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DemoChatResponse": {
+        "required": [
+          "reply",
+          "confidence",
+          "sources",
+          "remaining",
+          "handedOff"
+        ],
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handedOff": {
+            "type": "boolean"
           }
         }
       },

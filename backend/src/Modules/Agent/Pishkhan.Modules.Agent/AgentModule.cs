@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pishkhan.AI;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
+using Pishkhan.Infrastructure.Security;
 using Pishkhan.Modules.Agent.Evals;
 using Pishkhan.Modules.Agent.Features;
 using Pishkhan.Modules.Agent.Persistence;
@@ -33,6 +35,13 @@ public static class AgentModule
         services.AddPishkhanAi(configuration);
         services.AddScoped<EvalService>();
         services.AddScoped<ReplyPipeline>();
+        services.AddOptions<DemoChatOptions>().Bind(configuration.GetSection(DemoChatOptions.Section));
+        if (!services.Any(d => d.ServiceType == typeof(AltchaVerifier)))
+        {
+            services.AddOptions<AltchaOptions>().Bind(configuration.GetSection(AltchaOptions.Section));
+            services.TryAddSingleton<AltchaVerifier>();
+        }
+
         return services;
     }
 
@@ -40,11 +49,12 @@ public static class AgentModule
     public static MessagingBuilder AddAgentConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<ReplyRequested, ReplyRequestedHandler>("ai");
 
-    /// <summary>Api: the agent's settings and traces under <c>/workspaces/{id}/agent</c>.</summary>
+    /// <summary>Api: the agent's settings, traces and test mode under <c>/workspaces/{id}/agent</c>, and the website's <c>/public/demo-chat</c>.</summary>
     public static IEndpointRouteBuilder MapAgentEndpoints(this IEndpointRouteBuilder app)
     {
         AgentEndpoints.Map(app);
         AgentSandbox.Map(app);
+        DemoChat.Map(app);
         return app;
     }
 

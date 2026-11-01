@@ -5,10 +5,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pishkhan.Infrastructure.Application;
+using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
+using Pishkhan.Modules.Content.Contracts;
 using Pishkhan.Modules.Content.Features;
 using Pishkhan.Modules.Content.Persistence;
+using Pishkhan.Modules.Content.Services;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Http;
@@ -16,7 +19,9 @@ using Pishkhan.Web.OpenApi;
 
 namespace Pishkhan.Modules.Content;
 
-/// <summary>Website content and public forms (backend plan 9.16). For now: leads (waitlist and contact form).</summary>
+/// <summary>
+/// Website content and public forms (backend plan 9.16): leads (waitlist and contact form) and the website's revalidation webhook.
+/// </summary>
 public static class ContentModule
 {
     public static IServiceCollection AddContentModule(this IServiceCollection services, IConfiguration configuration)
@@ -24,9 +29,15 @@ public static class ContentModule
         services.AddModuleDbContext<ContentDbContext>(ContentDbContext.SchemaName);
         services.AddOptions<AltchaOptions>().Bind(configuration.GetSection(AltchaOptions.Section));
         services.TryAddSingleton<AltchaVerifier>();
+        services.AddOptions<WebsiteOptions>().Bind(configuration.GetSection(WebsiteOptions.Section));
+        services.AddHttpClient(SiteRevalidationHandler.ClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddHandlersFrom(typeof(ContentModule).Assembly);
         return services;
     }
+
+    /// <summary>Workers (platform group): calls the website's signed revalidation webhook after a publish.</summary>
+    public static MessagingBuilder AddContentConsumers(this MessagingBuilder messaging) =>
+        messaging.AddConsumer<SiteRevalidationRequested, SiteRevalidationHandler>("platform");
 
     /// <summary>Api: <c>POST /api/v1/public/leads</c>.</summary>
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)

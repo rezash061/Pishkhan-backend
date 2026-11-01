@@ -9,6 +9,7 @@ using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Audit.Contracts;
 using Pishkhan.Modules.Backoffice.Contracts;
 using Pishkhan.Modules.Billing.Contracts;
+using Pishkhan.Modules.Content.Contracts;
 using Pishkhan.Modules.Billing.Domain;
 using Pishkhan.Modules.Billing.Persistence;
 using Pishkhan.SharedKernel;
@@ -269,6 +270,7 @@ internal static partial class PlanEndpoints
             plan.Publish(audit.StaffId, now);
             await audit.RecordAsync(db, plan, "plan.publish", request?.Reason, token, new { replacedVersion = previous?.VersionNumber });
             cache.Enqueue(db, CacheTags.Plans);
+            RefreshSite(db);
             await db.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
             return Results.Ok(ToResponse(plan));
@@ -294,11 +296,15 @@ internal static partial class PlanEndpoints
         if (wasPublished)
         {
             cache.Enqueue(db, CacheTags.Plans);
+            RefreshSite(db);
         }
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(ToResponse(plan));
     }
+
+    /// <summary>The website's pricing pages are cached too: ask the Content module to call its revalidation webhook.</summary>
+    private static void RefreshSite(BillingDbContext db) => db.Publish(new SiteRevalidationRequested([SiteTags.Plans], []), SiteTags.Plans);
 
     private static async Task<IResult> PublicListAsync(BillingDbContext db, HybridCache cache, CancellationToken ct) =>
         Results.Ok(await cache.GetOrCreateAsync(

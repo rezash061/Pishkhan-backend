@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\src\Modules\Analytics\Pishkhan.Modules.Analytics\Pishkhan.Modules.Analytics.csproj" />
     <ProjectReference Include="..\..\src\Modules\Knowledge\Pishkhan.Modules.Knowledge\Pishkhan.Modules.Knowledge.csproj" />
     <ProjectReference Include="..\..\src\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
