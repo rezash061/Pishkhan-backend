@@ -34,7 +34,6 @@ public static class AgentModule
         }
         services.AddPishkhanAi(configuration);
         services.AddScoped<EvalService>();
-        services.AddScoped<ReplyPipeline>();
         services.AddOptions<DemoChatOptions>().Bind(configuration.GetSection(DemoChatOptions.Section));
         if (!services.Any(d => d.ServiceType == typeof(AltchaVerifier)))
         {
@@ -42,6 +41,16 @@ public static class AgentModule
             services.TryAddSingleton<AltchaVerifier>();
         }
 
+        return services;
+    }
+
+    /// <summary>
+    /// Api and Workers: the reply pipeline (test mode, demo chat, AI replies). It reads the Knowledge and Catalog modules, so the host
+    /// must have them; the AdminApi does not.
+    /// </summary>
+    public static IServiceCollection AddAgentReplies(this IServiceCollection services)
+    {
+        services.AddScoped<ReplyPipeline>();
         return services;
     }
 

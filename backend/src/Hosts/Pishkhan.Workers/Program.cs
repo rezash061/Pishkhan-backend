@@ -36,7 +36,7 @@ services
     .AddConversationsModule(configuration)
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
-    .AddAgentModule(configuration)
+    .AddAgentModule(configuration).AddAgentReplies()
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)

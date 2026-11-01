@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed (2026-11-01)
+- AdminApi failed DI validation at startup in Development: `ReplyPipeline` (needs Knowledge and Catalog) was registered by `AddAgentModule`. It now comes from `AddAgentReplies()`, which only the Api and Workers hosts call. The admin integration host now validates on build, so this is caught by tests.
+
 ### Added (Phase 1, BE-1.13 part 2: website CMS, 2026-11-01)
 - CMS entries (Content module, new tables `content.entries`, `content.categories` and `content.redirects`). Kinds are `page`, `post`, `help`, `case_study`, `legal` and `faq`.
   - Each entry has a draft and a published copy. Editors save the draft, and the site keeps showing the published copy until the next publish.
