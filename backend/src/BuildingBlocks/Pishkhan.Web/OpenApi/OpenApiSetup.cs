@@ -192,9 +192,9 @@ public static class EndpointGroups
     public static RouteGroupBuilder MapPublicApi(this IEndpointRouteBuilder app) =>
         app.MapGroup("/api/v1/public").WithGroupName(ApiDocuments.Public).AllowAnonymous().RequireRateLimiting(Http.RateLimitPolicies.Public);
 
-    /// <summary>Back-office endpoints: <c>/admin/v1</c>, staff token.</summary>
+    /// <summary>Back-office endpoints: <c>/admin/v1</c>, staff token, per-staff rate limit.</summary>
     public static RouteGroupBuilder MapAdminApi(this IEndpointRouteBuilder app) =>
-        app.MapGroup("/admin/v1").WithGroupName(ApiDocuments.Admin).RequireAuthorization(Auth.AuthPolicies.Staff);
+        app.MapGroup("/admin/v1").WithGroupName(ApiDocuments.Admin).RequireAuthorization(Auth.AuthPolicies.Staff).RequireRateLimiting(Http.RateLimitPolicies.Staff);
 
     public static RouteGroupBuilder MapAdminAnonymousApi(this IEndpointRouteBuilder app) =>
         app.MapGroup("/admin/v1").WithGroupName(ApiDocuments.Admin).AllowAnonymous().RequireRateLimiting(Http.RateLimitPolicies.Auth);

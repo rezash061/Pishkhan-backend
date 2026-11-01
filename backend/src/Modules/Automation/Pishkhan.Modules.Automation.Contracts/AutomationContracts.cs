@@ -119,3 +119,10 @@ public sealed record CommentReplyRequested(Guid ChannelAccountId, string Comment
 /// <summary>Process one page of a post's existing comments for a backlog run, then ask for the next page.</summary>
 [IntegrationEvent(Topics.BacklogPageRequested)]
 public sealed record BacklogPageRequested(Guid BacklogRunId, string? After) : IIntegrationEvent;
+
+/// <summary>In-process API of the Automation module, scoped to the current workspace.</summary>
+public interface IFlowQueries
+{
+    /// <summary>Whether the flow exists in the current workspace (deleted flows do not).</summary>
+    Task<bool> FlowExistsAsync(Guid flowId, CancellationToken cancellationToken);
+}

@@ -79,14 +79,18 @@ public sealed class JwtKeyRing
         var path = Path.Combine(directory, $"jwt-{name}.pem");
         if (!File.Exists(path))
         {
+            // Written aside and moved into place, so a host starting at the same moment never reads a half-written file, and the
+            // first host to finish wins (no overwrite: every host must sign with the same key).
             using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            File.WriteAllText(temp, key.ExportPkcs8PrivateKeyPem());
             try
             {
-                File.WriteAllText(path, key.ExportPkcs8PrivateKeyPem());
+                File.Move(temp, path, overwrite: false);
             }
             catch (IOException) when (File.Exists(path))
             {
-                // created concurrently by another host
+                File.Delete(temp); // created concurrently by another host
             }
         }
 
