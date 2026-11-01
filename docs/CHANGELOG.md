@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.7 part 2: form submissions, consents and the contacts export, 2026-11-01)
+- Form submissions: a completed flow run that answered questions publishes `automation.form-submitted.v1` (`FormSubmitted`: flow, version, name, run, conversation, answers by question variable). The Workers store it per run on the conversation's contact (`form_submissions`).
+  - `GET /api/v1/workspaces/{workspaceId}/crm/forms` lists the flows that collected answers, with the latest name, the number of submissions, the last submission and the answer keys.
+  - `GET .../crm/forms/{flowId}/submissions?cursor=&limit=` lists a flow's submissions newest first, and `GET .../contacts/{contactId}/submissions` lists a contact's.
+- Consents (`contact_consents`, history only):
+  - `POST .../contacts/{contactId}/consents` (`workspace.crm.write`) takes `channel` (phone, sms or bale), `granted` and optional `evidence` (up to 500 characters). It records the decision with source `manual` and the member who recorded it.
+  - `GET .../contacts/{contactId}/consents` returns `current` (the latest decision per channel) and the history.
+  - The contact list takes `consent=sms|phone|bale` (latest decision is a grant), and segments take a `consent` condition (`granted`, `not_granted`).
+- Contacts export (`contact_exports`):
+  - `POST .../contacts/exports` takes the list's filters (`q`, `tag`, `segmentId`, `channelAccountId`, `hasPhone`, `consent`) and answers 202. It answers 409 `crm.export.too_many` when the caller already has 3 pending.
+  - The Workers (platform group, `conversations.contact-export-requested.v1`) write up to 200,000 contacts to an RTL Excel file in the `exports` bucket. Columns: id, name, username, phone, email, tags, Jalali created date, Jalali last message, and one column per custom field. Then they notify the member in-app (kind `crm_export`).
+  - `GET .../contacts/exports` and `GET .../contacts/exports/{exportId}` show the caller's own exports. Status is pending, ready, failed, downloaded or expired; a ready file expires after 24 hours.
+  - `POST .../contacts/exports/{exportId}/download` returns a 5-minute URL once. Otherwise it answers 409 `crm.export.not_ready` or `crm.export.gone`.
+- Meta data deletion also deletes the customer's form submissions, and the consents of a contact it deletes.
+- Migration `CrmFormsConsentsExports`.
+
+### Fixed
+- Ids created with an older clock (backfill, a test's fixed clock) could break the creation order of ids being made at the same time with the current clock: each such call restarted the sequence. Older timestamps now keep their own sequence per millisecond (the last 64), so each timeline stays in order.
+
 ### Added (Phase 1, BE-1.7 part 1: contacts, tags, custom fields and segments, 2026-11-01)
 - Contacts in the panel (Conversations module, `workspace.crm.read`; changes need `workspace.crm.write`):
   - `GET /api/v1/workspaces/{workspaceId}/contacts?q=&tag=&segmentId=&channelAccountId=&hasPhone=&cursor=&limit=` returns contacts newest first, paged by cursor. `q` matches name, username or email, or a phone in any spelling. Each contact carries tags, fields, the channel accounts they wrote to, and `lastSeenAt` (their last message).

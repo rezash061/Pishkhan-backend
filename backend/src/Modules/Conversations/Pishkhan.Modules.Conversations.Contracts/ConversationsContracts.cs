@@ -163,3 +163,7 @@ public interface IConversationQueries
 
     Task<ConversationSnapshot?> FindAsync(Guid channelAccountId, string externalUserId, CancellationToken cancellationToken);
 }
+
+/// <summary>Builds a contacts Excel export (platform group) and notifies the member who asked.</summary>
+[IntegrationEvent(Topics.ContactExportRequested)]
+public sealed record ContactExportRequested(Guid ExportId, Guid WorkspaceId) : IIntegrationEvent;

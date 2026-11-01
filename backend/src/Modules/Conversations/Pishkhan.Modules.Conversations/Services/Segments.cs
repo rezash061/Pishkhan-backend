@@ -18,6 +18,7 @@ namespace Pishkhan.Modules.Conversations.Services;
 /// <item><c>channel_account</c>: <c>eq</c>, <c>neq</c> (value: channel account id)</item>
 /// <item><c>last_seen</c>, <c>created</c>: <c>within_days</c>, <c>not_within_days</c> (value: 1 to 3650)</item>
 /// <item><c>has_phone</c>: <c>is</c> (value: true or false)</item>
+/// <item><c>consent</c>: <c>granted</c>, <c>not_granted</c> (value: phone, sms or bale; the latest decision for that channel counts)</item>
 /// </list>
 /// </summary>
 public sealed record SegmentRule(string Match, IReadOnlyList<SegmentCondition> Conditions);
@@ -100,7 +101,9 @@ public static partial class SegmentSql
                 return c.Value is { ValueKind: JsonValueKind.Number } d && d.TryGetInt32(out var days) && days is >= 1 and <= 3650 ? null : ("value", "validation.segment.value");
             case "has_phone" when c.Op == "is":
                 return c.Value is { ValueKind: JsonValueKind.True or JsonValueKind.False } ? null : ("value", "validation.segment.value");
-            case "tag" or "channel_account" or "last_seen" or "created" or "has_phone":
+            case "consent" when c.Op is "granted" or "not_granted":
+                return Text() is "phone" or "sms" or "bale" ? null : ("value", "validation.segment.value");
+            case "tag" or "channel_account" or "last_seen" or "created" or "has_phone" or "consent":
                 return ("op", "validation.segment.op");
             default:
                 return ("field", "validation.segment.field");
@@ -144,6 +147,8 @@ public static partial class SegmentSql
                 ("created", "within_days") => $"c.created_at >= {P(Since(now, text))}",
                 ("created", "not_within_days") => $"c.created_at < {P(Since(now, text))}",
                 ("has_phone", "is") => c.Value!.Value.GetBoolean() ? "(c.fields ? 'phone')" : "NOT (c.fields ? 'phone')",
+                ("consent", "granted") => $"{Consent(P(text))} IS TRUE",
+                ("consent", "not_granted") => $"{Consent(P(text))} IS NOT TRUE",
                 _ => throw new InvalidOperationException($"Unvalidated segment condition {c.Field} {c.Op}"),
             });
         }
@@ -164,6 +169,9 @@ public static partial class SegmentSql
 
         return $"(CASE WHEN (c.fields->>{key}) ~ '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$' THEN (c.fields->>{key}) END) {op} {p(text, null)}";
     }
+
+    private static string Consent(string channel) =>
+        $"(SELECT k.granted FROM conversations.contact_consents k WHERE k.contact_id = c.id AND k.channel = {channel} ORDER BY k.created_at DESC, k.id DESC LIMIT 1)";
 
     private static DateTimeOffset Since(DateTimeOffset now, string days) => now.AddDays(-int.Parse(days, CultureInfo.InvariantCulture));
 

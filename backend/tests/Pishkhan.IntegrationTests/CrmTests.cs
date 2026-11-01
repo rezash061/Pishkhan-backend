@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ClosedXML.Excel;
 using Microsoft.Extensions.DependencyInjection;
+using Pishkhan.Infrastructure.Storage;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
@@ -9,9 +12,9 @@ using Pishkhan.Modules.Conversations.Persistence;
 
 namespace Pishkhan.IntegrationTests;
 
-/// <summary>BE-1.7 part 1: contacts with search and filters, custom fields, tags and segments.</summary>
+/// <summary>BE-1.7: contacts with search and filters, custom fields, tags, segments, consents and the Excel export.</summary>
 [Collection(WorkersCollection.Name)]
-public sealed class CrmTests(InfraFixture infra) : IAsyncLifetime
+public sealed class CrmTests(InfraFixture infra, ChannelsHost workers) : IAsyncLifetime
 {
     private ApiFactory _api = null!;
 
@@ -181,5 +184,79 @@ public sealed class CrmTests(InfraFixture infra) : IAsyncLifetime
         var other = await ApiFactory.CreateWorkspaceAsync(client, Ct);
         (await client.GetAsync($"/api/v1/workspaces/{other}/contacts/{sara}", Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{other}/crm/tags", Ct)).GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Consents_are_recorded_as_history_and_contacts_export_to_excel_once()
+    {
+        var client = await _api.SignInAsync(Ct);
+        var ws = await ApiFactory.CreateWorkspaceAsync(client, Ct);
+        var account = Guid.NewGuid();
+        var sara = await SeedAsync(ws, "سارا", "sara", "09121112233", ["vip"], account, TimeSpan.FromHours(2));
+        var ali = await SeedAsync(ws, "علی", "ali", "09351234567", ["vip"], account, null);
+        await SeedAsync(ws, "مینا", null, null, [], null, null);
+        var contacts = $"/api/v1/workspaces/{ws}/contacts";
+        await Json(await client.PostAsJsonAsync($"/api/v1/workspaces/{ws}/crm/fields", new { key = "city", label = "شهر", type = "text", sortOrder = 0 }, Ct), HttpStatusCode.Created);
+        await Json(await client.PatchAsJsonAsync($"{contacts}/{sara}", new { fields = new Dictionary<string, string?> { ["city"] = "شیراز" } }, Ct), HttpStatusCode.OK);
+
+        // Consents: the latest decision per channel counts; the history stays.
+        (await client.PostAsJsonAsync($"{contacts}/{sara}/consents", new { channel = "fax", granted = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await client.PostAsJsonAsync($"{contacts}/{Guid.NewGuid()}/consents", new { channel = "sms", granted = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        await Json(await client.PostAsJsonAsync($"{contacts}/{sara}/consents", new { channel = "sms", granted = true, evidence = "در دایرکت گفت پیامک بفرستید" }, Ct), HttpStatusCode.Created);
+        await Json(await client.PostAsJsonAsync($"{contacts}/{ali}/consents", new { channel = "sms", granted = true }, Ct), HttpStatusCode.Created);
+        var withdrawn = await Json(await client.PostAsJsonAsync($"{contacts}/{ali}/consents", new { channel = "sms", granted = false, evidence = "لغو ۱۱" }, Ct), HttpStatusCode.Created);
+        withdrawn.GetProperty("current").GetProperty("sms").GetBoolean().ShouldBeFalse();
+        withdrawn.GetProperty("history").GetArrayLength().ShouldBe(2);
+        withdrawn.GetProperty("history")[0].GetProperty("source").GetString().ShouldBe("manual");
+        var consented = (await client.GetFromJsonAsync<JsonElement>($"{contacts}?consent=sms", Ct)).GetProperty("items").EnumerateArray().Select(c => c.GetProperty("id").GetGuid()).ToList();
+        consented.ShouldBe([sara]);
+        (await client.GetAsync($"{contacts}?consent=fax", Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var notGranted = await Json(await client.PostAsJsonAsync($"/api/v1/workspaces/{ws}/crm/segments/preview",
+            new { match = "all", conditions = new[] { Cond("tag", "has", "vip"), Cond("consent", "not_granted", "sms") } }, Ct), HttpStatusCode.OK);
+        notGranted.GetProperty("contactCount").GetInt32().ShouldBe(1);
+
+        // Export: built in the background, downloadable once, by the member who asked.
+        (await client.PostAsJsonAsync($"{contacts}/exports", new { segmentId = Guid.NewGuid() }, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        var started = await Json(await client.PostAsJsonAsync($"{contacts}/exports", new { tag = "vip" }, Ct), HttpStatusCode.Accepted);
+        started.GetProperty("status").GetString().ShouldBe("pending");
+        var exportId = started.GetProperty("id").GetGuid();
+        var watch = Stopwatch.StartNew();
+        JsonElement export;
+        while ((export = await client.GetFromJsonAsync<JsonElement>($"{contacts}/exports/{exportId}", Ct)).GetProperty("status").GetString() == "pending")
+        {
+            watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(45), "the export is built");
+            await Task.Delay(300, Ct);
+        }
+
+        export.GetProperty("status").GetString().ShouldBe("ready");
+        export.GetProperty("rowCount").GetInt32().ShouldBe(2);
+        (await client.GetFromJsonAsync<JsonElement>($"{contacts}/exports", Ct))[0].GetProperty("id").GetGuid().ShouldBe(exportId);
+
+        var teammate = await _api.SignInAsync(Ct);
+        (await teammate.PostAsync($"{contacts}/exports/{exportId}/download", null, Ct)).StatusCode.ShouldBeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.NotFound);
+        var download = await Json(await client.PostAsync($"{contacts}/exports/{exportId}/download", null, Ct), HttpStatusCode.OK);
+        download.GetProperty("url").GetString().ShouldNotBeNullOrEmpty();
+        var again = await client.PostAsync($"{contacts}/exports/{exportId}/download", null, Ct);
+        again.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await again.Content.ReadAsStringAsync(Ct)).ShouldContain("crm.export.gone");
+
+        // The file: one row per contact, phones as text, the custom field as a column.
+        await using var scope = workers.Host.Services.CreateAsyncScope();
+        var storage = scope.ServiceProvider.GetRequiredService<IObjectStorage>();
+        await using var stream = await storage.OpenReadAsync(Buckets.Exports, $"{ws:N}/contacts/{exportId:N}.xlsx", Ct);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, Ct);
+        buffer.Position = 0;
+        using var workbook = new XLWorkbook(buffer);
+        var sheet = workbook.Worksheet(1);
+        sheet.Cell(1, 2).GetString().ShouldBe("نام");
+        sheet.Cell(1, 9).GetString().ShouldBe("شهر");
+        sheet.LastRowUsed()!.RowNumber().ShouldBe(3);
+        sheet.Cell(2, 2).GetString().ShouldBe("سارا");
+        sheet.Cell(2, 4).GetString().ShouldBe("09121112233");
+        sheet.Cell(2, 6).GetString().ShouldBe("vip");
+        sheet.Cell(2, 9).GetString().ShouldBe("شیراز");
+        sheet.Cell(3, 2).GetString().ShouldBe("علی");
+        sheet.Cell(3, 8).GetString().ShouldNotBeEmpty();
     }
 }

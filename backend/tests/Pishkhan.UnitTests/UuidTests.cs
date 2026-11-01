@@ -18,6 +18,24 @@ public sealed class UuidTests
     }
 
     [Fact]
+    public void Interleaved_clocks_each_keep_their_order()
+    {
+        var at = DateTimeOffset.UtcNow.AddSeconds(20);
+        var current = new List<Guid>();
+        var older = new List<Guid>();
+        for (var i = 0; i < 1_000; i++)
+        {
+            current.Add(Uuid.NewV7(at));
+            older.Add(Uuid.NewV7(at.AddMinutes(-10))); // another caller with an older clock
+            Uuid.NewV7(at.AddMinutes(-20));
+        }
+
+        current.Select(g => g.ToString()).ShouldBe(current.Select(g => g.ToString()).Order(StringComparer.Ordinal));
+        older.Select(g => g.ToString()).ShouldBe(older.Select(g => g.ToString()).Order(StringComparer.Ordinal));
+        current.Concat(older).Distinct().Count().ShouldBe(2_000);
+    }
+
+    [Fact]
     public void The_timestamp_prefix_is_the_creation_time()
     {
         var at = DateTimeOffset.UtcNow.AddSeconds(10);
