@@ -287,6 +287,7 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
         ids["exportId"] = await Created("/contacts/exports", new { }, HttpStatusCode.Accepted);
         ids["sourceId"] = await Created("/knowledge/sources", new { kind = "faq", question = "ارسال چند روز است؟", answer = "دو تا چهار روز کاری." });
         ids["id"] = await Created("/quick-replies", new { shortcut = "salam", text = "سلام، خوش آمدید" });
+        ids["orderId"] = await Created("/orders", new { conversationId = Guid.Parse(ids["conversationId"]), items = new[] { new { productId = Guid.Parse(ids["productId"]), quantity = 1 } } });
         ids["invitationId"] = await Created("/invitations", new { phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999), role = "agent" });
         return ids;
     }

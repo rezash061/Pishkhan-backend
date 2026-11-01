@@ -270,7 +270,7 @@ public sealed class AgentRepliesTests(InfraFixture infra, ChannelsHost workers) 
         trace.GetProperty("intent").GetString().ShouldBe("shipping");
         trace.GetProperty("facts").EnumerateArray().ShouldContain(f => f.GetProperty("sourceKind").GetString() == "faq");
         trace.GetProperty("confidence").GetDouble().ShouldBeGreaterThanOrEqualTo(0.6);
-        trace.GetProperty("prompts").GetString()!.ShouldContain("agent.reply@1");
+        trace.GetProperty("prompts").GetString()!.ShouldContain("agent.reply@2");
         trace.GetProperty("models").GetString()!.ShouldContain("fake/fake-writer");
         trace.GetProperty("inputTokens").GetInt64().ShouldBeGreaterThan(0);
 

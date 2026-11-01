@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\Modules\Conversations\Pishkhan.Modules.Conversations\Pishkhan.Modules.Conversations.csproj" />
     <ProjectReference Include="..\..\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\Pishkhan.Modules.Catalog\Pishkhan.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\Modules\Orders\Pishkhan.Modules.Orders\Pishkhan.Modules.Orders.csproj" />
     <ProjectReference Include="..\..\Modules\Tenancy\Pishkhan.Modules.Tenancy\Pishkhan.Modules.Tenancy.csproj" />
     <ProjectReference Include="..\..\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />
     <ProjectReference Include="..\..\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />

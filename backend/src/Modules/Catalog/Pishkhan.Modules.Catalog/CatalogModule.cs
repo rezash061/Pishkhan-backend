@@ -7,6 +7,7 @@ using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Catalog.Features;
 using Pishkhan.Modules.Catalog.Persistence;
 using Pishkhan.Modules.Catalog.Services;
+using Pishkhan.Modules.Orders.Contracts;
 
 namespace Pishkhan.Modules.Catalog;
 
@@ -19,9 +20,10 @@ public static class CatalogModule
         return services;
     }
 
-    /// <summary>Commerce group: Excel imports.</summary>
+    /// <summary>Commerce group: Excel imports, and stock taken and returned by orders.</summary>
     public static MessagingBuilder AddCatalogConsumers(this MessagingBuilder messaging) =>
-        messaging.AddConsumer<CatalogImportRequested, CatalogImportHandler>("commerce");
+        messaging.AddConsumer<CatalogImportRequested, CatalogImportHandler>("commerce")
+            .AddConsumer<OrderStatusChanged, OrderStockHandler>("commerce");
 
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder app)
     {

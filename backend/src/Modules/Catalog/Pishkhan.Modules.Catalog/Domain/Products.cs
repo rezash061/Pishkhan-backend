@@ -169,6 +169,23 @@ public sealed class Product : AggregateRoot<Guid>, ITenantOwned, ISoftDeletable
     /// <summary>A product without variants is in stock; with variants, when any variant is.</summary>
     public bool InStock => Variants.Where(v => v.DeletedAt is null).ToList() is not { Count: > 0 } live || live.Any(v => v.InStock);
 
+    /// <summary>Applies stock changes by variant id; true when any counted stock changed.</summary>
+    internal bool AdjustStock(IReadOnlyDictionary<Guid, int> deltas, DateTimeOffset now)
+    {
+        var changed = false;
+        foreach (var variant in Variants.Where(v => v.DeletedAt is null && deltas.ContainsKey(v.Id)))
+        {
+            changed |= variant.AdjustStock(deltas[variant.Id], now);
+        }
+
+        if (changed)
+        {
+            Touch(now);
+        }
+
+        return changed;
+    }
+
     private void Touch(DateTimeOffset now)
     {
         UpdatedAt = now;
@@ -262,6 +279,22 @@ public sealed class ProductVariant : Entity<Guid>, ITenantOwned, ISoftDeletable
 
     internal static bool SameAttributes(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b) =>
         a.Count == b.Count && a.All(x => b.Any(y => y.Key.Trim() == x.Key && y.Value.Trim() == x.Value));
+
+    /// <summary>
+    /// Takes (negative) or returns (positive) counted stock; a variant with unlimited stock does not change. Stock never goes below zero:
+    /// an order paid for the last units after someone else took them is the seller's to resolve, not a negative count.
+    /// </summary>
+    internal bool AdjustStock(int delta, DateTimeOffset now)
+    {
+        if (StockPolicy == StockPolicies.Unlimited || delta == 0)
+        {
+            return false;
+        }
+
+        Stock = Math.Max(0, (Stock ?? 0) + delta);
+        UpdatedAt = now;
+        return true;
+    }
 
     /// <summary>"رنگ: قرمز، سایز: L".</summary>
     public string Label => string.Join("، ", Attributes.Select(a => $"{a.Key}: {a.Value}"));

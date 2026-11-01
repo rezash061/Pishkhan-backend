@@ -4,6 +4,8 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Pishkhan.Modules.Agent.Domain;
 using Pishkhan.Modules.Catalog.Contracts;
+using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Modules.Orders.Contracts;
 using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 
@@ -11,8 +13,8 @@ namespace Pishkhan.Modules.Agent.Replies;
 
 /// <summary>
 /// The tools the reply model may call (backend plan 10.2 step 6), scoped to the current workspace through the catalog's queries. Tool
-/// results are the only source of prices and stock: every result is added to the guard's allowed facts. Orders and payment links come
-/// with the Orders module (Phase 2).
+/// results are the only source of prices and stock: every result is added to the guard's allowed facts. <c>create_order</c> saves the
+/// conversation's draft order (catalog prices only) in a live conversation; in the test chat and the demo it only prices the lines.
 /// </summary>
 internal sealed class AgentTools
 {
@@ -22,16 +24,26 @@ internal sealed class AgentTools
     // Persian stays readable for the model and in traces (fewer tokens than \u escapes); the results are never embedded in HTML.
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    private readonly ICatalogQueries _catalog;
+    private const int MaxOrderLines = 10;
 
-    public AgentTools(ICatalogQueries catalog)
+    private readonly ICatalogQueries _catalog;
+    private readonly IOrderCommands _orders;
+    private readonly ConversationSnapshot _conversation;
+    private readonly bool _live;
+
+    /// <param name="live">False in the test chat and the demo: <c>create_order</c> prices the lines and saves nothing.</param>
+    public AgentTools(ICatalogQueries catalog, IOrderCommands orders, ConversationSnapshot conversation, bool live)
     {
         _catalog = catalog;
+        _orders = orders;
+        _conversation = conversation;
+        _live = live;
         Functions =
         [
             AIFunctionFactory.Create(SearchProductsAsync, "search_products", "Search the shop's active products by words from the customer's message. Returns prices in Toman and stock."),
             AIFunctionFactory.Create(GetProductAsync, "get_product", "Get one product with all its variants, prices in Toman and stock."),
             AIFunctionFactory.Create(CheckStockAsync, "check_stock", "Check whether a variant of a product is in stock."),
+            AIFunctionFactory.Create(CreateOrderAsync, "create_order", "Save the customer's order as a draft for the shop to confirm, once they chose products, variants and quantities. Prices come from the catalog. Returns the order number, lines, total in Toman and what is still missing."),
             AIFunctionFactory.Create(RequestHandoff, "request_handoff", "Hand the conversation to a person when the customer needs something you cannot do."),
             AIFunctionFactory.Create(AddUnansweredQuestion, "add_unanswered_question", "Record a customer question the facts do not answer, so the owner can add the answer."),
         ];
@@ -48,6 +60,9 @@ internal sealed class AgentTools
 
     /// <summary>True when a catalog tool returned at least one product.</summary>
     public bool FoundData { get; private set; }
+
+    /// <summary>The draft order saved by <c>create_order</c> in this run, if any.</summary>
+    public Guid? OrderId { get; private set; }
 
     public async Task<string> InvokeAsync(FunctionCallContent call, CancellationToken ct)
     {
@@ -116,6 +131,61 @@ internal sealed class AgentTools
             : JsonSerializer.Serialize(new { productId = product.Id, variantId = variant.Id, product.Title, variant.Attributes, variant.InStock, variant.Stock }, Json);
     }
 
+    private async Task<string> CreateOrderAsync(
+        [Description("The products to order: productId from search_products, variantId (empty when the product has no variants) and quantity")] OrderToolItem[] items,
+        [Description("The customer's name, if they gave it")] string? customerName,
+        [Description("The customer's mobile number, if they gave it")] string? phone,
+        [Description("The delivery address as the customer wrote it, with city and postal code if given")] string? address,
+        [Description("Anything else the customer asked for, such as gift wrapping")] string? note,
+        CancellationToken ct)
+    {
+        var lines = new List<DraftOrderItem>();
+        foreach (var item in (items ?? []).Take(MaxOrderLines))
+        {
+            if (!Guid.TryParse(item.ProductId, out var productId))
+            {
+                return JsonSerializer.Serialize(new { error = "product_not_found", productId = item.ProductId }, Json);
+            }
+
+            Guid? variantId = Guid.TryParse(item.VariantId, out var v) ? v : null;
+            lines.Add(new DraftOrderItem(productId, variantId, item.Quantity));
+        }
+
+        if (lines.Count == 0)
+        {
+            return JsonSerializer.Serialize(new { error = "items_required" }, Json);
+        }
+
+        var result = _live
+            ? await _orders.SaveDraftAsync(new DraftOrderRequest(_conversation.Id, _conversation.ContactId, lines, customerName, phone, address, note), ct)
+            : await _orders.QuoteAsync(lines, ct);
+        if (!result.Ok)
+        {
+            return JsonSerializer.Serialize(new { error = result.Error!.Replace("orders.", string.Empty, StringComparison.Ordinal), productId = result.ErrorDetail }, Json);
+        }
+
+        FoundData = true;
+        OrderId = result.OrderId;
+        return JsonSerializer.Serialize(new
+        {
+            ok = true,
+            saved = _live,
+            orderNumber = result.Number is { } n ? PersianDigits.ToPersian(n.ToString(System.Globalization.CultureInfo.InvariantCulture)) : null,
+            status = "draft, the shop will confirm it and send payment details",
+            lines = result.Lines.Select(l => new
+            {
+                title = l.Title,
+                variant = l.VariantLabel,
+                quantity = l.Quantity,
+                unitPrice = PersianMoney.FormatToman(l.UnitPrice),
+                lineTotal = PersianMoney.FormatToman(l.LineTotal),
+            }),
+            total = PersianMoney.FormatToman(result.Total),
+            totalToman = result.Total.ToToman(),
+            missing = result.Missing,
+        }, Json);
+    }
+
     private string RequestHandoff([Description("Why a person is needed, in a few words")] string reason)
     {
         HandoffReason = string.IsNullOrWhiteSpace(reason) ? "ai_request" : reason.Trim();
@@ -127,6 +197,12 @@ internal sealed class AgentTools
         UnansweredQuestion = string.IsNullOrWhiteSpace(question) ? null : question.Trim();
         return """{"ok":true}""";
     }
+
+    /// <summary>One line of <c>create_order</c>.</summary>
+    internal sealed record OrderToolItem(
+        [property: Description("The product id")] string ProductId,
+        [property: Description("The variant id, or empty")] string? VariantId,
+        [property: Description("How many, at least 1")] int Quantity);
 
     private static object View(ProductSummary p) => new
     {
