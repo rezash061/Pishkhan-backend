@@ -16,6 +16,8 @@
 - Live in-app notifications:
   - Each stored notification publishes `notifications.notification-created.v1`.
   - The Api hosts push it on the inbox hub as `notification.created` to the user's own connections. The payload is `{workspaceId, id, kind, title, body, link, createdAt}`, and no join is needed.
+### Fixed (2026-11-01)
+- AdminApi failed DI validation at startup in Development: `ReplyPipeline` (needs Knowledge and Catalog) was registered by `AddAgentModule`. It now comes from `AddAgentReplies()`, which only the Api and Workers hosts call. The admin integration host now validates on build, so this is caught by tests.
 
 ### Added (Phase 1, BE-1.13 part 2: website CMS, 2026-11-01)
 - CMS entries (Content module, new tables `content.entries`, `content.categories` and `content.redirects`). Kinds are `page`, `post`, `help`, `case_study`, `legal` and `faq`.

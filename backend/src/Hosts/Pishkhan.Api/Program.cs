@@ -44,7 +44,7 @@ services
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
     .AddBillingModule(configuration)
-    .AddAgentModule(configuration)
+    .AddAgentModule(configuration).AddAgentReplies()
     .AddKnowledgeModule(configuration)
     .DecorateHandlers();
 services.AddPishkhanRealtime();
