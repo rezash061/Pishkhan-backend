@@ -49,7 +49,8 @@ internal sealed class SiteRevalidationHandler(
 {
     public const string ClientName = "website";
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    // Persian paths stay readable in the body (the site parses it as JSON either way).
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public async Task HandleAsync(SiteRevalidationRequested message, EventEnvelope envelope, CancellationToken cancellationToken)
     {

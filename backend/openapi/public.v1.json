@@ -66,6 +66,466 @@
         }
       }
     },
+    "/api/v1/public/pages/{slug}": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "A published page (home, about, ...)",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/legal/{slug}": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "A published legal page (terms, privacy, ...); `data.version` is its version",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/posts": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Published blog posts, newest first, without bodies",
+        "description": "Filter by `category`. Paged with `cursor` (from `next`), `limit` up to 50.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfPublicEntrySummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/posts/{slug}": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "A published blog post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/help": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Published help articles, without bodies; filter by `category`",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicEntrySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/help/search": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Search published help articles (title, description, body and `data.keywords`)",
+        "description": "Every word of `q` must match; Persian is normalised (Arabic ي/ك, digits, ZWNJ). Title matches first, at most 20.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicEntrySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/help/{slug}": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "A published help article",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/case-studies": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Published case studies, newest first, without bodies",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicEntrySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/case-studies/{slug}": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "A published case study",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/faqs": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Published FAQs (title is the question, description the answer); filter by `tag` in `data.tags`",
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicEntrySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/categories": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Blog or help categories (`kind`: blog, help), in display order",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicCategory"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/redirects": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "Website redirects, for the site's redirects() at build and its fallback",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicRedirect"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/preview": {
+      "get": {
+        "tags": [
+          "Website"
+        ],
+        "summary": "An entry's current draft, for the site's preview mode (token from the back office)",
+        "description": "Not cached. 404 when the token is invalid or expired (tokens last one hour).",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/leads": {
       "post": {
         "tags": [
@@ -314,6 +774,7 @@
           }
         }
       },
+      "JsonElement": { },
       "LeadAccepted": {
         "required": [
           "status"
@@ -404,6 +865,27 @@
           }
         }
       },
+      "PageOfPublicEntrySummary": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicEntrySummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "PlanFeature": {
         "required": [
           "key",
@@ -463,6 +945,144 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PublicCategory": {
+        "required": [
+          "kind",
+          "slug",
+          "title",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PublicEntry": {
+        "required": [
+          "kind",
+          "slug",
+          "title",
+          "description",
+          "category",
+          "author",
+          "body",
+          "data",
+          "publishedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PublicEntrySummary": {
+        "required": [
+          "kind",
+          "slug",
+          "title",
+          "description",
+          "category",
+          "author",
+          "data",
+          "publishedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -568,6 +1188,25 @@
             "items": {
               "$ref": "#/components/schemas/PlanFeature"
             }
+          }
+        }
+      },
+      "PublicRedirect": {
+        "required": [
+          "from",
+          "to",
+          "permanent"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "permanent": {
+            "type": "boolean"
           }
         }
       }

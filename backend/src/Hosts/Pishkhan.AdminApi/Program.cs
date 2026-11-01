@@ -26,7 +26,7 @@ services.AddPishkhanOpenApi(ApiDocuments.Admin);
 services
     .AddBackofficeModule(configuration)
     .AddAuditModule(configuration)
-    .AddContentModule(configuration)
+    .AddContentModule(configuration).AddContentBackoffice()
     .AddTenancyModule(configuration)
     .AddIdentityDirectory()
     .AddChannelsDirectory()
