@@ -48,6 +48,7 @@ public static class Topics
     public const string MembershipChanged = "tenancy.membership-changed.v1";
     public const string WorkspaceDeleted = "tenancy.workspace-deleted.v1";
     public const string NotificationRequested = "notifications.notification-requested.v1";
+    public const string NotificationCreated = "notifications.notification-created.v1";
     public const string AuditEntryRecorded = "audit.entry-recorded.v1";
     public const string AnalyticsEventRecorded = "analytics.event-recorded.v1";
     public const string SiteRevalidationRequested = "content.site-revalidation-requested.v1";
@@ -95,6 +96,7 @@ public static class Topics
         new(MembershipChanged, 6, Week, "workspace id"),
         new(WorkspaceDeleted, 6, TwoWeeks, "workspace id"),
         new(NotificationRequested, 12, Week, "user id"),
+        new(NotificationCreated, 12, TimeSpan.FromDays(1), "user id"),
         new(AuditEntryRecorded, 12, Week, "workspace id"),
         new(AnalyticsEventRecorded, 24, Week, "workspace id"),
         new(SiteRevalidationRequested, 3, Week, "first tag or path"),

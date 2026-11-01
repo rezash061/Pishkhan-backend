@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.14: notifications v1 completed, 2026-11-01)
+- Web push (VAPID, RFC 8292; payloads encrypted with `aes128gcm`, RFC 8291, checked against the RFC's test vector):
+  - `GET /api/v1/me/push/key` returns the VAPID public key. It is 404 `push.unavailable` when `WebPush:PublicKey`/`PrivateKey` are not set.
+  - `PUT /api/v1/me/push-subscriptions` stores the browser's `PushSubscription.toJSON()` (`endpoint`, `keys.p256dh`, `keys.auth`). Sending the same endpoint again updates it. A user can have up to 10 browsers.
+  - The endpoint must be https on a known push service (`WebPush:AllowedHosts`: FCM, Mozilla, Windows, Apple), so the server never posts anywhere else.
+  - `GET /api/v1/me/push-subscriptions` lists the caller's browsers. `DELETE /api/v1/me/push-subscriptions?endpoint=` removes one.
+  - Notifications whose `push` preference is on are sent to every subscribed browser after the commit, as JSON `{kind, title, body, link, workspaceId}`.
+  - A subscription the push service reports gone (404/410) is deleted. One that fails 5 times in a row is dropped.
+- Handoff SMS now follows the plan ("handoff waiting > N minutes"). In-app and push go out at once, and a timer checks after `Notifications:HandoffSmsAfter` (10 minutes).
+  - The SMS is sent only if the conversation is still handed off and the customer spoke last.
+  - The 30-minute cooldown per kind still applies.
+- Live in-app notifications:
+  - Each stored notification publishes `notifications.notification-created.v1`.
+  - The Api hosts push it on the inbox hub as `notification.created` to the user's own connections. The payload is `{workspaceId, id, kind, title, body, link, createdAt}`, and no join is needed.
+
 ### Added (Phase 1, BE-1.13 part 2: website CMS, 2026-11-01)
 - CMS entries (Content module, new tables `content.entries`, `content.categories` and `content.redirects`). Kinds are `page`, `post`, `help`, `case_study`, `legal` and `faq`.
   - Each entry has a draft and a published copy. Editors save the draft, and the site keeps showing the published copy until the next publish.

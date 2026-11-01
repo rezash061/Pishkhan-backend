@@ -161,4 +161,69 @@ public sealed class NotificationsTests(InfraFixture infra, ChannelsHost workers)
         var stranger = await _api.SignInAsync(Ct);
         (await stranger.GetAsync(list, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Web_push_reaches_subscribed_browsers_and_a_waiting_handoff_texts_after_the_delay()
+    {
+        var phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999);
+        var owner = await _api.SignInAsync(phone, Ct);
+        var ws = await ApiFactory.CreateWorkspaceAsync(owner, Ct);
+        var account = await SeedAccountAsync(ws);
+
+        // Subscribe a browser; endpoints outside the push services and malformed keys are refused.
+        (await owner.GetFromJsonAsync<JsonElement>("/api/v1/me/push/key", Ct)).GetProperty("publicKey").GetString().ShouldBe(FakePushService.VapidPublicKey);
+        using var browser = new FakePushService.Browser();
+        var keys = new { p256dh = Pishkhan.Modules.Notifications.Services.Base64Url.Encode(browser.PublicKey), auth = Pishkhan.Modules.Notifications.Services.Base64Url.Encode(browser.AuthSecret) };
+        var endpoint = $"https://fcm.googleapis.com/fcm/send/{Guid.NewGuid():N}";
+        (await owner.PutAsJsonAsync("/api/v1/me/push-subscriptions", new { endpoint = "https://10.0.0.1/x", keys }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await owner.PutAsJsonAsync("/api/v1/me/push-subscriptions", new { endpoint, keys = new { p256dh = "AAAA", auth = keys.auth } }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await owner.PutAsJsonAsync("/api/v1/me/push-subscriptions", new { endpoint, keys }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await owner.PutAsJsonAsync("/api/v1/me/push-subscriptions", new { endpoint, keys }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK); // renewing is idempotent
+        var gone = $"https://fcm.googleapis.com/fcm/send/gone-{Guid.NewGuid():N}";
+        (await owner.PutAsJsonAsync("/api/v1/me/push-subscriptions", new { endpoint = gone, keys }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await owner.GetFromJsonAsync<JsonElement>("/api/v1/me/push-subscriptions", Ct)).GetArrayLength().ShouldBe(2);
+
+        // The owner wants handoff SMS; a rule hands a conversation off.
+        var prefs = $"/api/v1/workspaces/{ws}/notification-preferences";
+        (await owner.PutAsJsonAsync(prefs, new { items = new[] { new { kind = "handoff", inApp = true, push = true, sms = true } } }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await owner.PostAsJsonAsync($"/api/v1/workspaces/{ws}/automation/rules", new
+        {
+            name = "اپراتور",
+            triggerKind = "dm_keyword",
+            trigger = new { match = "contains", keywords = new[] { "اپراتور" } },
+            actions = new[] { new { kind = "handoff", reason = "customer_asked" } },
+            priority = 0,
+        }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await DmAsync(account, "c_" + Guid.NewGuid().ToString("N")[..10], "اپراتور لطفا");
+        var list = $"/api/v1/workspaces/{ws}/notifications";
+        await Eventually(() => owner.GetFromJsonAsync<JsonElement>(list, Ct), p => p.GetProperty("unreadCount").GetInt32() == 1, "the handoff notification");
+
+        // Push: encrypted for the browser (RFC 8291) and signed with VAPID.
+        var watch = Stopwatch.StartNew();
+        while (!FakePushService.Deliveries.Any(d => d.Endpoint == endpoint) && watch.Elapsed < TimeSpan.FromSeconds(20))
+        {
+            await Task.Delay(100, Ct);
+        }
+
+        var delivery = FakePushService.Deliveries.Single(d => d.Endpoint == endpoint);
+        delivery.Encoding.ShouldBe("aes128gcm");
+        delivery.Authorization!.ShouldStartWith("vapid t=");
+        delivery.Authorization.ShouldEndWith("k=" + FakePushService.VapidPublicKey);
+        var payload = JsonDocument.Parse(browser.Decrypt(delivery.Body)).RootElement;
+        payload.GetProperty("kind").GetString().ShouldBe("handoff");
+        payload.GetProperty("title").GetString().ShouldBe("یک گفتگو منتظر پاسخ تیم است");
+        payload.GetProperty("link").GetString()!.ShouldStartWith("/inbox/");
+        payload.GetProperty("workspaceId").GetGuid().ShouldBe(ws);
+
+        // The push service said the second browser is gone: it is dropped.
+        await Eventually(() => owner.GetFromJsonAsync<JsonElement>("/api/v1/me/push-subscriptions", Ct), a => a.GetArrayLength() == 1, "the gone subscription dropped");
+
+        // No SMS yet; once the handoff has waited (3 seconds in tests) with no team reply, one SMS.
+        (await SmsCountAsync(phone, "منتظر پاسخ تیم")).ShouldBe(0);
+        await Eventually(async () => JsonSerializer.SerializeToElement(await SmsCountAsync(phone, "منتظر پاسخ تیم")), n => n.GetInt32() == 1, "the waiting-handoff SMS");
+
+        // Unsubscribing stops push to that browser.
+        (await owner.DeleteAsync($"/api/v1/me/push-subscriptions?endpoint={Uri.EscapeDataString(endpoint)}", Ct)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.GetFromJsonAsync<JsonElement>("/api/v1/me/push-subscriptions", Ct)).GetArrayLength().ShouldBe(0);
+    }
 }

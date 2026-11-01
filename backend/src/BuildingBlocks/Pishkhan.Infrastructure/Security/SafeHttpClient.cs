@@ -116,7 +116,7 @@ public sealed class SafeHttpClient(IHttpClientFactory factory)
         return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast || address.IsIPv6UniqueLocal);
     }
 
-    internal static SocketsHttpHandler CreateHandler() => new()
+    public static SocketsHttpHandler CreateHandler() => new()
     {
         AllowAutoRedirect = false,
         AutomaticDecompression = DecompressionMethods.None,

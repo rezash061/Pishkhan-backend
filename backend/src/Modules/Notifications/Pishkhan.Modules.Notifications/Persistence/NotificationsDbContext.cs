@@ -18,6 +18,8 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
 
     public DbSet<SmsLog> SmsLog => Set<SmsLog>();
 
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Notification>(b =>
@@ -44,6 +46,18 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             b.ToTable("sms_log");
             b.HasKey(x => new { x.WorkspaceId, x.UserId, x.Kind });
             b.Property(x => x.Kind).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<PushSubscription>(b =>
+        {
+            b.ToTable("push_subscriptions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Endpoint).HasMaxLength(PushSubscription.MaxEndpoint);
+            b.Property(x => x.P256dh).HasMaxLength(100);
+            b.Property(x => x.Auth).HasMaxLength(50);
+            b.Property(x => x.UserAgent).HasMaxLength(300);
+            b.HasIndex(x => x.Endpoint).IsUnique();
+            b.HasIndex(x => x.UserId);
         });
     }
 }
