@@ -78,6 +78,29 @@ public sealed class Contact : AggregateRoot<Guid>, ITenantOwned
         return true;
     }
 
+    /// <summary>Our copy of the channel's profile picture (Files module, purpose <c>avatar</c>).</summary>
+    public Guid? AvatarFileId { get; private set; }
+
+    /// <summary>When the channel profile was last read; it is read again after <see cref="ProfileRefreshAfter"/>.</summary>
+    public DateTimeOffset? ProfileFetchedAt { get; private set; }
+
+    public static readonly TimeSpan ProfileRefreshAfter = TimeSpan.FromDays(7);
+
+    public bool ProfileIsStale(DateTimeOffset now) => ProfileFetchedAt is not { } at || now - at >= ProfileRefreshAfter;
+
+    /// <summary>What the channel profile says. A name the seller set is kept; the username fills in only when missing.</summary>
+    public void LearnProfile(string? name, string? username, Guid? avatarFileId, DateTimeOffset now)
+    {
+        if (DisplayName is null && !string.IsNullOrWhiteSpace(name))
+        {
+            DisplayName = name.Trim().Length <= 100 ? name.Trim() : name.Trim()[..100];
+        }
+
+        LearnUsername(username);
+        AvatarFileId = avatarFileId ?? AvatarFileId;
+        ProfileFetchedAt = now;
+    }
+
     /// <summary>Fills in the username the first time a channel tells us (a comment carries it; a DM does not).</summary>
     public void LearnUsername(string? username)
     {

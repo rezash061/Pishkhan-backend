@@ -53,6 +53,9 @@ internal sealed class FakeInstagram : HttpMessageHandler
     /// <summary>Public comment replies: (comment id, text).</summary>
     public static ConcurrentQueue<(string CommentId, string Text)> PublicReplies { get; } = new();
 
+    /// <summary>Customer profiles by Instagram-scoped id, for <c>GET /{igsid}?fields=name,username,profile_pic,...</c>.</summary>
+    public static ConcurrentDictionary<string, (string? Name, string? Username, string? Picture)> Profiles { get; } = new();
+
     /// <summary>Existing comments per media id, served newest first by <c>GET /{media}/comments</c> in pages of 50.</summary>
     public static ConcurrentDictionary<string, IReadOnlyList<(string Id, string From, string Text, DateTimeOffset At)>> Comments { get; } = new();
 
@@ -82,6 +85,13 @@ internal sealed class FakeInstagram : HttpMessageHandler
             var page = all.Skip(after).Take(50).Select(c => $$$"""{"id":"{{{c.Id}}}","text":"{{{c.Text}}}","timestamp":"{{{c.At:yyyy-MM-ddTHH:mm:ssK}}}","from":{"id":"{{{c.From}}}","username":"u{{{c.From}}}"}}""");
             var next = after + 50 < all.Count ? $$""","paging":{"cursors":{"after":"{{after + 50}}"},"next":"https://graph/next"}""" : string.Empty;
             return Json(HttpStatusCode.OK, $$$"""{"data":[{{{string.Join(',', page)}}}]{{{next}}}}""");
+        }
+
+        if (request.Method == HttpMethod.Get && segments is [_, var igsid] && request.RequestUri.Query.Contains("profile_pic", StringComparison.Ordinal))
+        {
+            return Profiles.TryGetValue(igsid, out var p)
+                ? Json(HttpStatusCode.OK, System.Text.Json.JsonSerializer.Serialize(new { id = igsid, name = p.Name, username = p.Username, profile_pic = p.Picture }))
+                : Json(HttpStatusCode.OK, $$"""{"id":"{{igsid}}"}""");
         }
 
         if (request.Method == HttpMethod.Get && segments is [_, var id] && id != "me" && (request.RequestUri.Query.Contains("media_type", StringComparison.Ordinal)))
@@ -146,6 +156,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
         builder.Services.AddHttpClient("website").ConfigurePrimaryHttpMessageHandler(() => new FakeWebsite());
         builder.Services.AddHttpClient("webpush").ConfigurePrimaryHttpMessageHandler(() => new FakePushService());
+        builder.Services.AddHttpClient(Pishkhan.Infrastructure.Security.SafeHttpClient.ClientName).ConfigurePrimaryHttpMessageHandler(() => new FakeWebPages());
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-channels", m => m
             .AddCacheInvalidation()
             .AddConversationsIngestConsumers()

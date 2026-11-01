@@ -8,6 +8,7 @@ using Npgsql;
 using Pishkhan.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Files.Contracts;
 using Pishkhan.Modules.Conversations.Services;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
@@ -17,10 +18,13 @@ using Pishkhan.Web.OpenApi;
 
 namespace Pishkhan.Modules.Conversations.Features;
 
-/// <summary>A contact in the CRM. <c>lastSeenAt</c> is the customer's last message on any channel; <c>channels</c> are the accounts they wrote to.</summary>
+/// <summary>
+/// A contact in the CRM. <c>lastSeenAt</c> is the customer's last message on any channel; <c>channels</c> are the accounts they wrote to.
+/// <c>profilePicUrl</c> is a signed URL of the Instagram profile picture (valid 6 hours), null until fetched.
+/// </summary>
 public sealed record ContactResponse(
     Guid Id, string? DisplayName, string? Username, IReadOnlyList<string> Tags, IReadOnlyDictionary<string, string> Fields, IReadOnlyList<Guid> Channels,
-    DateTimeOffset? LastSeenAt, DateTimeOffset CreatedAt);
+    DateTimeOffset? LastSeenAt, DateTimeOffset CreatedAt, Uri? ProfilePicUrl);
 
 public sealed record ContactConversation(Guid Id, Guid ChannelAccountId, string ChannelKind, string Status, DateTimeOffset? LastInboundAt, string? LastMessagePreview);
 
@@ -166,7 +170,7 @@ internal static class CrmEndpoints
 
     private static async Task<IResult> ListAsync(
         Guid workspaceId, string? q, string? tag, Guid? segmentId, Guid? channelAccountId, bool? hasPhone, string? consent, string? cursor, int? limit,
-        ConversationsDbContext db, IClock clock, CancellationToken ct)
+        ConversationsDbContext db, IFileService files, IClock clock, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxPageSize);
         var filtered = await FilterAsync(db, workspaceId, new ContactFilter(q, tag, segmentId, channelAccountId, hasPhone, consent), clock.UtcNow, ct);
@@ -184,7 +188,7 @@ internal static class CrmEndpoints
         var rows = await query.OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id).Take(take + 1).ToListAsync(ct);
         var next = rows.Count > take ? Cursor.Write(rows[take - 1].CreatedAt, rows[take - 1].Id) : null;
         var page = rows.Take(take).ToList();
-        return Results.Ok(new Page<ContactResponse>(await ToResponsesAsync(db, page, ct), next));
+        return Results.Ok(new Page<ContactResponse>(await ToResponsesAsync(db, files, page, ct), next));
     }
 
     /// <summary>The contacts matching the list filters (also used by the Excel export), or the problem with a filter.</summary>
@@ -251,7 +255,7 @@ internal static class CrmEndpoints
         return (query, null);
     }
 
-    private static async Task<IResult> GetAsync(Guid workspaceId, Guid contactId, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetAsync(Guid workspaceId, Guid contactId, ConversationsDbContext db, IFileService files, CancellationToken ct)
     {
         var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contactId, ct);
         if (contact is null)
@@ -263,10 +267,10 @@ internal static class CrmEndpoints
             .OrderByDescending(c => c.LastInboundAt).ThenByDescending(c => c.Id).Take(50)
             .Select(c => new ContactConversation(c.Id, c.ChannelAccountId, c.ChannelKind, c.Status, c.LastInboundAt, c.LastMessagePreview))
             .ToListAsync(ct);
-        return Results.Ok(new ContactDetail((await ToResponsesAsync(db, [contact], ct))[0], conversations));
+        return Results.Ok(new ContactDetail((await ToResponsesAsync(db, files, [contact], ct))[0], conversations));
     }
 
-    private static async Task<IResult> UpdateAsync(Guid workspaceId, Guid contactId, UpdateContactRequest request, ConversationsDbContext db, CancellationToken ct)
+    private static async Task<IResult> UpdateAsync(Guid workspaceId, Guid contactId, UpdateContactRequest request, ConversationsDbContext db, IFileService files, CancellationToken ct)
     {
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == contactId, ct);
         if (contact is null)
@@ -355,7 +359,7 @@ internal static class CrmEndpoints
         }
 
         await db.SaveChangesAsync(ct);
-        return Results.Ok((await ToResponsesAsync(db, [contact], ct))[0]);
+        return Results.Ok((await ToResponsesAsync(db, files, [contact], ct))[0]);
     }
 
     /// <summary>A value fit for the field's type, normalised; null when it does not fit. Undefined fields take any text.</summary>
@@ -380,15 +384,17 @@ internal static class CrmEndpoints
         };
     }
 
-    private static async Task<List<ContactResponse>> ToResponsesAsync(ConversationsDbContext db, IReadOnlyList<Contact> contacts, CancellationToken ct)
+    private static async Task<List<ContactResponse>> ToResponsesAsync(ConversationsDbContext db, IFileService files, IReadOnlyList<Contact> contacts, CancellationToken ct)
     {
+        var avatars = await ConversationEndpoints.AvatarsAsync(files, contacts, ct);
         var ids = contacts.Select(c => c.Id).ToList();
         var channels = (await db.ChannelIdentities.AsNoTracking().Where(i => ids.Contains(i.ContactId)).Select(i => new { i.ContactId, i.ChannelAccountId }).ToListAsync(ct))
             .ToLookup(i => i.ContactId, i => i.ChannelAccountId);
         var seen = await db.Conversations.AsNoTracking().Where(c => ids.Contains(c.ContactId))
             .GroupBy(c => c.ContactId).Select(g => new { g.Key, At = g.Max(c => c.LastInboundAt) }).ToDictionaryAsync(x => x.Key, x => x.At, ct);
         return [.. contacts.Select(c => new ContactResponse(
-            c.Id, c.DisplayName, c.Username, c.Tags, c.Fields, [.. channels[c.Id].Distinct()], seen.GetValueOrDefault(c.Id), c.CreatedAt))];
+            c.Id, c.DisplayName, c.Username, c.Tags, c.Fields, [.. channels[c.Id].Distinct()], seen.GetValueOrDefault(c.Id), c.CreatedAt,
+            c.AvatarFileId is { } avatar ? avatars.GetValueOrDefault(avatar) : null))];
     }
 
     /// <summary>Contacts whose name, username or email contains the text, or whose phone is that number in any spelling.</summary>

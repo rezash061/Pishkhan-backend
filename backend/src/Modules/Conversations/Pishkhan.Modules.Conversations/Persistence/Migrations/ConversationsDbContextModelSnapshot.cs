@@ -241,6 +241,10 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AvatarFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("avatar_file_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -256,6 +260,10 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("fields")
                         .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.Property<DateTimeOffset?>("ProfileFetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("profile_fetched_at");
 
                     b.PrimitiveCollection<List<string>>("Tags")
                         .IsRequired()

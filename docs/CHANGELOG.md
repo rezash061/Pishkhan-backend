@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added (user-panel gaps: knowledge files and URLs, contact pictures, 2026-11-01)
+- Knowledge sources from uploaded documents and web pages:
+  - `POST /workspaces/{id}/knowledge/sources` takes `kind: "file"` with `fileId` (an upload with purpose `knowledge_document`: PDF, DOCX or TXT, scanned clean) or `kind: "url"` with `url` (https, public host). Anything else is 400 on `fileId` or `url`.
+  - The AI group extracts the text before indexing: PDF text layer (PdfPig, NFKC-normalised for Persian presentation forms), DOCX paragraphs and table rows, UTF-8 or BOM-marked text, and the visible text of an HTML page (no scripts, styles, navigation, header, footer or forms). Pages are fetched through `SafeHttpClient` with a 2 MB cap; text is capped at 50,000 characters.
+  - The title defaults to "سند" for a file and to the host for a URL; a page's own `<title>` replaces the host.
+  - A source that yields no text goes to `failed` with `error` set to one of `knowledge.empty`, `knowledge.file_unavailable`, `knowledge.file_unreadable`, `knowledge.file_type`, `knowledge.page_unreachable`, `knowledge.page_too_large`, `knowledge.page_type`.
+  - `PATCH` on a file or URL source accepts only `title`, `enabled` and (URL sources) `url`; a new URL re-indexes the source. `body`, `question` or `answer` give 400 `validation.knowledge.extracted`.
+  - `SourceResponse` gains `fileId` and `url`. Migration `KnowledgeFilesAndUrls`.
+- Contact profile pictures:
+  - When a new Instagram customer writes for the first time, the outbound group reads their profile (name, username, picture), copies the picture into the Files module (purpose `avatar`, 2 MB, Meta CDN hosts only) and fills the contact. A name the seller set is kept. A repeated request within 7 days is skipped. Existing contacts are not backfilled.
+  - New topic `conversations.contact-profile-requested.v1` (`ContactProfileRequested`).
+  - `contact.profilePicUrl` on conversation responses and `profilePicUrl` on CRM contacts: a signed URL valid for 6 hours, or null. Instagram's own CDN URL is never returned. Migration `ContactProfiles`.
+- `docs/deployment.md`: the inbox hub has no CORS policy and must be served at `/hubs/inbox` on the panel's own origin (Nginx block for production, Next rewrite for development, `access_token` kept out of access logs).
+
 ### Added (Phase 1, BE-1.15: beta hardening, 2026-11-01)
 - Cross-tenant access suite (`CrossTenantTests`). It walks every route the Api host maps under `/workspaces/{workspaceId}` (about 100 route and method pairs) and seeds one resource of each kind in workspace B:
   - A non-member calling any of B's routes gets 404.

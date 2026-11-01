@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Pishkhan.Infrastructure.Security;
+using Pishkhan.Modules.Files.Contracts;
 using Pishkhan.Modules.Knowledge.Contracts;
 using Pishkhan.Modules.Knowledge.Domain;
 using Pishkhan.Modules.Knowledge.Persistence;
@@ -15,16 +17,24 @@ namespace Pishkhan.Modules.Knowledge.Features;
 
 /// <summary>
 /// A FAQ needs <c>question</c> and <c>answer</c> (the title defaults to the question); a text source needs <c>title</c> and <c>body</c>.
+/// A <c>file</c> source needs <c>fileId</c>: a clean upload with purpose <c>knowledge_document</c> (PDF, DOCX or plain text). A <c>url</c>
+/// source needs an https <c>url</c> (the title defaults to the page's title). The text of files and pages is extracted in the background.
 /// Product sources are written from the catalog and can only be enabled or disabled here.
 /// </summary>
-public sealed record SourceRequest(string Kind, string? Title, string? Question, string? Answer, string? Body, bool? Enabled);
+public sealed record SourceRequest(string Kind, string? Title, string? Question, string? Answer, string? Body, bool? Enabled, Guid? FileId = null, string? Url = null);
 
-public sealed record SourceUpdateRequest(string? Title, string? Question, string? Answer, string? Body, bool? Enabled);
+/// <summary>File and URL sources take only <c>title</c>, <c>enabled</c> and (URL) <c>url</c>; their text comes from the document or page.</summary>
+public sealed record SourceUpdateRequest(string? Title, string? Question, string? Answer, string? Body, bool? Enabled, string? Url = null);
 
-/// <summary><c>status</c>: pending (being indexed), indexed or failed (<c>error</c>); <c>indexedRevision</c> lags <c>revision</c> while pending.</summary>
+/// <summary>
+/// <c>status</c>: pending (being indexed), indexed or failed (<c>error</c>); <c>indexedRevision</c> lags <c>revision</c> while pending.
+/// For file and URL sources <c>body</c> is the extracted text (empty until the first extraction). Their errors:
+/// <c>knowledge.file_unavailable</c>, <c>knowledge.file_type</c>, <c>knowledge.file_unreadable</c>, <c>knowledge.page_unreachable</c>,
+/// <c>knowledge.page_too_large</c> (over 2 MB), <c>knowledge.page_type</c> and <c>knowledge.empty</c> (no text, for example a scanned PDF).
+/// </summary>
 public sealed record SourceResponse(
     Guid Id, string Kind, string Title, string? Question, string Body, Guid? ProductId, bool Enabled, string Status, int Revision, int? IndexedRevision,
-    int ChunkCount, string? Error, DateTimeOffset? IndexedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    int ChunkCount, string? Error, DateTimeOffset? IndexedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, Guid? FileId, string? Url);
 
 public sealed record KnowledgeSearchRequest(string Query, int? Limit);
 
@@ -43,7 +53,7 @@ internal static class KnowledgeEndpoints
 
         group.MapPost("/sources", CreateAsync)
             .RequireWorkspacePermission(Permissions.KnowledgeWrite)
-            .WithSummary("Add a FAQ or a text; it is indexed in the background")
+            .WithSummary("Add a FAQ, a text, an uploaded document or a web page; it is indexed in the background")
             .Produces<SourceResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithStandardProblems();
@@ -62,14 +72,14 @@ internal static class KnowledgeEndpoints
 
         group.MapDelete("/sources/{sourceId:guid}", DeleteAsync)
             .RequireWorkspacePermission(Permissions.KnowledgeWrite)
-            .WithSummary("Delete a FAQ or text with its chunks (product sources follow the catalog)")
+            .WithSummary("Delete a FAQ, text, document or page with its chunks (product sources follow the catalog)")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/sources/{sourceId:guid}/reindex", ReindexAsync)
             .RequireWorkspacePermission(Permissions.KnowledgeWrite)
-            .WithSummary("Build the source's chunks and embeddings again")
+            .WithSummary("Build the source's chunks and embeddings again (a web page is fetched again)")
             .Produces<SourceResponse>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -82,7 +92,7 @@ internal static class KnowledgeEndpoints
 
     internal static SourceResponse ToResponse(KnowledgeSource s) => new(
         s.Id, s.Kind, s.Title, s.Question, s.Body, s.ProductId, s.Enabled, s.Status, s.Revision, s.IndexedRevision, s.ChunkCount, s.Error, s.IndexedAt,
-        s.CreatedAt, s.UpdatedAt);
+        s.CreatedAt, s.UpdatedAt, s.FileId, s.Url);
 
     private static async Task<IResult> ListAsync(
         Guid workspaceId, string? kind, string? q, string? status, string? cursor, int? limit, KnowledgeDbContext db, CancellationToken ct)
@@ -151,8 +161,14 @@ internal static class KnowledgeEndpoints
         return errors;
     }
 
-    private static async Task<IResult> CreateAsync(Guid workspaceId, SourceRequest request, KnowledgeDbContext db, ICurrentUser caller, IClock clock, CancellationToken ct)
+    private static async Task<IResult> CreateAsync(
+        Guid workspaceId, SourceRequest request, KnowledgeDbContext db, IFileService files, ICurrentUser caller, IClock clock, CancellationToken ct)
     {
+        if (request.Kind is KnowledgeSourceKinds.File or KnowledgeSourceKinds.Url)
+        {
+            return await CreateExtractedAsync(workspaceId, request, db, files, caller, clock, ct);
+        }
+
         if (request.Kind is not (KnowledgeSourceKinds.Faq or KnowledgeSourceKinds.Text))
         {
             return Error.Validation("validation.failed", new Dictionary<string, string[]> { ["kind"] = ["validation.knowledge.kind"] }).ToProblem();
@@ -180,6 +196,72 @@ internal static class KnowledgeEndpoints
         return Results.Json(ToResponse(source), statusCode: StatusCodes.Status201Created);
     }
 
+    /// <summary>A document or page: checked here, its text read by the AI group.</summary>
+    private static async Task<IResult> CreateExtractedAsync(
+        Guid workspaceId, SourceRequest request, KnowledgeDbContext db, IFileService files, ICurrentUser caller, IClock clock, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        if (request.Title is { } t && (string.IsNullOrWhiteSpace(t) || t.Trim().Length > KnowledgeSource.MaxTitle))
+        {
+            errors["title"] = ["validation.knowledge.title"];
+        }
+
+        string? url = null;
+        if (request.Kind == KnowledgeSourceKinds.File)
+        {
+            if (request.FileId is not { } fileId || await files.GetCleanAsync(fileId, ct) is not { Purpose: FilePurposes.KnowledgeDocument })
+            {
+                errors["fileId"] = ["validation.knowledge.file"];
+            }
+        }
+        else if (ValidUrl(request.Url) is { } valid)
+        {
+            url = valid;
+        }
+        else
+        {
+            errors["url"] = ["validation.knowledge.url"];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Error.Validation("validation.failed", errors).ToProblem();
+        }
+
+        if (await db.Sources.CountAsync(ct) >= MaxSources)
+        {
+            return Error.Conflict("knowledge.limit").ToProblem();
+        }
+
+        var title = request.Title?.Trim() ?? (url is null ? "سند" : KnowledgeSource.DefaultUrlTitle(url));
+        var source = KnowledgeSource.Create(
+            workspaceId, request.Kind, Clip(title, KnowledgeSource.MaxTitle), null, string.Empty, null, caller.UserId, clock.UtcNow, request.FileId, url);
+        source.Enabled = request.Enabled ?? true;
+        db.Sources.Add(source);
+        db.Publish(new KnowledgeSourceChanged(workspaceId, source.Id, source.Revision), workspaceId.ToString(), workspaceId: workspaceId);
+        await db.SaveChangesAsync(ct);
+        return Results.Json(ToResponse(source), statusCode: StatusCodes.Status201Created);
+    }
+
+    /// <summary>An absolute https URL that the SSRF guard accepts (no IP literals or private hosts), normalised; null otherwise.</summary>
+    private static string? ValidUrl(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length > KnowledgeSource.MaxUrl || !Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        try
+        {
+            SafeHttpClient.EnsureAllowed(uri, null);
+            return uri.AbsoluteUri;
+        }
+        catch (SafeHttpException)
+        {
+            return null;
+        }
+    }
+
     private static async Task<IResult> GetAsync(Guid workspaceId, Guid sourceId, KnowledgeDbContext db, CancellationToken ct) =>
         await db.Sources.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sourceId, ct) is { } source ? Results.Ok(ToResponse(source)) : Error.NotFound().ToProblem();
 
@@ -193,9 +275,44 @@ internal static class KnowledgeEndpoints
 
         if (source.Kind == KnowledgeSourceKinds.Product)
         {
-            if (request.Title is not null || request.Question is not null || request.Answer is not null || request.Body is not null)
+            if (request.Title is not null || request.Question is not null || request.Answer is not null || request.Body is not null || request.Url is not null)
             {
                 return Error.Validation("validation.failed", new Dictionary<string, string[]> { ["body"] = ["validation.knowledge.product_managed"] }).ToProblem();
+            }
+        }
+        else if (source.Kind is KnowledgeSourceKinds.File or KnowledgeSourceKinds.Url)
+        {
+            var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+            if (request.Question is not null || request.Answer is not null || request.Body is not null || (request.Url is not null && source.Kind == KnowledgeSourceKinds.File))
+            {
+                errors["body"] = ["validation.knowledge.extracted"];
+            }
+
+            if (request.Title is { } t && (string.IsNullOrWhiteSpace(t) || t.Trim().Length > KnowledgeSource.MaxTitle))
+            {
+                errors["title"] = ["validation.knowledge.title"];
+            }
+
+            var url = request.Url is null || source.Kind == KnowledgeSourceKinds.File ? source.Url : ValidUrl(request.Url);
+            if (url is null && source.Kind == KnowledgeSourceKinds.Url)
+            {
+                errors["url"] = ["validation.knowledge.url"];
+            }
+
+            if (errors.Count > 0)
+            {
+                return Error.Validation("validation.failed", errors).ToProblem();
+            }
+
+            if (request.Title is { } title)
+            {
+                source.Title = Clip(title.Trim(), KnowledgeSource.MaxTitle);
+            }
+
+            if (url != source.Url)
+            {
+                source.Url = url;
+                db.Publish(new KnowledgeSourceChanged(workspaceId, source.Id, source.Touch()), workspaceId.ToString(), workspaceId: workspaceId);
             }
         }
         else

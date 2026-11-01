@@ -432,4 +432,47 @@ public sealed class AutomationTests(InfraFixture infra, ChannelsHost workers) : 
         (times[^1] - times[0]).ShouldBeGreaterThan(TimeSpan.FromSeconds((comments - capacity) / perSecond * 0.9));
         TestContext.Current.SendDiagnosticMessage($"Viral test: {comments} replies in {elapsed.TotalSeconds:F0}s, max {maxPerSecond}/s");
     }
+
+    [Fact]
+    public async Task A_new_customer_gets_name_username_and_a_copy_of_the_profile_picture()
+    {
+        var s = await SeedAsync();
+        var customer = "c_" + Guid.NewGuid().ToString("N")[..10];
+        var picture = $"https://scontent-{Guid.NewGuid():N}.cdninstagram.com/v/p.jpg";
+        using (var bitmap = new SkiaSharp.SKBitmap(32, 32))
+        {
+            bitmap.Erase(SkiaSharp.SKColors.Coral);
+            using var data = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 90);
+            FakeWebPages.Pages[picture] = ("image/jpeg", data.ToArray());
+        }
+
+        FakeInstagram.Profiles[customer] = ("سارا محمدی", "sara.shop", picture);
+        await DmAsync(s, customer, "سلام");
+
+        JsonElement contact = default;
+        await Eventually(
+            async () =>
+            {
+                var list = await s.Client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{s.WorkspaceId}/conversations", Ct);
+                contact = list.GetProperty("items").EnumerateArray().Select(c => c.GetProperty("contact")).FirstOrDefault();
+                return contact.ValueKind == JsonValueKind.Object && contact.GetProperty("profilePicUrl").ValueKind == JsonValueKind.String;
+            },
+            TimeSpan.FromSeconds(45),
+            "profile read and picture scanned");
+        contact.GetProperty("displayName").GetString().ShouldBe("سارا محمدی");
+        contact.GetProperty("username").GetString().ShouldBe("sara.shop");
+
+        // Served from our storage (re-encoded), not from Meta's CDN.
+        var url = contact.GetProperty("profilePicUrl").GetString()!;
+        url.ShouldNotContain("cdninstagram");
+        var crm = await s.Client.GetFromJsonAsync<JsonElement>($"/api/v1/workspaces/{s.WorkspaceId}/contacts/{contact.GetProperty("id").GetGuid()}", Ct);
+        crm.GetProperty("contact").GetProperty("profilePicUrl").GetString().ShouldNotBeNull();
+
+        // A name the seller set is kept on the next read; the profile is read once, not on every message.
+        var calls = FakeInstagram.Profiles.Count;
+        await DmAsync(s, customer, "قیمت؟");
+        await Task.Delay(1000, Ct);
+        (await ConversationsAsync(s.WorkspaceId, db => db.Contacts.AsNoTracking().CountAsync(c => c.Username == "sara.shop", Ct))).ShouldBe(1);
+        calls.ShouldBe(FakeInstagram.Profiles.Count);
+    }
 }

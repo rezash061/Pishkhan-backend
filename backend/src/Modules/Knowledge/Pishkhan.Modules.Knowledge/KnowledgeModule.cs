@@ -22,6 +22,7 @@ public static class KnowledgeModule
         services.AddPishkhanAi(configuration);
         services.AddScoped<IKnowledgeSearch, KnowledgeSearch>();
         services.AddScoped<KnowledgeIndexer>();
+        services.AddScoped<KnowledgeContentReader>();
         return services;
     }
 

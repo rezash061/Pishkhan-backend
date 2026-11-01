@@ -42,7 +42,8 @@ public static class ConversationsModule
     public static MessagingBuilder AddConversationsOutboundConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
             "outbound", new RetryPolicy(OutboundSendHandler.MaxAttempts, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(60)))
-        .AddConsumer<TimerFired, OutboundDeferredHandler>("outbound");
+        .AddConsumer<TimerFired, OutboundDeferredHandler>("outbound")
+        .AddConsumer<ContactProfileRequested, ContactProfileHandler>("outbound");
 
     /// <summary>Api host: SignalR inbox (call after <c>AddPishkhanRealtime</c>).</summary>
     public static IServiceCollection AddConversationsRealtime(this IServiceCollection services)

@@ -276,6 +276,10 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("error");
 
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
                     b.Property<DateTimeOffset?>("IndexedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("indexed_at");
@@ -318,6 +322,11 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("url");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
