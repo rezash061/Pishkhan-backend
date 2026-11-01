@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Pishkhan.Infrastructure.Application;
 using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Infrastructure.Health;
@@ -33,6 +34,13 @@ public sealed class AdminHost : IAsyncDisposable
     public static async Task<AdminHost> StartAsync(InfraFixture infra, CancellationToken ct)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+
+        // As in Development: every registration must resolve at startup (the AdminApi has no Knowledge or Catalog module).
+        builder.Host.UseDefaultServiceProvider(o =>
+        {
+            o.ValidateOnBuild = true;
+            o.ValidateScopes = true;
+        });
         builder.Configuration.AddInMemoryCollection(infra.Settings);
         builder.WebHost.UseTestServer();
         builder.AddPishkhanWebHost("it-admin-api").AddPostgresCheck();

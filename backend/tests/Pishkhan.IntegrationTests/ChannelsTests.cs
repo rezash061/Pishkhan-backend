@@ -139,7 +139,7 @@ public sealed class ChannelsHost(InfraFixture infra) : IAsyncLifetime
         builder.Services.AddTenancyModule(builder.Configuration).AddChannelsModule(builder.Configuration).AddConversationsModule(builder.Configuration)
             .AddAutomationModule(builder.Configuration).AddFilesModule(builder.Configuration).AddCatalogModule(builder.Configuration)
             .AddIdentityModule(builder.Configuration).AddAuditModule(builder.Configuration).AddAnalyticsModule(builder.Configuration)
-            .AddNotificationsModule(builder.Configuration).AddBillingModule(builder.Configuration).AddAgentModule(builder.Configuration).AddKnowledgeModule(builder.Configuration)
+            .AddNotificationsModule(builder.Configuration).AddBillingModule(builder.Configuration).AddAgentModule(builder.Configuration).AddAgentReplies().AddKnowledgeModule(builder.Configuration)
             .AddContentModule(builder.Configuration);
         builder.Services.AddSingleton<IAntivirusScanner, CleanScanner>();
         builder.Services.AddHttpClient<InstagramGraphClient>().ConfigurePrimaryHttpMessageHandler(() => new FakeInstagram());
