@@ -14,11 +14,16 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
 {
     public const string SchemaName = "billing";
 
+    /// <summary>Invoice numbers, one sequence across Pishkhan.</summary>
+    public const string InvoiceSequence = "invoice_numbers";
+
     public override string Schema => SchemaName;
 
     public DbSet<Plan> Plans => Set<Plan>();
 
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+
+    public DbSet<Checkout> Checkouts => Set<Checkout>();
 
     public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
 
@@ -52,10 +57,32 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.Property(x => x.PlanCode).HasMaxLength(30);
             b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             b.Property(x => x.EndReason).HasMaxLength(20);
+            b.Property(x => x.Cycle).HasMaxLength(20);
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
 
             // One current subscription per workspace.
             b.HasIndex(x => x.WorkspaceId, "ix_subscriptions_workspace_active").IsUnique().HasFilter("status = 'Active'");
+            b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.HasSequence<long>(InvoiceSequence).StartsAt(1001);
+
+        modelBuilder.Entity<Checkout>(b =>
+        {
+            b.ToTable("checkouts");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.PlanCode).HasMaxLength(30);
+            b.Property(x => x.PlanName).HasMaxLength(100);
+            b.Property(x => x.Cycle).HasMaxLength(20);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Authority).HasMaxLength(64);
+            b.Property(x => x.ReferenceId).HasMaxLength(64);
+            b.Property(x => x.CardMask).HasMaxLength(32);
+            b.Property(x => x.Error).HasMaxLength(40);
+            b.HasIndex(x => x.Authority).IsUnique().HasFilter("authority IS NOT NULL");
+            b.HasIndex(x => x.InvoiceNumber).IsUnique().HasFilter("invoice_number IS NOT NULL");
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
             b.Ignore(x => x.DomainEvents);
         });
 

@@ -4591,7 +4591,8 @@
           "trial",
           "endsAt",
           "limits",
-          "subscription"
+          "subscription",
+          "upcoming"
         ],
         "type": "object",
         "properties": {
@@ -4653,6 +4654,12 @@
                 "$ref": "#/components/schemas/SubscriptionResponse"
               }
             ]
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionResponse"
+            }
           }
         }
       },
@@ -6278,7 +6285,9 @@
           "startsAt",
           "endsAt",
           "endedAt",
-          "endReason"
+          "endReason",
+          "cycle",
+          "checkoutId"
         ],
         "type": "object",
         "properties": {
@@ -6326,6 +6335,19 @@
               "null",
               "string"
             ]
+          },
+          "cycle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checkoutId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

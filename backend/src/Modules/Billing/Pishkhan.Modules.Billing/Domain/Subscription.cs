@@ -10,6 +10,20 @@ public enum SubscriptionStatus
 
     /// <summary>Replaced, cancelled or expired; kept as history.</summary>
     Ended,
+
+    /// <summary>Paid for and starting later, when the subscription before it ends (a renewal or a move to a smaller plan).</summary>
+    Scheduled,
+}
+
+public static class BillingCycles
+{
+    public const string Monthly = "monthly";
+    public const string Annual = "annual";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Monthly, Annual };
+
+    /// <summary>How long a paid period lasts: 30 days for a month, 365 for a year.</summary>
+    public static TimeSpan Length(string cycle) => cycle == Annual ? TimeSpan.FromDays(365) : TimeSpan.FromDays(30);
 }
 
 /// <summary>
@@ -49,7 +63,56 @@ public sealed class Subscription : AggregateRoot<Guid>, ITenantOwned
     /// <summary>replaced, cancelled or expired.</summary>
     public string? EndReason { get; private set; }
 
+    /// <summary>The staff member who granted it, or the user who bought it.</summary>
     public Guid GrantedBy { get; private set; }
+
+    /// <summary>Bought through checkout: <see cref="BillingCycles"/>. Null for a staff grant.</summary>
+    public string? Cycle { get; private set; }
+
+    /// <summary>What was paid for this period (Rial); null for a staff grant. An upgrade credits the unused part of it.</summary>
+    public long? PaidAmount { get; private set; }
+
+    public Guid? CheckoutId { get; private set; }
+
+    /// <summary>A subscription bought through checkout, current from <paramref name="startsAt"/> (now, or when the one before it ends).</summary>
+    public static Subscription Purchase(
+        Guid workspaceId, Plan plan, string cycle, long paid, Guid checkoutId, Guid userId, DateTimeOffset startsAt, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = workspaceId,
+        PlanId = plan.Id,
+        PlanCode = plan.Code,
+        PlanVersion = plan.VersionNumber,
+        Status = startsAt > now ? SubscriptionStatus.Scheduled : SubscriptionStatus.Active,
+        StartsAt = startsAt,
+        EndsAt = startsAt + BillingCycles.Length(cycle),
+        GrantedBy = userId,
+        Cycle = cycle,
+        PaidAmount = paid,
+        CheckoutId = checkoutId,
+        CreatedAt = now,
+    };
+
+    /// <summary>A scheduled subscription whose time has come.</summary>
+    public void Activate()
+    {
+        if (Status == SubscriptionStatus.Scheduled)
+        {
+            Status = SubscriptionStatus.Active;
+        }
+    }
+
+    /// <summary>The unused part of what was paid for this period, credited on an upgrade (Rial, rounded down).</summary>
+    public long UnusedCredit(DateTimeOffset now)
+    {
+        if (PaidAmount is not { } paid || EndsAt is not { } end || end <= now || end <= StartsAt)
+        {
+            return 0;
+        }
+
+        var from = now > StartsAt ? now : StartsAt;
+        return (long)(paid * ((end - from).TotalSeconds / (end - StartsAt).TotalSeconds));
+    }
 
     public static Subscription Grant(Guid workspaceId, Plan plan, bool trial, DateTimeOffset? endsAt, Guid staffId, DateTimeOffset now) => new()
     {
@@ -67,7 +130,18 @@ public sealed class Subscription : AggregateRoot<Guid>, ITenantOwned
     };
 
     /// <summary>Current: active and not past its end.</summary>
-    public bool IsCurrent(DateTimeOffset now) => Status == SubscriptionStatus.Active && (EndsAt is null || EndsAt > now);
+    public bool IsCurrent(DateTimeOffset now) =>
+        (Status == SubscriptionStatus.Active || (Status == SubscriptionStatus.Scheduled && StartsAt <= now)) && (EndsAt is null || EndsAt > now);
+
+    /// <summary>
+    /// The workspace's current subscription: the active one, or a scheduled one whose start has come (the one before it ended). Status is
+    /// stored as text, so "Active" sorts before "Scheduled".
+    /// </summary>
+    public static IQueryable<Subscription> Current(IQueryable<Subscription> query, Guid workspaceId, DateTimeOffset now) =>
+        query.Where(s => s.WorkspaceId == workspaceId
+                && (s.Status == SubscriptionStatus.Active || (s.Status == SubscriptionStatus.Scheduled && s.StartsAt <= now))
+                && (s.EndsAt == null || s.EndsAt > now))
+            .OrderBy(s => s.Status).ThenBy(s => s.StartsAt);
 
     /// <summary>Moves the end later. An expired subscription is extended from now.</summary>
     public void Extend(TimeSpan by, DateTimeOffset now)
@@ -92,10 +166,11 @@ public sealed class Subscription : AggregateRoot<Guid>, ITenantOwned
         EndReason = EndsAt is { } e && e <= now ? EndExpired : reason;
     }
 
-    /// <summary>The API spelling: active, trialing, expired, ended.</summary>
+    /// <summary>The API spelling: active, trialing, expired, ended, scheduled.</summary>
     public string StateName(DateTimeOffset now) => Status switch
     {
         SubscriptionStatus.Ended => "ended",
+        SubscriptionStatus.Scheduled when StartsAt > now => "scheduled",
         _ when !IsCurrent(now) => "expired",
         _ when Trial => "trialing",
         _ => "active",

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.8: subscription checkout, 2026-11-02)
+- Sellers buy, renew, upgrade and downgrade their plan themselves. They pay Pishkhan's own Zarinpal account (`Billing:Checkout:MerchantId`, `Sandbox`, `ApiBaseUrl`, `ReturnUrl`). Migration `Checkout` (`billing.checkouts`, sequence `billing.invoice_numbers` from 1001, and `cycle`, `paid_amount`, `checkout_id` on subscriptions).
+- Endpoints under `/workspaces/{id}/billing`, all needing `workspace.billing.manage`:
+  - `POST /checkout/quote` with `{planId, cycle?}` (`monthly`, 30 days, the default; or `annual`, 365 days). It returns `kind`, `price`, `credit`, `amount`, `startsAt` and `endsAt` and saves nothing.
+  - `POST /checkout` (accepts `Idempotency-Key`) gives 201 `{checkout, paymentUrl}`. Send the browser to `paymentUrl`.
+  - `GET /checkouts` (last 100) and `GET /checkouts/{checkoutId}`. A paid checkout is the invoice: it has `invoiceNumber`, `referenceId`, `cardMask` and `subscriptionId`.
+- Kinds of checkout:
+  - `new`: no paid plan now (the free plan, a trial or an expired plan). Starts at once.
+  - `renewal`: the same plan. Starts when the paid time ends, including periods already paid for.
+  - `upgrade`: a plan with a higher monthly price. Starts at once. `credit` is the unused part of what was paid for the current period, so only the difference is paid.
+  - `downgrade`: a cheaper plan. Starts when the paid time ends.
+  - The smallest amount charged is 10,000 Rial, Zarinpal's minimum.
+- Errors:
+  - 404 `billing.plan.not_found`.
+  - 422 `billing.checkout.plan_not_for_sale` (draft, private or free plan), `billing.checkout.cycle_not_offered`, `billing.checkout.unavailable` (no Pishkhan merchant ID) and `billing.checkout.gateway_unavailable`.
+  - 409 `billing.checkout.managed_subscription` (a staff grant without an end) and `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).
+- Zarinpal returns the payer to `GET /billing/checkout/callback`, which redirects (303) to `{ReturnUrl}?checkout={id}&status=paid|failed|pending`.
+  - The payment is verified with Zarinpal for the checkout's own amount. Only then does the subscription start; audited as `billing.checkout_paid`.
+  - A cancelled payment fails with `error: "cancelled"`. A repeated callback changes nothing. If Zarinpal cannot be reached it stays `pending` and the same callback can be retried.
+  - A checkout not paid within an hour shows as `expired`.
+- Paid periods that start later are subscriptions in the new state `scheduled`. Entitlements switch to them when the current one ends. `GET /billing/subscription` lists them in the new `upcoming` field. Subscriptions also show `cycle` and `checkoutId`.
+
 ### Added (Phase 2, BE-2.6: bulk price update, 2026-11-02)
 - Change many prices at once under `/workspaces/{id}/catalog/price-changes` (`workspace.catalog.write`; reading the history needs `workspace.catalog.read`). Migration `PriceChanges` (`catalog.price_changes`).
 - Which products (`scope`): any of `productIds` (up to 1,000), `categoryId` (with its subcategories), `tag` and `status`, which must all match. Or `all: true`. Products priced by formula are never changed. At most 5,000 products (422 `catalog.price_change_too_large`).

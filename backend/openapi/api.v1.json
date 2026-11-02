@@ -8586,6 +8586,303 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/billing/checkout/quote": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "What buying a plan costs now, and when it would start",
+        "description": "404 `billing.plan.not_found`; 422 `billing.checkout.plan_not_for_sale` or `billing.checkout.cycle_not_offered`; 409 `billing.checkout.managed_subscription` (a plan granted by the Pishkhan team without an end) or `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutQuoteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/checkout": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Buy, renew or upgrade: opens the payment at Zarinpal",
+        "description": "The same errors as the quote, plus 422 `billing.checkout.unavailable` (online payment is not set up) and `billing.checkout.gateway_unavailable` (Zarinpal did not answer; try again). The subscription starts when Zarinpal confirms the payment.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID; retries with the same key return the first response.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartCheckoutResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/checkouts": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Checkouts and invoices, newest first (100)",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckoutResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/checkouts/{checkoutId}": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "One checkout; a paid one is the invoice",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "checkoutId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/knowledge/sources": {
       "get": {
         "tags": [
@@ -10776,6 +11073,184 @@
           }
         }
       },
+      "CheckoutQuoteResponse": {
+        "required": [
+          "kind",
+          "planId",
+          "planCode",
+          "planName",
+          "cycle",
+          "price",
+          "credit",
+          "amount",
+          "startsAt",
+          "endsAt"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "cycle": {
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CheckoutRequest": {
+        "required": [
+          "planId",
+          "cycle"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cycle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CheckoutResponse": {
+        "required": [
+          "id",
+          "kind",
+          "planId",
+          "planCode",
+          "planName",
+          "planVersion",
+          "cycle",
+          "price",
+          "credit",
+          "amount",
+          "status",
+          "error",
+          "invoiceNumber",
+          "referenceId",
+          "cardMask",
+          "subscriptionId",
+          "createdBy",
+          "createdAt",
+          "paidAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "planName": {
+            "type": "string"
+          },
+          "planVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cycle": {
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "invoiceNumber": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "referenceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardMask": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subscriptionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "ConnectInstagramResponse": {
         "required": [
           "authorizeUrl"
@@ -11178,7 +11653,8 @@
           "trial",
           "endsAt",
           "limits",
-          "subscription"
+          "subscription",
+          "upcoming"
         ],
         "type": "object",
         "properties": {
@@ -11240,6 +11716,12 @@
                 "$ref": "#/components/schemas/SubscriptionResponse"
               }
             ]
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionResponse"
+            }
           }
         }
       },
@@ -16187,6 +16669,21 @@
           }
         }
       },
+      "StartCheckoutResponse": {
+        "required": [
+          "checkout",
+          "paymentUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "checkout": {
+            "$ref": "#/components/schemas/CheckoutResponse"
+          },
+          "paymentUrl": {
+            "type": "string"
+          }
+        }
+      },
       "StorefrontCard": {
         "required": [
           "productId",
@@ -16265,7 +16762,9 @@
           "startsAt",
           "endsAt",
           "endedAt",
-          "endReason"
+          "endReason",
+          "cycle",
+          "checkoutId"
         ],
         "type": "object",
         "properties": {
@@ -16313,6 +16812,19 @@
               "null",
               "string"
             ]
+          },
+          "cycle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checkoutId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

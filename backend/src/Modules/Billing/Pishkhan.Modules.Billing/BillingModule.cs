@@ -12,7 +12,7 @@ namespace Pishkhan.Modules.Billing;
 
 /// <summary>
 /// Billing (backend plan 9.13, BE-1.11): versioned plans and the public price list, subscriptions granted by staff, usage per period
-/// and entitlements (<see cref="IEntitlements"/>) for other modules. Paid checkout, invoices and overage are Phase 2.
+/// and entitlements (<see cref="IEntitlements"/>) for other modules. Checkout (BE-2.8) sells plans through Zarinpal; overage is later.
 /// </summary>
 public static class BillingModule
 {
@@ -20,6 +20,14 @@ public static class BillingModule
     {
         services.AddModuleDbContext<BillingDbContext>(BillingDbContext.SchemaName);
         services.AddSingleton<IEntitlements, EntitlementService>();
+        return services;
+    }
+
+    /// <summary>Api, with the Payments module: self-serve checkout paid into Pishkhan's Zarinpal account (<see cref="CheckoutOptions"/>).</summary>
+    public static IServiceCollection AddBillingCheckout(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<CheckoutOptions>().Bind(configuration.GetSection(CheckoutOptions.Section));
+        services.AddScoped<CheckoutService>();
         return services;
     }
 
@@ -40,6 +48,7 @@ public static class BillingModule
     {
         PlanEndpoints.MapPublic(app);
         SubscriptionEndpoints.MapPanel(app);
+        CheckoutEndpoints.Map(app);
         return app;
     }
 

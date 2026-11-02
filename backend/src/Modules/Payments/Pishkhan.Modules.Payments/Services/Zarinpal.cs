@@ -120,3 +120,18 @@ internal sealed class ZarinpalGateway(HttpClient http, IOptions<PaymentsOptions>
         }
     }
 }
+
+internal sealed class ZarinpalClient(ZarinpalGateway gateway) : Contracts.IZarinpalClient
+{
+    public async Task<Contracts.ZarinpalStart> StartAsync(string merchantId, bool sandbox, long amountRial, Uri callback, string description, CancellationToken cancellationToken)
+    {
+        var started = await gateway.StartAsync(new GatewayMerchant(merchantId, sandbox), amountRial, callback, description, cancellationToken);
+        return new Contracts.ZarinpalStart(started.Authority, started.RedirectUrl, started.Error);
+    }
+
+    public async Task<Contracts.ZarinpalVerify> VerifyAsync(string merchantId, bool sandbox, long amountRial, string authority, CancellationToken cancellationToken)
+    {
+        var verified = await gateway.VerifyAsync(new GatewayMerchant(merchantId, sandbox), amountRial, authority, cancellationToken);
+        return new Contracts.ZarinpalVerify(verified.Ok, verified.Code, verified.ReferenceId, verified.CardMask);
+    }
+}

@@ -47,7 +47,7 @@ services
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
-    .AddBillingModule(configuration)
+    .AddBillingModule(configuration).AddBillingCheckout(configuration)
     .AddAgentModule(configuration).AddAgentReplies()
     .AddKnowledgeModule(configuration)
     .DecorateHandlers();

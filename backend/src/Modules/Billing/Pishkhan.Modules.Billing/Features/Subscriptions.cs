@@ -19,18 +19,22 @@ using Pishkhan.Web.OpenApi;
 
 namespace Pishkhan.Modules.Billing.Features;
 
-/// <summary>A subscription. <c>state</c>: active, trialing, expired (past its end), ended. <c>endReason</c>: replaced, cancelled, expired.</summary>
+/// <summary>
+/// A subscription. <c>state</c>: active, trialing, scheduled (paid for, starts at <c>startsAt</c>), expired (past its end), ended.
+/// <c>endReason</c>: replaced, cancelled, expired. <c>cycle</c> (monthly or annual) and <c>checkoutId</c> are set when it was bought.
+/// </summary>
 public sealed record SubscriptionResponse(
     Guid Id, Guid PlanId, string PlanCode, int PlanVersion, string State, bool Trial, DateTimeOffset StartsAt, DateTimeOffset? EndsAt,
-    DateTimeOffset? EndedAt, string? EndReason);
+    DateTimeOffset? EndedAt, string? EndReason, string? Cycle, Guid? CheckoutId);
 
 /// <summary>
 /// The workspace's plan now. <c>source</c>: subscription (granted plan or trial), free (no subscription: the published free plan) or
 /// none (no free plan is published; nothing is limited). <c>limits</c> maps a meter to its limit per period; null is unlimited.
+/// <c>upcoming</c>: periods already paid for (renewals and downgrades, state <c>scheduled</c>) in the order they start.
 /// </summary>
 public sealed record CurrentPlanResponse(
     string Source, Guid? PlanId, string? PlanCode, string? PlanName, int? PlanVersion, bool Trial, DateTimeOffset? EndsAt,
-    IReadOnlyDictionary<string, int?> Limits, SubscriptionResponse? Subscription);
+    IReadOnlyDictionary<string, int?> Limits, SubscriptionResponse? Subscription, IReadOnlyList<SubscriptionResponse> Upcoming);
 
 /// <summary>One meter: <c>used</c> this period (current count for channel_accounts and seats) against <c>limit</c> (null: unlimited).</summary>
 public sealed record UsageMeter(string Meter, long Used, int? Limit);
@@ -51,7 +55,7 @@ public sealed record ExtendSubscriptionRequest(int Days, string Reason);
 
 public sealed record SubscriptionActionRequest(string Reason);
 
-/// <summary>Subscriptions, plan grants and usage (BE-1.11; admin plan 4.2 and 4.4 basic). Paid checkout is Phase 2 (BE-2.8).</summary>
+/// <summary>Subscriptions, plan grants and usage (BE-1.11; admin plan 4.2 and 4.4 basic). Paid checkout: <see cref="CheckoutEndpoints"/>.</summary>
 internal static class SubscriptionEndpoints
 {
     private static readonly string[] Readers = [StaffRoles.SuperAdmin, StaffRoles.Finance, StaffRoles.Support, StaffRoles.ReadOnly];
@@ -278,10 +282,15 @@ internal static class SubscriptionEndpoints
         var limits = await EntitlementService.LoadAsync(db, workspaceId, now, ct);
         var subscription = await Subscriptions(db)
             .Where(s => s.WorkspaceId == workspaceId && s.Status == SubscriptionStatus.Active)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(ct)
+            ?? await Subscription.Current(Subscriptions(db), workspaceId, now).FirstOrDefaultAsync(ct);
+        var upcoming = await Subscriptions(db)
+            .Where(s => s.WorkspaceId == workspaceId && s.Status == SubscriptionStatus.Scheduled && (subscription == null || s.Id != subscription.Id))
+            .OrderBy(s => s.StartsAt)
+            .ToListAsync(ct);
         return new CurrentPlanResponse(
             limits.Source, limits.PlanId, limits.PlanCode, limits.PlanName, limits.PlanVersion, limits.Trial, limits.EndsAt, limits.Limits,
-            subscription is null ? null : ToResponse(subscription, now));
+            subscription is null ? null : ToResponse(subscription, now), [.. upcoming.Where(s => s.EndsAt is not { } end || end > now).Select(s => ToResponse(s, now))]);
     }
 
     private static async Task<UsageResponse> UsageAsync(
@@ -307,7 +316,7 @@ internal static class SubscriptionEndpoints
         db.Subscriptions.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]);
 
     private static SubscriptionResponse ToResponse(Subscription s, DateTimeOffset now) =>
-        new(s.Id, s.PlanId, s.PlanCode, s.PlanVersion, s.StateName(now), s.Trial, s.StartsAt, s.EndsAt, s.EndedAt, s.EndReason);
+        new(s.Id, s.PlanId, s.PlanCode, s.PlanVersion, s.StateName(now), s.Trial, s.StartsAt, s.EndsAt, s.EndedAt, s.EndReason, s.Cycle, s.CheckoutId);
 }
 
 /// <summary>Subscription changes are audited in the workspace, so the owner's audit view shows them, by the signed-in staff member.</summary>
