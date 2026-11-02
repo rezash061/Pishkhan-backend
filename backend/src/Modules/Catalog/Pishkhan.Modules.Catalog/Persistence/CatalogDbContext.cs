@@ -26,6 +26,8 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
 
     public DbSet<CatalogImport> Imports => Set<CatalogImport>();
 
+    public DbSet<PriceChangeBatch> PriceChanges => Set<PriceChangeBatch>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Category>(b =>
@@ -73,6 +75,17 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             b.Property(x => x.Name).HasMaxLength(100);
             Json(b.Property(x => x.Items));
             b.HasIndex(x => x.WorkspaceId).HasFilter("deleted_at IS NULL");
+            b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<PriceChangeBatch>(b =>
+        {
+            b.ToTable("price_changes");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            Json(b.Property(x => x.Scope));
+            Json(b.Property(x => x.Rule));
+            Json(b.Property(x => x.Items));
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
             b.Ignore(x => x.DomainEvents);
         });
 

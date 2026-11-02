@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\Orders\Pishkhan.Modules.Orders.Contracts\Pishkhan.Modules.Orders.Contracts.csproj" />
     <ProjectReference Include="..\..\Files\Pishkhan.Modules.Files.Contracts\Pishkhan.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ClosedXML" />

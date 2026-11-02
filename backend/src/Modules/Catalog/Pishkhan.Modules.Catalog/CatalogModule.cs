@@ -17,6 +17,7 @@ public static class CatalogModule
     {
         services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.SchemaName);
         services.AddScoped<ICatalogQueries, CatalogQueries>();
+        services.AddScoped<PriceChanges>();
         return services;
     }
 
@@ -28,6 +29,7 @@ public static class CatalogModule
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder app)
     {
         CatalogEndpoints.Map(app);
+        PriceChangeEndpoints.Map(app);
         return app;
     }
 }

@@ -186,6 +186,35 @@ public sealed class Product : AggregateRoot<Guid>, ITenantOwned, ISoftDeletable
         return changed;
     }
 
+    /// <summary>The product's own price (<paramref name="variantId"/> null) or a live variant's own price; null when it has none.</summary>
+    internal long? OwnPrice(Guid? variantId) =>
+        variantId is { } id ? Variants.FirstOrDefault(v => v.Id == id && v.DeletedAt is null)?.Price : Price;
+
+    /// <summary>Sets one own price (a bulk price change); false when the product or variant has no own price to change.</summary>
+    internal bool SetPrice(Guid? variantId, long price, DateTimeOffset now)
+    {
+        if (variantId is { } id)
+        {
+            if (Variants.FirstOrDefault(v => v.Id == id && v.DeletedAt is null) is not { Price: not null } variant)
+            {
+                return false;
+            }
+
+            variant.SetPrice(price, now);
+        }
+        else if (Price is null)
+        {
+            return false;
+        }
+        else
+        {
+            Price = price;
+        }
+
+        Touch(now);
+        return true;
+    }
+
     private void Touch(DateTimeOffset now)
     {
         UpdatedAt = now;
@@ -274,6 +303,12 @@ public sealed class ProductVariant : Entity<Guid>, ITenantOwned, ISoftDeletable
         StockPolicy = d.StockPolicy;
         Stock = d.StockPolicy == StockPolicies.Unlimited ? null : d.Stock ?? 0;
         SortOrder = order;
+        UpdatedAt = now;
+    }
+
+    internal void SetPrice(long price, DateTimeOffset now)
+    {
+        Price = price;
         UpdatedAt = now;
     }
 
