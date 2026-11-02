@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.2: Zarinpal payment links, 2026-11-02)
+- New Payments module (`payments` schema). Migration `InitialPayments`. Decisions are in ADR 0011.
+- The seller connects their own Zarinpal merchant account. Money goes straight to the seller; Pishkhan never holds it.
+  - `GET`, `PUT` and `DELETE /workspaces/{id}/payments/merchant-account`. Reading needs `workspace.settings.read`; changing needs `workspace.settings.write`.
+  - `PUT` takes `{provider?, merchantId?, sandbox, enabled}`. The merchant ID must be Zarinpal's 36-character ID (`payments.merchant_id_invalid`). Leave it out to keep the stored one.
+  - The merchant ID is stored encrypted. Responses show only its last four characters (`merchantIdHint`).
+  - Connecting, updating and disconnecting are audited (`payments.merchant_connected`, `payments.merchant_updated`, `payments.merchant_disconnected`).
+- Payment links:
+  - `POST /workspaces/{id}/orders/{orderId}/payment-links` (`workspace.orders.write`, accepts `Idempotency-Key`). A complete draft moves to `awaiting_payment`. Errors: 422 `payments.merchant_missing`, 409 `orders.not_payable`, 400 `orders.incomplete`.
+  - The link's amount is the order total when the link is made. A new link cancels the older active ones.
+  - `GET /workspaces/{id}/orders/{orderId}/payment-links` lists them, newest first.
+  - `POST /workspaces/{id}/payment-links/{linkId}/cancel`. A link that isn't active is 409 `payments.link_not_active`.
+  - Link `status` is `active`, `paid`, `cancelled` or `expired`. A link can be paid for 3 days (`Payments:LinkLifetime`) and allows 20 payment attempts.
+  - Each link also returns `url`, `attempts`, `lastError` (Zarinpal's code, or `cancelled` when the customer left the gateway), `referenceId` and `cardMask`.
+  - When an order leaves `awaiting_payment` (back to draft, cancelled, or marked paid by hand), its active links are cancelled.
+- The customer's payment page, `GET /pay/{token}`, is a small Persian page with the order lines, the total in Toman and a pay button. It is served by the Api host, outside the API documents, and rate-limited per IP.
+  - The token is 32 random URL-safe characters.
+  - The page has its own CSP: no scripts, and the form may only go to us and to Zarinpal.
+  - The button (`POST /pay/{token}`) opens a payment at Zarinpal and redirects the customer there (303).
+- Zarinpal's callback, `GET /pay/callback/zarinpal`:
+  - Verifies the payment with Zarinpal for the link's own amount. The callback's `Status` only says whether the customer finished; it is never trusted to mark anything paid.
+  - A verified payment marks the link paid and publishes `payments.payment-confirmed.v1` (`PaymentConfirmed`), audited as `payment.confirmed`. The order then moves to `paid` (System actor, with the reference ID in its timeline), which takes the stock.
+  - A forged, repeated or late callback verifies nothing again and never pays twice. An unknown authority is 404.
+  - A verified payment for an order no longer awaiting payment, or for a different total, is recorded as a note on the order and does not change its status.
+- Configuration: `Payments:PublicBaseUrl` (where `/pay` is served, for links and the callback), `Payments:Zarinpal:BaseUrl` and `Payments:Zarinpal:SandboxBaseUrl`.
+- The security headers middleware now keeps a `Content-Security-Policy` an endpoint has set.
+
 ### Added (Phase 2, BE-2.1: orders, 2026-11-01)
 - New Orders module (`orders` schema). Migration `InitialOrders`. Decisions are in ADR 0010.
 - Statuses: `draft → awaiting_payment → paid → preparing → shipped → delivered → completed`, plus `cancelled`, `refunded` and `returned`.

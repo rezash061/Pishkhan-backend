@@ -288,6 +288,15 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
         ids["sourceId"] = await Created("/knowledge/sources", new { kind = "faq", question = "ارسال چند روز است؟", answer = "دو تا چهار روز کاری." });
         ids["id"] = await Created("/quick-replies", new { shortcut = "salam", text = "سلام، خوش آمدید" });
         ids["orderId"] = await Created("/orders", new { conversationId = Guid.Parse(ids["conversationId"]), items = new[] { new { productId = Guid.Parse(ids["productId"]), quantity = 1 } } });
+        (await b.Client.PutAsJsonAsync(url + "/payments/merchant-account", new { merchantId = Guid.NewGuid().ToString() }, Ct)).EnsureSuccessStatusCode();
+        var payable = await Created("/orders", new
+        {
+            items = new[] { new { productId = Guid.Parse(ids["productId"]), quantity = 1 } },
+            customerName = "مشتری ب",
+            phone = "09123456789",
+            address = new { text = "شیراز، خیابان زند، کوچه ۱۲، پلاک ۴ کد پستی ۷۱۳۴۸۹۵۶۴۱" },
+        });
+        ids["linkId"] = await Created($"/orders/{payable}/payment-links", new { });
         ids["invitationId"] = await Created("/invitations", new { phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999), role = "agent" });
         return ids;
     }

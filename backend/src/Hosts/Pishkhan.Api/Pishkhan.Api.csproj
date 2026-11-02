@@ -27,5 +27,6 @@
     <ProjectReference Include="..\..\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\Pishkhan.Modules.Catalog\Pishkhan.Modules.Catalog.csproj" />
     <ProjectReference Include="..\..\Modules\Orders\Pishkhan.Modules.Orders\Pishkhan.Modules.Orders.csproj" />
+    <ProjectReference Include="..\..\Modules\Payments\Pishkhan.Modules.Payments\Pishkhan.Modules.Payments.csproj" />
   </ItemGroup>
 </Project>

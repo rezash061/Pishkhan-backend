@@ -11,6 +11,7 @@ using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Orders;
+using Pishkhan.Modules.Payments;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
@@ -42,6 +43,7 @@ services
     .AddContentModule(configuration)
     .AddCatalogModule(configuration)
     .AddOrdersModule(configuration)
+    .AddPaymentsModule(configuration)
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)
     .AddAnalyticsModule(configuration)
@@ -67,6 +69,7 @@ app.MapAutomationEndpoints();
 app.MapContentEndpoints();
 app.MapCatalogEndpoints();
 app.MapOrderEndpoints();
+app.MapPaymentsEndpoints();
 app.MapBillingEndpoints();
 app.MapKnowledgeEndpoints();
 app.MapAgentEndpoints();

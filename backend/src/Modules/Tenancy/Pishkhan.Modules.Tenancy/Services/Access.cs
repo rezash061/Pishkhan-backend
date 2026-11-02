@@ -123,4 +123,11 @@ internal sealed class WorkspaceQueries(TenancyDbContext db, HybridCache cache) :
             Entry,
             [CacheTags.Workspace(workspaceId)],
             cancellationToken);
+
+    public async Task<string?> GetNameAsync(Guid workspaceId, CancellationToken cancellationToken) =>
+        await db.Workspaces.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(w => w.Id == workspaceId)
+            .Select(w => w.Name)
+            .FirstOrDefaultAsync(cancellationToken);
 }

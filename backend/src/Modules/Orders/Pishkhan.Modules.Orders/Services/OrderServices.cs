@@ -190,6 +190,33 @@ internal sealed class OrderCommands(OrdersDbContext db, OrderPricing pricing, Or
         return Result(null, order, priced, [.. order.MissingForShipping()], request.Items);
     }
 
+    public async Task<PaymentRequestResult> RequestPaymentAsync(Guid orderId, Guid userId, CancellationToken cancellationToken)
+    {
+        var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+        {
+            return new PaymentRequestResult("orders.not_found", null);
+        }
+
+        if (order.Status == OrderStatuses.Draft)
+        {
+            if (order.MissingForPayment().Count > 0)
+            {
+                return new PaymentRequestResult("orders.incomplete", OrderQueries.ForPayment(order));
+            }
+
+            var now = clock.UtcNow;
+            order.MoveTo(OrderStatuses.AwaitingPayment, now);
+            db.Events.Add(OrderEvent.For(order, OrderEventKinds.StatusChanged, OrderActor.User(userId), now, OrderStatuses.Draft));
+            db.Publish(order.Changed(OrderStatuses.Draft, now), order.Id.ToString(), order.WorkspaceId);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return order.Status == OrderStatuses.AwaitingPayment
+            ? new PaymentRequestResult(null, OrderQueries.ForPayment(order))
+            : new PaymentRequestResult("orders.not_payable", OrderQueries.ForPayment(order));
+    }
+
     private static List<LineRequest> Lines(IReadOnlyList<DraftOrderItem> items) => [.. items.Select(i => new LineRequest(i.ProductId, i.VariantId, i.Quantity))];
 
     private static DraftOrderResult Result(PricingError? error, Order? order, List<OrderItem> items, IReadOnlyList<string> missing, IReadOnlyList<DraftOrderItem> asked)

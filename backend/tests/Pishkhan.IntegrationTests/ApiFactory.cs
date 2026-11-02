@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,6 +16,9 @@ namespace Pishkhan.IntegrationTests;
 public sealed class ApiFactory(InfraFixture infra, IReadOnlyDictionary<string, string?>? overrides = null) : WebApplicationFactory<Program>
 {
     private bool _created;
+
+    /// <summary>Replaces services after the host's own registrations (fake providers).</summary>
+    public Action<IServiceCollection>? TestServices { get; init; }
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -44,6 +48,10 @@ public sealed class ApiFactory(InfraFixture infra, IReadOnlyDictionary<string, s
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        if (TestServices is { } configure)
+        {
+            builder.ConfigureTestServices(configure);
+        }
 
         // As in Development: every registration must resolve at startup, so a module needing a service its host lacks fails here.
         builder.UseDefaultServiceProvider(o =>
