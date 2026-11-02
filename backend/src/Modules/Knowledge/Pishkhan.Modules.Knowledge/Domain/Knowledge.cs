@@ -166,3 +166,15 @@ public sealed class UnansweredQuestion : Entity<Guid>, ITenantOwned
         CreatedAt = askedAt,
     };
 }
+
+/// <summary>A FAQ key of an industry template the workspace has received (BE-2.9), kept after the FAQ is deleted so it is never added twice.</summary>
+public sealed class TemplateItem : ITenantOwned
+{
+    public Guid WorkspaceId { get; init; }
+
+    public required string Key { get; init; }
+
+    public Guid SourceId { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; }
+}

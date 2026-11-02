@@ -434,6 +434,11 @@ public sealed class Flow : AggregateRoot<Guid>, ITenantOwned, ISoftDeletable
 
     public DateTimeOffset? DeletedAt { get; set; }
 
+    /// <summary>The industry template's key for a flow it added (BE-2.9); kept when the flow is deleted, so the template never adds it twice.</summary>
+    public string? TemplateKey { get; private set; }
+
+    internal void FromTemplate(string key) => TemplateKey = key;
+
     public static Flow Create(Guid workspaceId, string name, FlowGraph draft, DateTimeOffset now) => new()
     {
         Id = Uuid.NewV7(now),

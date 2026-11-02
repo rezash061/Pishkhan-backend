@@ -51,6 +51,7 @@ public static class AgentModule
     public static IServiceCollection AddAgentReplies(this IServiceCollection services)
     {
         services.AddScoped<ReplyPipeline>();
+        services.AddScoped<IAgentTemplates, AgentTemplates>();
         return services;
     }
 

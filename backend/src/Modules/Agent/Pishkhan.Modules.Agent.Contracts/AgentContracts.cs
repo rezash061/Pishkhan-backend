@@ -22,3 +22,13 @@ public static class AiReplyOutcomes
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Sent, HandedOff, Failed };
 }
+
+/// <summary>The AI agent's persona an industry template suggests (BE-2.9). <see cref="Tone"/> is friendly, formal or playful.</summary>
+public sealed record TemplateAgentProfile(string Name, string Tone, string? BrandVoice, IReadOnlyList<string> NeverSay, IReadOnlyList<string> HandoffKeywords);
+
+/// <summary>Sets up the AI agent from an industry template (BE-2.9).</summary>
+public interface IAgentTemplates
+{
+    /// <summary>Saves the profile only when the workspace has not set one up yet; false when it already had one (nothing changes).</summary>
+    Task<bool> ApplyProfileAsync(Guid workspaceId, TemplateAgentProfile profile, CancellationToken cancellationToken);
+}

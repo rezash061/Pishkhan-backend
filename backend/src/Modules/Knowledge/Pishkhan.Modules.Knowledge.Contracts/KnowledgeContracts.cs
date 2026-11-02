@@ -34,3 +34,16 @@ public interface IKnowledgeSearch
 {
     Task<IReadOnlyList<KnowledgeHit>> SearchAsync(string query, int limit, CancellationToken cancellationToken);
 }
+
+/// <summary>A FAQ an industry template suggests (BE-2.9). <see cref="Key"/> is the template's own id for it.</summary>
+public sealed record TemplateFaq(string Key, string Question, string Answer);
+
+/// <summary>Adds an industry template's FAQs to a workspace (BE-2.9).</summary>
+public interface IKnowledgeTemplates
+{
+    /// <summary>
+    /// Adds each FAQ whose key the workspace has never had, disabled so the owner checks the answer before the AI uses it. Applying the
+    /// same FAQs again adds nothing, and a FAQ the owner deleted is not brought back. Returns how many were added and how many were skipped.
+    /// </summary>
+    Task<(int Created, int Skipped)> ApplyFaqsAsync(Guid workspaceId, IReadOnlyList<TemplateFaq> faqs, Guid? userId, CancellationToken cancellationToken);
+}

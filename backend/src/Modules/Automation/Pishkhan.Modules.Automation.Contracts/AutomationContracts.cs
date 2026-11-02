@@ -126,3 +126,26 @@ public interface IFlowQueries
     /// <summary>Whether the flow exists in the current workspace (deleted flows do not).</summary>
     Task<bool> FlowExistsAsync(Guid flowId, CancellationToken cancellationToken);
 }
+
+/// <summary>A flow an industry template suggests (BE-2.9): <see cref="Graph"/> in the same JSON shape as the flows API.</summary>
+public sealed record TemplateFlow(string Key, string Name, System.Text.Json.JsonElement Graph);
+
+/// <summary>
+/// A rule an industry template suggests (BE-2.9): <see cref="Trigger"/> and <see cref="Actions"/> in the same JSON shape as the rules API,
+/// except that a <c>start_flow</c> action names its flow by the template's <c>flowKey</c>.
+/// </summary>
+public sealed record TemplateRule(string Key, string Name, string TriggerKind, System.Text.Json.JsonElement Trigger, System.Text.Json.JsonElement Actions, int Priority);
+
+/// <summary>What applying a template's automations did.</summary>
+public sealed record TemplateAutomationResult(int FlowsCreated, int RulesCreated, int Skipped);
+
+/// <summary>Adds an industry template's flows and rules to a workspace (BE-2.9).</summary>
+public interface IAutomationTemplates
+{
+    /// <summary>
+    /// Adds each flow and rule whose key the workspace has never had (deleted ones included, so applying again never brings back what the
+    /// owner removed). Flows are published so rules can start them; rules are added disabled for the owner to review and switch on.
+    /// Throws <see cref="InvalidOperationException"/> when the template itself is invalid.
+    /// </summary>
+    Task<TemplateAutomationResult> ApplyAsync(Guid workspaceId, IReadOnlyList<TemplateFlow> flows, IReadOnlyList<TemplateRule> rules, CancellationToken cancellationToken);
+}
