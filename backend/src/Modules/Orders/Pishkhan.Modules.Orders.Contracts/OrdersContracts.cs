@@ -98,4 +98,28 @@ public interface IOrderCommands
     /// <see cref="DraftOrderResult.Missing"/> lists what the seller still needs (address, postal code, phone) before asking for payment.
     /// </summary>
     Task<DraftOrderResult> SaveDraftAsync(DraftOrderRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Readies an order for payment: a complete draft moves to <c>awaiting_payment</c> (by the given user); an order already awaiting
+    /// payment stays. Any other status cannot be paid.
+    /// </summary>
+    Task<PaymentRequestResult> RequestPaymentAsync(Guid orderId, Guid userId, CancellationToken cancellationToken);
 }
+
+/// <summary>An order as the payment page shows it. Amounts are Rial.</summary>
+public sealed record OrderForPayment(Guid Id, Guid WorkspaceId, long Number, string Status, Money Total, IReadOnlyList<OrderForPaymentLine> Lines);
+
+public sealed record OrderForPaymentLine(string Title, string? VariantLabel, int Quantity, Money LineTotal);
+
+/// <summary>In-process reads of the Orders module, scoped to the current workspace.</summary>
+public interface IOrderQueries
+{
+    Task<OrderForPayment?> GetForPaymentAsync(Guid orderId, CancellationToken cancellationToken);
+}
+
+/// <summary>Why an order cannot be paid now: <c>orders.not_found</c>, <c>orders.not_payable</c> (status) or <c>orders.incomplete</c> (no items or zero total).</summary>
+public sealed record PaymentRequestResult(string? Error, OrderForPayment? Order)
+{
+    public bool Ok => Error is null;
+}
+

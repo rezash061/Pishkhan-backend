@@ -28,6 +28,10 @@
     <Project Path="src/Modules/Orders/Pishkhan.Modules.Orders.Contracts/Pishkhan.Modules.Orders.Contracts.csproj" />
     <Project Path="src/Modules/Orders/Pishkhan.Modules.Orders/Pishkhan.Modules.Orders.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Payments/">
+    <Project Path="src/Modules/Payments/Pishkhan.Modules.Payments.Contracts/Pishkhan.Modules.Payments.Contracts.csproj" />
+    <Project Path="src/Modules/Payments/Pishkhan.Modules.Payments/Pishkhan.Modules.Payments.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Analytics/">
     <Project Path="src/Modules/Analytics/Pishkhan.Modules.Analytics.Contracts/Pishkhan.Modules.Analytics.Contracts.csproj" />
     <Project Path="src/Modules/Analytics/Pishkhan.Modules.Analytics/Pishkhan.Modules.Analytics.csproj" />

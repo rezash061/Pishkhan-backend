@@ -14,7 +14,12 @@ public static class SecurityHeadersExtensions
             headers.XContentTypeOptions = "nosniff";
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             headers.XFrameOptions = "DENY";
-            headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+            if (string.IsNullOrEmpty(headers.ContentSecurityPolicy))
+            {
+                // An endpoint that serves HTML (the payment page) sets its own policy before the response starts.
+                headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+            }
+
             headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
             headers["Cross-Origin-Resource-Policy"] = "same-site";
             return Task.CompletedTask;

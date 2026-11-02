@@ -44,4 +44,7 @@ public interface IWorkspaceQueries
 
     /// <summary>The workspace's business hours (cached; cleared on workspace changes). Unknown workspaces get <see cref="BusinessHours.Default"/>.</summary>
     Task<BusinessHours> GetBusinessHoursAsync(Guid workspaceId, CancellationToken cancellationToken);
+
+    /// <summary>The workspace's display name (the shop name customers see), or null for an unknown workspace.</summary>
+    Task<string?> GetNameAsync(Guid workspaceId, CancellationToken cancellationToken);
 }

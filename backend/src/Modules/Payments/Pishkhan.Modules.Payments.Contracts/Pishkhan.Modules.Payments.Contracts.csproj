@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Public surface of the module: integration events, query interfaces and DTOs. Other modules may reference only this project. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.SharedKernel\Pishkhan.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Contracts\Pishkhan.Contracts.csproj" />
+  </ItemGroup>
+</Project>

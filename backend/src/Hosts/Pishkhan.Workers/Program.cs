@@ -11,6 +11,7 @@ using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Orders;
+using Pishkhan.Modules.Payments;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
@@ -38,6 +39,7 @@ services
     .AddAutomationModule(configuration)
     .AddCatalogModule(configuration)
     .AddOrdersModule(configuration)
+    .AddPaymentsModule(configuration)
     .AddAgentModule(configuration).AddAgentReplies()
     .AddAuditModule(configuration)
     .AddNotificationsModule(configuration)
@@ -58,6 +60,8 @@ services.AddPishkhanMessaging(configuration, "workers", m => m
     .AddAutomationOutboundConsumers()
     .AddAutomationPlatformConsumers()
     .AddCatalogConsumers()
+    .AddOrdersConsumers()
+    .AddPaymentsConsumers()
     .AddFilesConsumers()
     .AddTenancyPlatformConsumers()
     .AddAuditConsumers()
