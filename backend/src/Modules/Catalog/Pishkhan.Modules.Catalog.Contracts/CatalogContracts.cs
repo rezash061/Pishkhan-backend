@@ -33,6 +33,9 @@ public static class ProductChangeKinds
 {
     public const string Created = "created";
     public const string Updated = "updated";
+
+    /// <summary>A bulk price change, or its undo.</summary>
+    public const string PricesChanged = "prices_changed";
     public const string Deleted = "deleted";
 }
 
@@ -41,6 +44,13 @@ public static class ProductChangeKinds
 public sealed record ProductChanged(Guid WorkspaceId, Guid ProductId, string Change, int Revision) : IIntegrationEvent;
 
 /// <summary>Commerce group: reads an uploaded Excel sheet and upserts its products.</summary>
+/// <summary>
+/// A bulk price change (or its undo, <see cref="Undo"/>) was applied. Every product in it also gets a <see cref="ProductChanged"/>; this one
+/// is for consumers that care about the batch as a whole.
+/// </summary>
+[IntegrationEvent(Topics.PricesUpdated)]
+public sealed record PricesUpdated(Guid WorkspaceId, Guid BatchId, IReadOnlyList<Guid> ProductIds, bool Undo, DateTimeOffset OccurredAt) : IIntegrationEvent;
+
 [IntegrationEvent(Topics.CatalogImportRequested)]
 public sealed record CatalogImportRequested(Guid ImportId) : IIntegrationEvent;
 

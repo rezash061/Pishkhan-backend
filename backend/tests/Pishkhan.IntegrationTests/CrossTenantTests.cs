@@ -297,6 +297,7 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
             address = new { text = "شیراز، خیابان زند، کوچه ۱۲، پلاک ۴ کد پستی ۷۱۳۴۸۹۵۶۴۱" },
         });
         ids["linkId"] = await Created($"/orders/{payable}/payment-links", new { });
+        ids["batchId"] = await Created("/catalog/price-changes", new { scope = new { productIds = new[] { Guid.Parse(ids["productId"]) } }, kind = "percent", percent = 10 });
         ids["invitationId"] = await Created("/invitations", new { phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999), role = "agent" });
         return ids;
     }

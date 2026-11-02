@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.6: bulk price update, 2026-11-02)
+- Change many prices at once under `/workspaces/{id}/catalog/price-changes` (`workspace.catalog.write`; reading the history needs `workspace.catalog.read`). Migration `PriceChanges` (`catalog.price_changes`).
+- Which products (`scope`): any of `productIds` (up to 1,000), `categoryId` (with its subcategories), `tag` and `status`, which must all match. Or `all: true`. Products priced by formula are never changed. At most 5,000 products (422 `catalog.price_change_too_large`).
+- How prices change:
+  - `kind: "percent"` with `percent` from −90 to 500 (up to two decimals).
+  - `kind: "amount"` with `amount` in Rial; negative lowers prices.
+  - New prices are rounded to `roundTo` Toman (1, 100, 500, 1000, 5000, 10000, 50000 or 100000; default 1) by `roundMode` (`nearest`, the default, `up` or `down`).
+- Changed prices: the product's own price and every variant's own price. Variants that use the product's price follow it.
+- `POST /preview` saves nothing. It returns every price that changes (old and new, with product title and variant label), the prices that would reach zero or below (`invalid`), and a `fingerprint`.
+- `POST` (accepts `Idempotency-Key`) applies the same calculation as one batch, so the result is exactly the preview.
+  - With the preview's `fingerprint`, a catalog change since the preview gives 409 `catalog.price_change_stale`.
+  - 422 `catalog.price_change_below_zero` while any price would reach zero or below; 422 `catalog.price_change_empty` when nothing changes.
+  - Audited as `catalog.prices_changed`.
+- `GET` lists the last 50 batches. `GET /{batchId}` adds every price changed.
+- `POST /{batchId}/undo` within 24 hours puts back every price that still has the batch's new value. Prices changed by hand since are left alone and counted in `undoSkipped`. 409 `catalog.price_change_undone` or `catalog.price_change_undo_expired`. Audited as `catalog.prices_change_undone`.
+- Every changed product publishes `ProductChanged` with the new change kind `prices_changed`, so the AI's knowledge re-indexes it. Each batch and each undo also publishes `catalog.prices-updated.v1` (`PricesUpdated`). Catalog caches, cards included, are invalidated in the same transaction.
+
 ### Added (Phase 2, BE-2.2: Zarinpal payment links, 2026-11-02)
 - New Payments module (`payments` schema). Migration `InitialPayments`. Decisions are in ADR 0011.
 - The seller connects their own Zarinpal merchant account. Money goes straight to the seller; Pishkhan never holds it.
