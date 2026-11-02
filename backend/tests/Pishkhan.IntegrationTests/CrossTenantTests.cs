@@ -11,6 +11,8 @@ using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Agent.Domain;
 using Pishkhan.Modules.Agent.Persistence;
+using Pishkhan.Modules.Billing.Domain;
+using Pishkhan.Modules.Billing.Persistence;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Persistence;
@@ -269,6 +271,15 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
             notifications.Notifications.Add(notification);
             await notifications.SaveChangesAsync(Ct);
             ids["notificationId"] = notification.Id.ToString();
+
+            // A checkout as the seller's own purchase leaves it (the plan only names what was bought).
+            var billing = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+            var plan = Plan.Create("tenant-b", new PlanDraft("ب", null, null, 1_000_000, null, null, new Dictionary<string, int?>(), [], true, false, false, 0), b.UserId, now);
+            var checkout = Checkout.Create(
+                b.WorkspaceId, new CheckoutQuote(CheckoutKinds.New, BillingCycles.Monthly, 1_000_000, 0, 1_000_000, now, now.AddDays(30), null), plan, b.UserId, now);
+            billing.Checkouts.Add(checkout);
+            await billing.SaveChangesAsync(Ct);
+            ids["checkoutId"] = checkout.Id.ToString();
         }
 
         ids["channelId"] = accountId.ToString();

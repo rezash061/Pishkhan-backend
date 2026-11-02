@@ -26,6 +26,7 @@ public static class PaymentsModule
                 o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
             });
         services.AddTransient<IPaymentGateway>(sp => sp.GetRequiredService<ZarinpalGateway>());
+        services.AddTransient<Contracts.IZarinpalClient, ZarinpalClient>();
         services.AddScoped<MerchantSecrets>();
         services.AddScoped<PaymentFlow>();
         return services;

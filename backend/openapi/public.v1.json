@@ -1088,6 +1088,7 @@
       },
       "PublicPlan": {
         "required": [
+          "id",
           "code",
           "name",
           "tagline",
@@ -1105,6 +1106,10 @@
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "code": {
             "type": "string"
           },

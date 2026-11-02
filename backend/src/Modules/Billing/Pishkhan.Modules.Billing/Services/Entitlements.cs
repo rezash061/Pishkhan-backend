@@ -59,8 +59,8 @@ internal sealed class EntitlementService(HybridCache cache, IServiceScopeFactory
 
     internal static async Task<Entitlements> LoadAsync(BillingDbContext db, Guid workspaceId, DateTimeOffset now, CancellationToken ct)
     {
-        var subscription = await db.Subscriptions.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter])
-            .FirstOrDefaultAsync(s => s.WorkspaceId == workspaceId && s.Status == SubscriptionStatus.Active && (s.EndsAt == null || s.EndsAt > now), ct);
+        var subscription = await Subscription.Current(db.Subscriptions.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]), workspaceId, now)
+            .FirstOrDefaultAsync(ct);
         if (subscription is not null && await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == subscription.PlanId, ct) is { } plan)
         {
             return new Entitlements(
