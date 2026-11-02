@@ -44,10 +44,10 @@ public sealed record PlanSearch(string? Code, string? Status, int? Page, int? Pa
 
 /// <summary>
 /// A plan as the website's pricing page shows it (website contract <c>PublicPlan</c>). <c>aiConversations</c>, <c>channelAccounts</c>
-/// and <c>seats</c> are null when unlimited.
+/// and <c>seats</c> are null when unlimited. <c>id</c> is the published version, the <c>planId</c> a checkout takes.
 /// </summary>
 public sealed record PublicPlan(
-    string Code, string Name, string? Tagline, string? Description, Money Monthly, Money? Annual, int? AiConversations, Money? OveragePerConversation,
+    Guid Id, string Code, string Name, string? Tagline, string? Description, Money Monthly, Money? Annual, int? AiConversations, Money? OveragePerConversation,
     int? ChannelAccounts, int? Seats, bool Highlighted, bool IsFree, IReadOnlyDictionary<string, int?> Limits, IReadOnlyList<PlanFeature> Features);
 
 /// <summary>Plans and pricing (backend plan 9.13, admin plan 4.4): the back-office editor and the public price list.</summary>
@@ -401,8 +401,8 @@ internal static partial class PlanEndpoints
         new(p.Id, p.Code, p.VersionNumber, Plan.StatusName(p.Status), p.Name, p.Tagline, p.Description, Money.Rial(p.MonthlyPrice), Rial(p.AnnualPrice),
             Rial(p.OveragePerConversation), p.Limits, p.Features, p.IsPublic, p.IsFree, p.Highlighted, p.SortOrder, p.CreatedAt, p.UpdatedAt, p.PublishedAt);
 
-    private static PublicPlan ToPublic(Plan p) =>
-        new(p.Code, p.Name, p.Tagline, p.Description, Money.Rial(p.MonthlyPrice), Rial(p.AnnualPrice), p.Limit(BillingMeters.AiConversations),
+    internal static PublicPlan ToPublic(Plan p) =>
+        new(p.Id, p.Code, p.Name, p.Tagline, p.Description, Money.Rial(p.MonthlyPrice), Rial(p.AnnualPrice), p.Limit(BillingMeters.AiConversations),
             Rial(p.OveragePerConversation), p.Limit(BillingMeters.ChannelAccounts), p.Limit(BillingMeters.Seats), p.Highlighted, p.IsFree, p.Limits, p.Features);
 
     private static Money? Rial(long? amount) => amount is { } a ? Money.Rial(a) : null;

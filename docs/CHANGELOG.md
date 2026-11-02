@@ -7,6 +7,7 @@
 - Endpoints under `/workspaces/{id}/billing`, all needing `workspace.billing.manage`:
   - `POST /checkout/quote` with `{planId, cycle?}` (`monthly`, 30 days, the default; or `annual`, 365 days). It returns `kind`, `price`, `credit`, `amount`, `startsAt` and `endsAt` and saves nothing.
   - `POST /checkout` (accepts `Idempotency-Key`) gives 201 `{checkout, paymentUrl}`. Send the browser to `paymentUrl`.
+  - `GET /plans`: the plans on sale, in display order, as `{plan, current, kind, unavailable}`. `kind` is what buying the plan would be now; when it can't be bought, `kind` is null and `unavailable` holds the quote's error code.
   - `GET /checkouts` (last 100) and `GET /checkouts/{checkoutId}`. A paid checkout is the invoice: it has `invoiceNumber`, `referenceId`, `cardMask` and `subscriptionId`.
 - Kinds of checkout:
   - `new`: no paid plan now (the free plan, a trial or an expired plan). Starts at once.
@@ -22,6 +23,7 @@
   - The payment is verified with Zarinpal for the checkout's own amount. Only then does the subscription start; audited as `billing.checkout_paid`.
   - A cancelled payment fails with `error: "cancelled"`. A repeated callback changes nothing. If Zarinpal cannot be reached it stays `pending` and the same callback can be retried.
   - A checkout not paid within an hour shows as `expired`.
+- `GET /api/v1/public/plans`: each `PublicPlan` now has `id` (the published version), which is the `planId` a checkout takes.
 - Paid periods that start later are subscriptions in the new state `scheduled`. Entitlements switch to them when the current one ends. `GET /billing/subscription` lists them in the new `upcoming` field. Subscriptions also show `cycle` and `checkoutId`.
 
 ### Added (Phase 2, BE-2.6: bulk price update, 2026-11-02)

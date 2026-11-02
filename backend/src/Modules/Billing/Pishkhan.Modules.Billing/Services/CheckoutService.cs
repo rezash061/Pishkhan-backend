@@ -28,6 +28,11 @@ public sealed class CheckoutOptions
     public string ReturnUrl { get; set; } = "http://localhost:3000/billing";
 }
 
+internal sealed record CheckoutStanding(Subscription? Current, Plan? CurrentPlan, IReadOnlyList<Subscription> Scheduled, DateTimeOffset Now)
+{
+    public (CheckoutQuote? Quote, string? Error) Quote(Plan plan, string cycle) => CheckoutPlanner.Quote(plan, cycle, Current, CurrentPlan, Scheduled, Now);
+}
+
 internal sealed record StartedCheckout(Checkout? Checkout, Uri? PaymentUrl, string? Error);
 
 /// <summary>
@@ -47,14 +52,21 @@ internal sealed class CheckoutService(
             return (null, null, "billing.plan.not_found");
         }
 
+        var standing = await StandingAsync(workspaceId, ct);
+        var (quote, error) = standing.Quote(plan, cycle);
+        return (quote, plan, error);
+    }
+
+    /// <summary>The workspace's subscriptions as a checkout sees them now.</summary>
+    public async Task<CheckoutStanding> StandingAsync(Guid workspaceId, CancellationToken ct)
+    {
         var now = clock.UtcNow;
         var current = await Subscription.Current(db.Subscriptions.AsNoTracking(), workspaceId, now).FirstOrDefaultAsync(ct);
         var currentPlan = current is null ? null : await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == current.PlanId, ct);
         var scheduled = await db.Subscriptions.AsNoTracking()
             .Where(s => s.WorkspaceId == workspaceId && s.Status == SubscriptionStatus.Scheduled && s.StartsAt > now && (current == null || s.Id != current.Id))
             .ToListAsync(ct);
-        var (quote, error) = CheckoutPlanner.Quote(plan, cycle, current, currentPlan, scheduled, now);
-        return (quote, plan, error);
+        return new CheckoutStanding(current, currentPlan, scheduled, now);
     }
 
     public async Task<StartedCheckout> StartAsync(Guid workspaceId, Guid planId, string cycle, Guid userId, CancellationToken ct)

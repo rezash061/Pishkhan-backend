@@ -133,6 +133,26 @@ public sealed class CheckoutTests(InfraFixture infra, ChannelsHost workers) : IA
 
         var s = await SellerAsync();
 
+        // The price list carries each plan's id; the panel's list also says what buying each would be.
+        // (The public list is cached and invalidated through the bus, so wait for the new plan.)
+        JsonElement? listed = null;
+        for (var i = 0; i < 100 && listed is null; i++)
+        {
+            var priceList = await _api.CreateClient().GetFromJsonAsync<JsonElement>("/api/v1/public/plans", Ct);
+            listed = priceList.EnumerateArray().Where(p => p.GetProperty("code").GetString() == "basic-" + marker).Select(p => (JsonElement?)p).FirstOrDefault();
+            if (listed is null)
+            {
+                await Task.Delay(200, Ct);
+            }
+        }
+
+        listed.ShouldNotBeNull().GetProperty("id").GetGuid().ShouldBe(basic);
+        var options = await s.Client.GetFromJsonAsync<JsonElement>(s.Url + "/plans", Ct);
+        var basicOption = options.EnumerateArray().Single(o => o.GetProperty("plan").GetProperty("id").GetGuid() == basic);
+        basicOption.GetProperty("kind").GetString().ShouldBe("new");
+        basicOption.GetProperty("current").GetBoolean().ShouldBeFalse();
+        options.EnumerateArray().ShouldNotContain(o => o.GetProperty("plan").GetProperty("id").GetGuid() == hidden);
+
         // Quotes: a workspace without a paid plan buys from now; plans that are not on sale and missing cycles are refused.
         var quote = await SendAsync(s.Client, s.Url + "/checkout/quote", new { planId = basic, cycle = "annual" }, HttpStatusCode.OK);
         quote.GetProperty("kind").GetString().ShouldBe("new");
@@ -223,6 +243,11 @@ public sealed class CheckoutTests(InfraFixture infra, ChannelsHost workers) : IA
         upgrade.GetProperty("kind").GetString().ShouldBe("upgrade");
         current = await CurrentAsync(t);
         current.GetProperty("planId").GetGuid().ShouldBe(pro);
+        options = await t.Client.GetFromJsonAsync<JsonElement>(t.Url + "/plans", Ct);
+        var proOption = options.EnumerateArray().Single(o => o.GetProperty("plan").GetProperty("id").GetGuid() == pro);
+        proOption.GetProperty("current").GetBoolean().ShouldBeTrue();
+        proOption.GetProperty("kind").GetString().ShouldBe("renewal");
+        options.EnumerateArray().Single(o => o.GetProperty("plan").GetProperty("id").GetGuid() == basic).GetProperty("kind").GetString().ShouldBe("downgrade");
         var proEnd = current.GetProperty("subscription").GetProperty("endsAt").GetDateTimeOffset();
         proEnd.ShouldBeInRange(DateTimeOffset.UtcNow.AddDays(29.9), DateTimeOffset.UtcNow.AddDays(30.1));
 

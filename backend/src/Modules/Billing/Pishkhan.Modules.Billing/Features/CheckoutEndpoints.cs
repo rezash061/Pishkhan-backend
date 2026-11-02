@@ -37,12 +37,24 @@ public sealed record CheckoutResponse(
 /// <summary><c>paymentUrl</c> is Zarinpal's page; send the browser there. Zarinpal returns the payer to the panel's billing page with <c>?checkout={id}</c>.</summary>
 public sealed record StartCheckoutResponse(CheckoutResponse Checkout, string PaymentUrl);
 
+/// <summary>
+/// A plan on sale as the panel's billing page shows it. <c>current</c>: the workspace is on this plan now (the free plan when nothing is
+/// bought or granted, or during a trial). <c>kind</c>: what buying it (monthly, or annual when that is the only price) would be (new, renewal, upgrade or downgrade), or null when it cannot be bought now; then <c>unavailable</c> is the error code a
+/// quote would give.
+/// </summary>
+public sealed record BillingPlanOption(PublicPlan Plan, bool Current, string? Kind, string? Unavailable);
+
 /// <summary>Self-serve subscription checkout through Zarinpal into Pishkhan's own account (BE-2.8 checkout).</summary>
 internal static class CheckoutEndpoints
 {
     public static void Map(IEndpointRouteBuilder app)
     {
         var ws = app.MapPanelApi().MapGroup("/workspaces/{workspaceId:guid}/billing").WithTags("Billing");
+
+        ws.MapGet("/plans", PlansAsync)
+            .RequireWorkspacePermission(Permissions.BillingManage)
+            .WithSummary("Plans on sale, in display order, with what buying each would be for this workspace")
+            .Produces<IReadOnlyList<BillingPlanOption>>();
 
         ws.MapPost("/checkout/quote", QuoteAsync)
             .RequireWorkspacePermission(Permissions.BillingManage)
@@ -91,6 +103,24 @@ internal static class CheckoutEndpoints
 
         var (quote, plan, error) = await checkouts.QuoteAsync(workspaceId, request.PlanId, Cycle(request), ct);
         return error is not null ? Problem(error) : Results.Ok(ToResponse(quote!, plan!));
+    }
+
+    private static async Task<IResult> PlansAsync(Guid workspaceId, BillingDbContext db, CheckoutService checkouts, CancellationToken ct)
+    {
+        var plans = await db.Plans.AsNoTracking().Where(p => p.Status == PlanStatus.Published && p.IsPublic)
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.MonthlyPrice).ToListAsync(ct);
+        var standing = await checkouts.StandingAsync(workspaceId, ct);
+        return Results.Ok(plans.Select(plan =>
+        {
+            var (quote, error) = standing.Quote(plan, BillingCycles.Monthly);
+            if (error == "billing.checkout.cycle_not_offered")
+            {
+                (quote, error) = standing.Quote(plan, BillingCycles.Annual);
+            }
+
+            var current = standing.Current is { Trial: false } s ? s.PlanCode == plan.Code : plan.IsFree;
+            return new BillingPlanOption(PlanEndpoints.ToPublic(plan), current, quote?.Kind, error);
+        }).ToList());
     }
 
     private static async Task<IResult> StartAsync(Guid workspaceId, CheckoutRequest request, CheckoutService checkouts, ICurrentUser caller, IClock clock, CancellationToken ct)
