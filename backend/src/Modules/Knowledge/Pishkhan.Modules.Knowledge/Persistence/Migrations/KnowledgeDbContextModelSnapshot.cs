@@ -190,6 +190,177 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.FeedImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channel_account_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("ItemsFound")
+                        .HasColumnType("integer")
+                        .HasColumnName("items_found");
+
+                    b.Property<int>("MaxPostsToRead")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_posts_to_read");
+
+                    b.Property<int>("PostsAnalyzed")
+                        .HasColumnType("integer")
+                        .HasColumnName("posts_analyzed");
+
+                    b.Property<int>("PostsFailed")
+                        .HasColumnType("integer")
+                        .HasColumnName("posts_failed");
+
+                    b.Property<int>("PostsRead")
+                        .HasColumnType("integer")
+                        .HasColumnName("posts_read");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_feed_imports");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_feed_imports_workspace_id_created_at");
+
+                    b.HasIndex(new[] { "WorkspaceId" }, "ix_feed_imports_workspace_running")
+                        .IsUnique()
+                        .HasDatabaseName("ix_feed_imports_workspace_id")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("feed_imports", "knowledge");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.FeedImportItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Answer")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("answer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("image_url");
+
+                    b.Property<Guid>("ImportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("MediaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("media_id");
+
+                    b.Property<string>("Permalink")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("permalink");
+
+                    b.Property<long?>("Price")
+                        .HasColumnType("bigint")
+                        .HasColumnName("price");
+
+                    b.Property<bool>("PriceInCaption")
+                        .HasColumnType("boolean")
+                        .HasColumnName("price_in_caption");
+
+                    b.Property<string>("Question")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("question");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.PrimitiveCollection<List<string>>("Tags")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("tags");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_feed_import_items");
+
+                    b.HasIndex("WorkspaceId", "ImportId", "Status")
+                        .HasDatabaseName("ix_feed_import_items_workspace_id_import_id_status");
+
+                    b.ToTable("feed_import_items", "knowledge");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.KnowledgeChunk", b =>
                 {
                     b.Property<Guid>("Id")
