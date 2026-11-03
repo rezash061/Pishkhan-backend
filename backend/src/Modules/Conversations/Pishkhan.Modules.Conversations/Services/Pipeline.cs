@@ -74,6 +74,14 @@ internal sealed class InstagramIngestHandler(
             IReadOnlyList<InboundAttachment> media = inbound.ReplyToStoryId is null ? inbound.Attachments : [.. inbound.Attachments, new InboundAttachment("story_reply", inbound.ReplyToStoryUrl)];
             var attachments = media.Count == 0 ? null : JsonSerializer.Serialize(media, EnvelopeJson.Options);
             var stored = Message.Inbound(account.WorkspaceId, conversation.Id, inbound.Kind, Truncate(inbound.Text), Truncate(normalized), inbound.ExternalMessageId, attachments, now);
+
+            // A voice note without text is answered once it is transcribed (BE-2.4).
+            var voice = string.IsNullOrWhiteSpace(inbound.Text) ? VoiceNotes.AudioUrl(inbound.Attachments) : null;
+            if (voice is not null)
+            {
+                stored.AwaitTranscript();
+            }
+
             Db.Messages.Add(stored);
             Db.ExternalMessageKeys.Add(new ExternalMessageKey { ChannelAccountId = account.Id, ExternalId = inbound.ExternalMessageId, MessageId = stored.Id, CreatedAt = now });
             conversation.RecordInbound(inbound.SentAt, inbound.Text ?? $"[{inbound.Kind}]");
@@ -81,8 +89,12 @@ internal sealed class InstagramIngestHandler(
             Db.Publish(
                 new InboundMessageReceived(
                     conversation.Id, stored.Id, stored.CreatedAt, account.Id, account.Kind, conversation.ContactId, stored.Kind, stored.Text, stored.NormalizedText,
-                    inbound.Attachments.Count, inbound.Postback, inbound.ReplyToStoryId, inbound.SenderExternalId, isNew),
+                    inbound.Attachments.Count, inbound.Postback, inbound.ReplyToStoryId, inbound.SenderExternalId, isNew, AwaitingTranscript: voice is not null),
                 conversation.Id.ToString());
+            if (voice is not null)
+            {
+                Db.Publish(new VoiceNoteReceived(account.WorkspaceId, conversation.Id, stored.Id, stored.CreatedAt, voice), conversation.Id.ToString(), workspaceId: account.WorkspaceId);
+            }
         }
 
         // Comments are not conversation messages: Automation decides what to do with them (private reply, public reply, tags).
@@ -136,7 +148,7 @@ internal sealed class EchoReplyHandler(ConversationsDbContext db, IOptionsMonito
 {
     protected override async Task HandleOnceAsync(InboundMessageReceived message, EventEnvelope envelope, CancellationToken cancellationToken)
     {
-        if (!options.CurrentValue.EchoReplies || string.IsNullOrWhiteSpace(message.Text))
+        if (!options.CurrentValue.EchoReplies || message.AwaitingTranscript || string.IsNullOrWhiteSpace(message.Text))
         {
             return;
         }

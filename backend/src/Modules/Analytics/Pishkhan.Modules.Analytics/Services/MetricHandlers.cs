@@ -10,7 +10,7 @@ namespace Pishkhan.Modules.Analytics.Services;
 internal sealed class InboundMetricsHandler(AnalyticsDbContext db) : IdempotentHandler<InboundMessageReceived, AnalyticsDbContext>(db)
 {
     protected override Task HandleOnceAsync(InboundMessageReceived message, EventEnvelope envelope, CancellationToken cancellationToken) =>
-        envelope.WorkspaceId is { } workspaceId
+        envelope.WorkspaceId is { } workspaceId && !message.IsRepeat
             ? Db.AddAsync(workspaceId, message.MessageCreatedAt, new MetricsDelta(MessagesReceived: 1, NewConversations: message.IsNewConversation ? 1 : 0), cancellationToken)
             : Task.CompletedTask;
 }

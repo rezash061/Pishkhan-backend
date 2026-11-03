@@ -164,7 +164,7 @@ internal sealed class ConversationQueries(ConversationsDbContext db) : IConversa
             .Where(m => m.ConversationId == conversationId)
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
             .Take(limit)
-            .Select(m => new MessageSnapshot(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.HandledBy, m.Status))
+            .Select(m => new MessageSnapshot(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text ?? m.Transcript, m.HandledBy, m.Status))
             .ToListAsync(cancellationToken);
         rows.Reverse();
         return rows;

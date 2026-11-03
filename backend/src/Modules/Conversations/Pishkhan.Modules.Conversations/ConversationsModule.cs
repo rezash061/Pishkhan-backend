@@ -8,6 +8,7 @@ using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Automation.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Modules.Files.Contracts;
 using Pishkhan.Modules.Conversations.Features;
 using Pishkhan.Modules.Conversations.Persistence;
 using Pishkhan.Modules.Conversations.Realtime;
@@ -43,7 +44,9 @@ public static class ConversationsModule
         .AddConsumer<OutboundMessageRequested, OutboundSendHandler>(
             "outbound", new RetryPolicy(OutboundSendHandler.MaxAttempts, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(60)))
         .AddConsumer<TimerFired, OutboundDeferredHandler>("outbound")
-        .AddConsumer<ContactProfileRequested, ContactProfileHandler>("outbound");
+        .AddConsumer<ContactProfileRequested, ContactProfileHandler>("outbound")
+        .AddConsumer<VoiceNoteReceived, VoiceNoteHandler>("outbound")
+        .AddConsumer<FileScanCompleted, VoiceNoteScanHandler>("outbound");
 
     /// <summary>Api host: SignalR inbox (call after <c>AddPishkhanRealtime</c>).</summary>
     public static IServiceCollection AddConversationsRealtime(this IServiceCollection services)

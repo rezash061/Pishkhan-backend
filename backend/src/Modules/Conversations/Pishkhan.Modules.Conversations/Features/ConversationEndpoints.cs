@@ -45,7 +45,8 @@ public sealed record MessageAttachment(string Type, string? Url);
 
 public sealed record MessageResponse(
     Guid Id, DateTimeOffset CreatedAt, string Direction, string Kind, string? Text, string Status, string? ErrorCode, string? HandledBy,
-    Guid? SentBy, string? Tag, DateTimeOffset? SentAt, DateTimeOffset? ReadAt, IReadOnlyList<MessageAttachment> Attachments);
+    Guid? SentBy, string? Tag, DateTimeOffset? SentAt, DateTimeOffset? ReadAt, IReadOnlyList<MessageAttachment> Attachments,
+    string? Transcript = null, string? TranscriptStatus = null);
 
 public sealed record QuickReplyOption(string Title, string Payload);
 
@@ -176,7 +177,8 @@ internal static class ConversationEndpoints
         c.HandoffReason is { } reason ? new HandoffInfo(reason, c.HandoffSuggestedReply, c.HandedOffAt) : null);
 
     internal static MessageResponse ToResponse(Message m) =>
-        new(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.Status, m.ErrorCode, m.HandledBy, m.SentBy, m.Tag, m.SentAt, m.ReadAt, Attachments(m));
+        new(m.Id, m.CreatedAt, m.Direction, m.Kind, m.Text, m.Status, m.ErrorCode, m.HandledBy, m.SentBy, m.Tag, m.SentAt, m.ReadAt, Attachments(m),
+            m.Transcript, m.TranscriptStatus);
 
     internal static IReadOnlyList<MessageAttachment> Attachments(Message m)
     {

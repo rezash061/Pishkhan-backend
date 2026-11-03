@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.4: voice notes, 2026-11-03)
+- Customers' Instagram voice notes are transcribed and answered like typed messages.
+  1. The inbound pipeline marks a voice note `transcriptStatus: pending`. It publishes `InboundMessageReceived` with the new flag `awaitingTranscript`, so the inbox shows the note at once, and the new event `conversations.voice-note-received.v1` (`VoiceNoteReceived`).
+  2. The outbound group downloads the audio from Instagram's CDN (25 MB cap) into the Files module (purpose `message_attachment`), which scans it.
+  3. On a clean scan (`files.scan-completed.v1`) the audio is transcribed (task `transcribe`, language `fa`). The transcript is stored on the message, and the message is announced again as a text message (`isRepeat`) with the transcript as its text. Rules, flows and the AI then answer it.
+  4. When the audio cannot be downloaded, isn't clean, no speech model answers, or the transcript is empty, `transcriptStatus` is `failed` and the conversation is handed off with reason `voice_unavailable`. A voice note never goes unanswered in silence.
+- `Pishkhan.AI.ISpeechTranscriber` uses the OpenAI-compatible `/audio/transcriptions` endpoint. It tries the routes of task `transcribe` in order, with the chat circuit breakers and usage metering. Fake providers return a fixed Persian sentence.
+- `MessageResponse` has `transcript` and `transcriptStatus` (`pending`, `done` or `failed`). The inbox gets the transcript through the usual `message.created` push when it arrives, for the same message id.
+- Consumers of `InboundMessageReceived`:
+  - Automation and the echo spike ignore `awaitingTranscript` announcements.
+  - Analytics doesn't count `isRepeat` ones.
+  - The AI's conversation history uses the transcript.
+- Migration `VoiceNotes`: `transcript` and `transcript_status` on messages, and an index on `media_file_id`.
+- Not chunked: Instagram voice notes are at most a minute long, well under the endpoints' limits.
+
 ### Added (Phase 1, BE-1.9: knowledge score and onboarding interview, 2026-11-03)
 - `GET /workspaces/{id}/knowledge/score` (`workspace.settings.read`) returns `{score, industry, parts, facts, products, openUnanswered, suggestions}`. The score is 0–100, made of three parts:
   - **facts**, 60 points: the share of the industry template's required facts answered by an enabled source with that `factKey`. Without a template, 10 or more enabled FAQs earn the full part.

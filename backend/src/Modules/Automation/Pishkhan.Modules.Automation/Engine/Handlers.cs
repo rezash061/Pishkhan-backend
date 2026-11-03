@@ -36,7 +36,8 @@ internal sealed class InboundEngineHandler(
 {
     protected override async Task HandleOnceAsync(InboundMessageReceived message, EventEnvelope envelope, CancellationToken cancellationToken)
     {
-        if (tenant.WorkspaceId is not { } workspaceId
+        // A voice note is answered when its transcript arrives, as a second announcement of the message (BE-2.4).
+        if (message.AwaitingTranscript || tenant.WorkspaceId is not { } workspaceId
             || await conversations.GetAsync(message.ConversationId, cancellationToken) is not { } conversation
             || conversation.Status == ConversationStatuses.HandedOff)
         {

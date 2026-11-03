@@ -54,7 +54,16 @@ public sealed record InboundMessageReceived(
     string? Payload = null,
     string? ReplyToStoryId = null,
     string? ExternalUserId = null,
-    bool IsNewConversation = false) : IIntegrationEvent;
+    bool IsNewConversation = false,
+    bool AwaitingTranscript = false,
+    bool IsRepeat = false) : IIntegrationEvent;
+
+/// <summary>
+/// A customer's voice note (BE-2.4), stored and announced with <c>AwaitingTranscript</c>. The outbound group downloads and scans it, then
+/// transcribes it and announces the message again with the transcript as its text (<c>IsRepeat</c>: already counted).
+/// </summary>
+[IntegrationEvent(Topics.VoiceNoteReceived)]
+public sealed record VoiceNoteReceived(Guid WorkspaceId, Guid ConversationId, Guid MessageId, DateTimeOffset MessageCreatedAt, Uri AudioUrl) : IIntegrationEvent;
 
 /// <summary>
 /// Asks the outbound worker to send an already stored outbound message (status <c>queued</c>). <see cref="Deferrals"/> counts how often the

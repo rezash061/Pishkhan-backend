@@ -24,6 +24,7 @@ public static class AiExtensions
         services.AddSingleton<ModelRouter>();
         services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
         services.AddSingleton<IAiProviderProbe>(sp => sp.GetRequiredService<ModelRouter>());
+        services.AddSingleton<ISpeechTranscriber, SpeechTranscriber>();
         services.AddSingleton<IPromptRegistry, ConfigPromptRegistry>();
 
         // Per-route timeouts are applied by the router; the HttpClient only bounds a hung connection.

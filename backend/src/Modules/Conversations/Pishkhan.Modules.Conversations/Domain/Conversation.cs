@@ -318,6 +318,27 @@ public sealed class Message : ITenantOwned
 
     public Guid? MediaFileId { get; set; }
 
+    /// <summary>A voice note's text (BE-2.4), shown in the inbox and answered like a typed message.</summary>
+    public string? Transcript { get; private set; }
+
+    /// <summary>Null for other messages; <see cref="TranscriptStatuses"/> for voice notes.</summary>
+    public string? TranscriptStatus { get; private set; }
+
+    public void AwaitTranscript() => TranscriptStatus = TranscriptStatuses.Pending;
+
+    public void Transcribed(string text, DateTimeOffset now)
+    {
+        Transcript = text.Length <= 4_000 ? text : text[..4_000];
+        TranscriptStatus = TranscriptStatuses.Done;
+        UpdatedAt = now;
+    }
+
+    public void TranscriptFailed(DateTimeOffset now)
+    {
+        TranscriptStatus = TranscriptStatuses.Failed;
+        UpdatedAt = now;
+    }
+
     /// <summary>Raw attachment descriptors (type and CDN URL) until the media worker downloads them.</summary>
     public string? AttachmentsJson { get; init; }
 
@@ -468,4 +489,13 @@ public sealed class PrivateReplyKey
     public Guid MessageId { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
+}
+
+public static class TranscriptStatuses
+{
+    public const string Pending = "pending";
+    public const string Done = "done";
+
+    /// <summary>Not transcribed: the audio could not be fetched, was not clean, or no speech model answered. The conversation is handed to a person.</summary>
+    public const string Failed = "failed";
 }
