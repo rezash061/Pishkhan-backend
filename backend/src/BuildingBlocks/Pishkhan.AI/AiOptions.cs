@@ -64,6 +64,9 @@ public sealed class AiEvalGateOptions
     public decimal MaxErrorRate { get; set; } = 0.05m;
 
     public int MinCases { get; set; } = 1;
+
+    /// <summary>The most the Finglish cases' intent accuracy may trail the Persian-script cases' (BE-2.3), checked when a set has both.</summary>
+    public decimal MaxFinglishGap { get; set; } = 0.05m;
 }
 
 public sealed class AiProviderOptions

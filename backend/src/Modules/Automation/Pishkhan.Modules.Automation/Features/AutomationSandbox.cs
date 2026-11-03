@@ -10,6 +10,7 @@ using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Tenancy.Contracts;
+using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Http;
@@ -170,7 +171,12 @@ internal static class AutomationSandbox
         }
         else
         {
-            candidates = RuleEvaluator.DmCandidates(rules, new DmInput(account, kind, request.Text, request.Payload, request.IsNewConversation));
+            var dm = new DmInput(account, kind, request.Text, request.Payload, request.IsNewConversation);
+            candidates = RuleEvaluator.DmCandidates(rules, dm);
+            if (candidates.Count == 0 && Finglish.Detect(request.Text).IsFinglish)
+            {
+                candidates = RuleEvaluator.DmCandidates(rules, dm with { Text = PersianNormalizer.Normalize(Finglish.Transliterate(request.Text).Persian) });
+            }
         }
 
         var outcome = "rule";

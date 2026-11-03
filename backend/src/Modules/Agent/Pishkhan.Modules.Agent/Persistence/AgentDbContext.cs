@@ -69,6 +69,8 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             b.Property(x => x.Route).HasMaxLength(200);
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.IntentAccuracy).HasPrecision(5, 4);
+            b.Property(x => x.FinglishIntentAccuracy).HasPrecision(5, 4);
+            b.Property(x => x.ScriptIntentAccuracy).HasPrecision(5, 4);
             b.Property(x => x.HandoffPrecision).HasPrecision(5, 4);
             b.Property(x => x.HandoffRecall).HasPrecision(5, 4);
             b.HasIndex(x => new { x.SetId, x.StartedAt });

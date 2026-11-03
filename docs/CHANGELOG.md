@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.3: Finglish, 2026-11-03)
+- `Pishkhan.Persian.Finglish` handles Persian written in Latin letters («salam gheymatesh chande?»).
+  - `Detect` looks at character classes (at least 70% Latin letters) and at two word lists: a Finglish lexicon of common shop words, and English stop words. A text is Finglish when it has more lexicon words than English ones. English, Persian script, emoji and digits alone are not Finglish.
+  - `Transliterate` writes it in Persian script. Lexicon words, with common suffixes such as -esh, -am and -ha, use their spelling; other words are spelled by letter rules (kh→خ, gh→ق, sh→ش, a final e→ه, an initial vowel→ا/آ). It reports `coverage` and the unknown words.
+- AI replies (`FinglishReader`):
+  - The handoff phrases, the classifier and retrieval read a Finglish turn in Persian script. The classifier sees the original with the Persian reading; generation still sees the customer's own words.
+  - When the rules knew less than 60% of the words, a model writes the text in Persian. This uses the new prompt `text.transliterate@1` with task `classify`, cached per word sequence for 30 days. A model outage falls back to the rules, and failures are not cached.
+  - The trace's `language` is `finglish` for these turns.
+- Automation: when no DM rule matches a Finglish message, the rules are tried again on its Persian reading, so «gheymat» matches a «قیمت» keyword. The sandbox test run does the same.
+- Eval runs score the Finglish cases separately:
+  - New fields `finglishCaseCount`, `finglishIntentAccuracy` and `scriptIntentAccuracy` on eval runs. Migration Agent `FinglishEval`.
+  - The eval gate adds the check `finglish_gap` when a set has both kinds of case. Finglish may trail Persian script by at most `Ai:EvalGate:MaxFinglishGap`, default 0.05, which is the plan's 5 points.
+  - Eval cases are read with the rules only, so a run does not depend on the transliteration model.
+  - New sample set `tools/Pishkhan.EvalRunner/samples/finglish.jsonl`: 30 cases over the five verticals.
+
 ### Added (Phase 1, BE-1.9: knowledge score and onboarding interview, 2026-11-03)
 - `GET /workspaces/{id}/knowledge/score` (`workspace.settings.read`) returns `{score, industry, parts, facts, products, openUnanswered, suggestions}`. The score is 0–100, made of three parts:
   - **facts**, 60 points: the share of the industry template's required facts answered by an enabled source with that `factKey`. Without a template, 10 or more enabled FAQs earn the full part.
