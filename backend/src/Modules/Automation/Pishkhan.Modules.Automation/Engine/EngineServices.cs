@@ -317,6 +317,10 @@ internal static class ActionPlanner
                 case ActionKinds.StartFlow when action.FlowId is { } id:
                     flow ??= id;
                     break;
+                case ActionKinds.CapturePhone when action.Value is { } phone && action.ConsentText is { } consent:
+                    plan.Actions.Add(new ConversationAction(
+                        ConversationActionKinds.CapturePhone, Value: TemplateRenderer.Render(phone, values), Evidence: consent.Trim(), Channels: [ConsentChannelNames.Sms]));
+                    break;
                 case ActionKinds.ScheduleFollowUp when conversationId is { } conversation && source is not null && action.Message is { } followUpMessage:
                     plan.FollowUps.Add(FollowUp.Schedule(
                         workspaceId, conversation, plan.ChannelAccountId, plan.ChannelKind, plan.ExternalUserId, source.Key, source.RuleId, source.FlowId,

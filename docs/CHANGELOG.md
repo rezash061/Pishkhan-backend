@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.7 part 1: outage detector, phone capture with consent, "move my customers", 2026-11-03)
+- Outage detector:
+  - Every Graph API call is counted per minute in the state Redis: successes, and failures that mean Instagram itself is failing (unreachable, or Meta's transient errors). Token, permission and rate-limit errors are the account's own and aren't counted.
+  - A platform job (`channels.instagram-outage`, every minute) applies the last 5 minutes (`Channels:Outage`). It is **down** at 20 or more failures and a failure share of 50% or more. It is **up** again after at least 3 minutes down, with 5 or more successes and under 20% failures.
+  - On a change it publishes `channels.outage-changed.v1` (`ChannelOutageChanged`) and notifies every workspace with an Instagram account (kind `channel_outage`). When Instagram goes down the notification links to `/settings/outage`.
+  - Migration Channels `OutageStatus` (`channels.platform_status`).
+- `GET /workspaces/{id}/channels/outage` (`workspace.inbox.read`) returns `{kind, status, mode, since}` for the panel's banner. Other modules use `IChannelHealth`.
+- Back office "outage mode":
+  - `GET /admin/v1/platform/outage` returns the status with the detector's `ok` and `failed` counts.
+  - `PUT /admin/v1/platform/outage` with `{mode, reason}` (Support or SuperAdmin, step-up): `auto`, `forced_down` (for example filtering the edge zone cannot see) or `forced_up`. It applies at once and is audited as `platform.outage_mode_set`.
+- Phone capture with consent:
+  - New flow action `capture_phone` with `value` (usually `{{flow.phone}}`) and `consentText` (5–500 characters: the question the customer agreed to).
+  - It saves the mobile on the contact (field `phone`, national form) and records an SMS consent with source `flow` and the question as evidence. An invalid number saves nothing.
+  - Rules cannot use it (`automation.capture_phone_flow_only`); a malformed action is `flow.capture_phone_invalid`.
+- "Move my customers" under `/workspaces/{id}/outage`:
+  - `GET /audience` (`workspace.crm.read`) returns `{contacts, withPhone, reachable, outage, nextAllowedAt}`.
+  - `POST /campaigns` (`workspace.crm.write`, accepts `Idempotency-Key`) with `{text}` (5–300 characters, usually with a link) returns 202 with the campaign.
+    - Every contact with a mobile whose **latest SMS consent decision is a grant** gets one SMS: the shop's name, then the text.
+    - Allowed only while Instagram is down or one of the workspace's Instagram accounts cannot send (422 `outage.not_down`), and once per 24 hours (409 `outage.campaign_cooldown`).
+    - Audited as `outage.campaign_started`.
+  - `GET /campaigns` and `GET /campaigns/{id}` return `{status, scanned, sent, failed}`. `status` is `sending`, `completed` or `limit_reached`.
+  - Sent in batches of 100 (`conversations.outage-campaign-batch-requested.v1`, outbound group). Each contact is claimed in the batch's transaction (one row per campaign and contact) and texted after the commit, so nobody is texted twice. A failed text is counted, not retried.
+  - Sends are metered (`sms`) and stop at the plan's SMS allowance.
+  - Migration Conversations `OutageCampaigns`.
+- Part 2 will add the Bale bot adapter, Bale account linking by deep link, Bale conversations in the same inbox, Bale as a campaign channel, and the AI's phone-capture tool.
+
 ### Added (Phase 2, BE-2.5: feed import, 2026-11-03)
 - The owner can turn past Instagram posts into products and FAQs. Suggestions wait for review; nothing reaches customers until the owner accepts it.
 - Endpoints under `/workspaces/{id}/knowledge/feed-imports`:

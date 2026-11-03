@@ -11,6 +11,8 @@
     <ProjectReference Include="..\..\Automation\Pishkhan.Modules.Automation.Contracts\Pishkhan.Modules.Automation.Contracts.csproj" />
     <ProjectReference Include="..\..\Notifications\Pishkhan.Modules.Notifications.Contracts\Pishkhan.Modules.Notifications.Contracts.csproj" />
     <ProjectReference Include="..\..\Files\Pishkhan.Modules.Files.Contracts\Pishkhan.Modules.Files.Contracts.csproj" />
+    <ProjectReference Include="..\..\Billing\Pishkhan.Modules.Billing.Contracts\Pishkhan.Modules.Billing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ClosedXML" />

@@ -133,6 +133,22 @@ public sealed class FormSubmission : Entity<Guid>, ITenantOwned
     };
 }
 
+/// <summary>Where a consent decision came from.</summary>
+public static class ConsentSources
+{
+    public const string Manual = "manual";
+
+    /// <summary>The customer agreed in a flow (BE-2.7 <c>capture_phone</c>); the evidence is the question they answered.</summary>
+    public const string Flow = "flow";
+}
+
+/// <summary>Contact fields with a meaning of their own.</summary>
+public static class FieldKeys
+{
+    /// <summary>The customer's mobile, in national form (<c>09121234567</c>).</summary>
+    public const string Phone = "phone";
+}
+
 public static class ConsentChannels
 {
     /// <summary>Calls to the contact's phone.</summary>

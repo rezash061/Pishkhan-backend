@@ -134,7 +134,7 @@ public static partial class FlowValidator
     private static readonly IReadOnlySet<string> FlowActionKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         ActionKinds.AddTag, ActionKinds.RemoveTag, ActionKinds.SetField, ActionKinds.Handoff, ActionKinds.PauseAi, ActionKinds.NotifyTeam,
-        ActionKinds.ScheduleFollowUp,
+        ActionKinds.ScheduleFollowUp, ActionKinds.CapturePhone,
     };
 
     [GeneratedRegex("^[a-z][a-z0-9_]{0,39}$", RegexOptions.CultureInvariant)]
@@ -309,6 +309,11 @@ public static partial class FlowValidator
                 else if (node.Actions.Any(a => a.Kind == ActionKinds.ScheduleFollowUp && FollowUps.Validate(a) is not null))
                 {
                     yield return "flow.followup_invalid";
+                }
+                else if (node.Actions.Any(a => a.Kind == ActionKinds.CapturePhone
+                    && (string.IsNullOrWhiteSpace(a.Value) || a.Value.Length > 100 || a.ConsentText?.Trim().Length is not (>= 5 and <= 500))))
+                {
+                    yield return "flow.capture_phone_invalid";
                 }
 
                 break;

@@ -46,7 +46,8 @@ public static class ConversationsModule
         .AddConsumer<TimerFired, OutboundDeferredHandler>("outbound")
         .AddConsumer<ContactProfileRequested, ContactProfileHandler>("outbound")
         .AddConsumer<VoiceNoteReceived, VoiceNoteHandler>("outbound")
-        .AddConsumer<FileScanCompleted, VoiceNoteScanHandler>("outbound");
+        .AddConsumer<FileScanCompleted, VoiceNoteScanHandler>("outbound")
+        .AddConsumer<OutageCampaignBatchRequested, OutageCampaignBatchHandler>("outbound");
 
     /// <summary>Api host: SignalR inbox (call after <c>AddPishkhanRealtime</c>).</summary>
     public static IServiceCollection AddConversationsRealtime(this IServiceCollection services)
@@ -72,6 +73,7 @@ public static class ConversationsModule
         ConversationEndpoints.Map(app);
         CrmEndpoints.Map(app);
         CrmRecords.Map(app);
+        OutageCampaignEndpoints.Map(app);
         app.MapHub<InboxHub>(InboxHub.Path);
         return app;
     }

@@ -360,6 +360,48 @@ namespace Pishkhan.Modules.Channels.Persistence.Migrations
                     b.ToTable("data_deletion_requests", "channels");
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Channels.Domain.PlatformChannelStatus", b =>
+                {
+                    b.Property<string>("Kind")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mode");
+
+                    b.Property<string>("ModeReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("mode_reason");
+
+                    b.Property<Guid?>("ModeSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("mode_set_by");
+
+                    b.Property<DateTimeOffset>("Since")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("since");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Kind")
+                        .HasName("pk_platform_status");
+
+                    b.ToTable("platform_status", "channels");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Channels.Domain.RateProfileOverride", b =>
                 {
                     b.Property<string>("Name")

@@ -270,3 +270,19 @@ public interface IChannelProfileReader
     /// <summary>Fetches a customer's profile. Null when the channel does not expose it (the user has not messaged the account, or blocked it).</summary>
     Task<ChannelUserProfile?> GetProfileAsync(Guid channelAccountId, string externalUserId, CancellationToken cancellationToken);
 }
+
+/// <summary>The platform's view of a channel (BE-2.7). <c>Status</c>: up or down. <c>Mode</c>: auto, forced_down or forced_up (set by staff).</summary>
+public sealed record ChannelOutageStatus(string Kind, string Status, string Mode, DateTimeOffset Since)
+{
+    public bool IsDown => Status == "down";
+}
+
+/// <summary>Whether Instagram itself is working, as the outage detector (or staff) sees it.</summary>
+public interface IChannelHealth
+{
+    Task<ChannelOutageStatus> GetInstagramAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>Instagram went down or came back (BE-2.7). Workspaces with an Instagram account are notified separately.</summary>
+[IntegrationEvent(Topics.ChannelOutageChanged)]
+public sealed record ChannelOutageChanged(string Kind, string Status, string Mode, DateTimeOffset Since) : IIntegrationEvent;

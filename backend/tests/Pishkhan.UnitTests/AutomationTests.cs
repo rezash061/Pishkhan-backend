@@ -156,7 +156,7 @@ public class RuleValidatorTests
         RuleValidator.Validate(dm with { TriggerKind = TriggerKinds.OrderStatusChanged }).ShouldContain(("triggerKind", "automation.trigger_unavailable"));
         RuleValidator.Validate(dm with { TriggerKind = "nope" }).ShouldContain(("triggerKind", "automation.trigger_unknown"));
         RuleValidator.Validate(dm with { TriggerKind = TriggerKinds.NewConversation, Actions = [new RuleAction { Kind = ActionKinds.CapturePhone }] })
-            .ShouldContain(("actions[0]", "automation.action_unavailable"));
+            .ShouldContain(("actions[0]", "automation.capture_phone_flow_only"));
         RuleValidator.Validate(Comment(PrivateReply) with { Trigger = new TriggerConfig { Keywords = ["a"], Scope = CommentScopes.NextPost }, ChannelAccountId = null })
             .ShouldContain(("channelAccountId", "automation.channel_required"));
     }

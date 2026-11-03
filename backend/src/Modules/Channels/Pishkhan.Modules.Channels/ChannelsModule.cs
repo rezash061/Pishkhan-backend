@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Channels.Contracts;
+using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Features;
 using Pishkhan.Modules.Channels.Instagram;
 using Pishkhan.Modules.Channels.Persistence;
@@ -29,6 +31,15 @@ public static class ChannelsModule
         services.AddScoped<IChannelPacing, ChannelPacingProvider>();
         services.AddScoped<InstagramTokenRefresher>();
         services.AddSingleton<IChannelWebhookParser, InstagramWebhookParser>();
+        return services.AddChannelsOutage(configuration);
+    }
+
+    /// <summary>The outage detector's counters and the outage status (every host that calls Instagram, and the AdminApi's outage mode).</summary>
+    public static IServiceCollection AddChannelsOutage(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<OutageOptions>().Bind(configuration.GetSection(OutageOptions.Section));
+        services.TryAddSingleton<InstagramHealth>();
+        services.TryAddScoped<IChannelHealth, ChannelHealth>();
         return services;
     }
 
@@ -51,6 +62,9 @@ public static class ChannelsModule
     public static readonly IReadOnlyList<RecurringJob> Jobs =
     [
         new(typeof(InstagramTokenRefreshJob), "channels.instagram-token-refresh", "0 15 * * * ?"),
+
+        // BE-2.7: every minute, so an outage is noticed within the detector's window.
+        new(typeof(InstagramOutageJob), "channels.instagram-outage", "0 * * * * ?"),
     ];
 
     /// <summary>Platform group: bookkeeping of Meta data deletion requests.</summary>
@@ -61,6 +75,14 @@ public static class ChannelsModule
     {
         ChannelEndpoints.Map(app);
         MetaCallbacks.Map(app);
+        OutageEndpoints.MapPanel(app);
+        return app;
+    }
+
+    /// <summary>AdminApi: <c>/admin/v1/platform/outage</c>. Needs <see cref="AddChannelsDirectory"/> and <see cref="AddChannelsOutage"/>.</summary>
+    public static IEndpointRouteBuilder MapChannelsAdminEndpoints(this IEndpointRouteBuilder app)
+    {
+        OutageEndpoints.MapAdmin(app);
         return app;
     }
 

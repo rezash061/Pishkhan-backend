@@ -65,6 +65,12 @@ public sealed record RuleAction
 
     /// <summary>schedule_followup: drop the follow-up when an order of the conversation is paid (default true).</summary>
     public bool? CancelOnPurchase { get; init; }
+
+    /// <summary>
+    /// capture_phone (flow action nodes only, BE-2.7): the question the customer agreed to, kept as the consent's evidence, for example
+    /// «اگر اینستاگرام قطع شد، با پیامک خبرتان کنیم؟». <see cref="Value"/> is the number, usually <c>{{flow.phone}}</c>.
+    /// </summary>
+    public string? ConsentText { get; init; }
 }
 
 /// <summary>An automation rule: one trigger, a list of actions, a priority (higher wins).</summary>

@@ -20,6 +20,9 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
 
     public DbSet<RateProfileOverride> RateProfiles => Set<RateProfileOverride>();
 
+    /// <summary>Platform-wide: not owned by a workspace.</summary>
+    public DbSet<PlatformChannelStatus> PlatformStatuses => Set<PlatformChannelStatus>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ChannelAccount>(b =>
@@ -50,6 +53,16 @@ public sealed class ChannelsDbContext(DbContextOptions<ChannelsDbContext> option
             b.Property(x => x.ExternalUserId).HasMaxLength(100);
             b.Property(x => x.Status).HasMaxLength(20);
             b.HasIndex(x => x.ExternalUserId);
+        });
+
+        modelBuilder.Entity<PlatformChannelStatus>(b =>
+        {
+            b.ToTable("platform_status");
+            b.HasKey(x => x.Kind);
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.Mode).HasMaxLength(20);
+            b.Property(x => x.ModeReason).HasMaxLength(300);
         });
 
         modelBuilder.Entity<RateProfileOverride>(b =>
