@@ -142,6 +142,19 @@ public sealed class FeedImportItem : Entity<Guid>, ITenantOwned
     /// <summary>The product or knowledge source created when it was accepted.</summary>
     public Guid? CreatedId { get; private set; }
 
+    public static FeedImportItem Suggest(FeedImport import, string kind, string mediaId, string? permalink, string? imageUrl, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = import.WorkspaceId,
+        ImportId = import.Id,
+        Kind = kind,
+        MediaId = mediaId,
+        Permalink = permalink,
+        ImageUrl = imageUrl,
+        CreatedAt = now,
+        UpdatedAt = now,
+    };
+
     public void Accept(Guid createdId, DateTimeOffset now)
     {
         Status = FeedItemStatuses.Accepted;

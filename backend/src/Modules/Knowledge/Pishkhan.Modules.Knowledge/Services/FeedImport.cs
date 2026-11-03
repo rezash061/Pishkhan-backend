@@ -204,25 +204,15 @@ internal sealed class FeedImportPageHandler(
             var image = (post.MediaType == "VIDEO" ? post.ThumbnailUrl : post.MediaUrl ?? post.ThumbnailUrl)?.ToString();
             foreach (var s in suggestions)
             {
-                Db.FeedImportItems.Add(new FeedImportItem
-                {
-                    Id = Uuid.NewV7(now),
-                    WorkspaceId = import.WorkspaceId,
-                    ImportId = import.Id,
-                    Kind = s.Kind,
-                    MediaId = post.Id,
-                    Permalink = post.Permalink?.ToString(),
-                    ImageUrl = image,
-                    Title = s.Title,
-                    Description = s.Description,
-                    Price = s.Price,
-                    PriceInCaption = s.PriceInCaption,
-                    Tags = [.. s.Tags],
-                    Question = s.Question,
-                    Answer = s.Answer,
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                });
+                var item = FeedImportItem.Suggest(import, s.Kind, post.Id, post.Permalink?.ToString(), image, now);
+                item.Title = s.Title;
+                item.Description = s.Description;
+                item.Price = s.Price;
+                item.PriceInCaption = s.PriceInCaption;
+                item.Tags = [.. s.Tags];
+                item.Question = s.Question;
+                item.Answer = s.Answer;
+                Db.FeedImportItems.Add(item);
                 found++;
             }
         }
