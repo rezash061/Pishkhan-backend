@@ -60,6 +60,9 @@ public sealed class KnowledgeSource : Entity<Guid>, ITenantOwned
 
     public Guid? CreatedBy { get; init; }
 
+    /// <summary>The industry template's required fact this source answers (BE-1.9 knowledge score), for example <c>shipping_cost</c>.</summary>
+    public string? FactKey { get; set; }
+
     public static KnowledgeSource Create(
         Guid workspaceId, string kind, string title, string? question, string body, Guid? productId, Guid? createdBy, DateTimeOffset now, Guid? fileId = null, string? url = null) => new()
     {

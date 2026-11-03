@@ -9750,6 +9750,174 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/knowledge/score": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "The knowledge score (0–100), the required facts still missing and what to do next",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeScoreResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/onboarding/draft": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Turn the owner's answer to a required fact into a FAQ draft; nothing is saved",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingDraftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/onboarding/confirm": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Save the approved FAQ for a required fact (replacing the fact's earlier FAQ) and return the new score",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingConfirmResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/templates": {
       "get": {
         "tags": [
@@ -12416,6 +12584,37 @@
           }
         }
       },
+      "FactStatus": {
+        "required": [
+          "key",
+          "label",
+          "prompt",
+          "covered",
+          "sourceId"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "covered": {
+            "type": "boolean"
+          },
+          "sourceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "FieldDefinitionRequest": {
         "required": [
           "key",
@@ -13547,6 +13746,59 @@
           }
         }
       },
+      "KnowledgeScoreResponse": {
+        "required": [
+          "score",
+          "industry",
+          "parts",
+          "facts",
+          "products",
+          "openUnanswered",
+          "suggestions"
+        ],
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorePart"
+            }
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactStatus"
+            }
+          },
+          "products": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProductStats"
+              }
+            ]
+          },
+          "openUnanswered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "KnowledgeSearchRequest": {
         "required": [
           "query",
@@ -14092,6 +14344,78 @@
           "unreadCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "OnboardingConfirmRequest": {
+        "required": [
+          "factKey",
+          "question",
+          "answer"
+        ],
+        "type": "object",
+        "properties": {
+          "factKey": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        }
+      },
+      "OnboardingConfirmResponse": {
+        "required": [
+          "source",
+          "score"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/SourceResponse"
+          },
+          "score": {
+            "$ref": "#/components/schemas/KnowledgeScoreResponse"
+          }
+        }
+      },
+      "OnboardingDraftRequest": {
+        "required": [
+          "factKey",
+          "answer"
+        ],
+        "type": "object",
+        "properties": {
+          "factKey": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        }
+      },
+      "OnboardingDraftResponse": {
+        "required": [
+          "factKey",
+          "question",
+          "answer",
+          "drafted"
+        ],
+        "type": "object",
+        "properties": {
+          "factKey": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "drafted": {
+            "type": "string"
           }
         }
       },
@@ -15773,6 +16097,28 @@
           }
         }
       },
+      "ProductStats": {
+        "required": [
+          "active",
+          "priced",
+          "inStock"
+        ],
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "priced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inStock": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ProvinceResponse": {
         "required": [
           "code",
@@ -16844,6 +17190,27 @@
           }
         }
       },
+      "ScorePart": {
+        "required": [
+          "key",
+          "points",
+          "max"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "SegmentCondition": {
         "required": [
           "field",
@@ -17250,6 +17617,12 @@
             "format": "uuid"
           },
           "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "factKey": {
             "type": [
               "null",
               "string"

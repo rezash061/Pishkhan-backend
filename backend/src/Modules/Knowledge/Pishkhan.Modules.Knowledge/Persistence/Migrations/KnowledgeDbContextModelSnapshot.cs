@@ -276,6 +276,11 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("error");
 
+                    b.Property<string>("FactKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("fact_key");
+
                     b.Property<Guid?>("FileId")
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
@@ -334,6 +339,10 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_sources");
+
+                    b.HasIndex("WorkspaceId", "FactKey")
+                        .HasDatabaseName("ix_sources_workspace_id_fact_key")
+                        .HasFilter("fact_key IS NOT NULL");
 
                     b.HasIndex("WorkspaceId", "ProductId")
                         .IsUnique()

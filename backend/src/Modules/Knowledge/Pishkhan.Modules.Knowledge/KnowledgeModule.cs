@@ -27,6 +27,14 @@ public static class KnowledgeModule
         return services;
     }
 
+    /// <summary>Api: the knowledge score and the onboarding interview. Needs the Templates, Catalog and Tenancy modules.</summary>
+    public static IServiceCollection AddKnowledgeOnboarding(this IServiceCollection services)
+    {
+        services.AddScoped<KnowledgeScorer>();
+        services.AddScoped<OnboardingDrafter>();
+        return services;
+    }
+
     /// <summary>AI group: indexing of sources and of catalog products, and the agent's unanswered questions.</summary>
     public static MessagingBuilder AddKnowledgeConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<KnowledgeSourceChanged, KnowledgeSourceChangedHandler>("ai")
@@ -37,6 +45,7 @@ public static class KnowledgeModule
     {
         KnowledgeEndpoints.Map(app);
         UnansweredEndpoints.Map(app);
+        OnboardingEndpoints.Map(app);
         return app;
     }
 }

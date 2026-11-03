@@ -50,7 +50,7 @@ services
     .AddAnalyticsModule(configuration)
     .AddBillingModule(configuration).AddBillingCheckout(configuration)
     .AddAgentModule(configuration).AddAgentReplies()
-    .AddKnowledgeModule(configuration)
+    .AddKnowledgeModule(configuration).AddKnowledgeOnboarding()
     .AddTemplatesModule(configuration).AddTemplatesApply()
     .DecorateHandlers();
 services.AddPishkhanRealtime();

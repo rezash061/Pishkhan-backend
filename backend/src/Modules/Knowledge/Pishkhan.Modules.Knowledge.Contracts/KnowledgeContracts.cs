@@ -35,8 +35,11 @@ public interface IKnowledgeSearch
     Task<IReadOnlyList<KnowledgeHit>> SearchAsync(string query, int limit, CancellationToken cancellationToken);
 }
 
-/// <summary>A FAQ an industry template suggests (BE-2.9). <see cref="Key"/> is the template's own id for it.</summary>
-public sealed record TemplateFaq(string Key, string Question, string Answer);
+/// <summary>
+/// A FAQ an industry template suggests (BE-2.9). <see cref="Key"/> is the template's own id for it; <see cref="FactKey"/>, when set, is the
+/// template's required fact it answers (BE-1.9 knowledge score).
+/// </summary>
+public sealed record TemplateFaq(string Key, string Question, string Answer, string? FactKey = null);
 
 /// <summary>Adds an industry template's FAQs to a workspace (BE-2.9).</summary>
 public interface IKnowledgeTemplates

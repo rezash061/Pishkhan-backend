@@ -35,6 +35,8 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
             b.Property(x => x.Error).HasMaxLength(200);
             b.HasIndex(x => new { x.WorkspaceId, x.Kind, x.CreatedAt });
             b.HasIndex(x => new { x.WorkspaceId, x.ProductId }).IsUnique().HasFilter("product_id IS NOT NULL");
+            b.Property(x => x.FactKey).HasMaxLength(100);
+            b.HasIndex(x => new { x.WorkspaceId, x.FactKey }).HasFilter("fact_key IS NOT NULL");
         });
 
         modelBuilder.Entity<TemplateItem>(b =>

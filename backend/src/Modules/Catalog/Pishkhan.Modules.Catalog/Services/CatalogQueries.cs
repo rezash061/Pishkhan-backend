@@ -59,6 +59,14 @@ internal sealed class CatalogQueries(CatalogDbContext db, ITenantContext tenant,
 
     private static readonly HybridCacheEntryOptions Entry = new() { Expiration = TimeSpan.FromMinutes(30), LocalCacheExpiration = TimeSpan.FromMinutes(5) };
 
+    public async Task<CatalogStats> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        // Variants are auto-included; a catalog is a few thousand products at most, so counting in memory keeps one definition of priced and in stock.
+        var products = await db.Products.AsNoTracking().Where(p => p.Status == ProductStatuses.Active).Take(10_000).ToListAsync(cancellationToken);
+        var priced = products.Count(p => p.Variants.Where(v => v.DeletedAt is null).ToList() is { Count: > 0 } live ? live.All(v => p.PriceOf(v) is not null) : p.Price is not null);
+        return new CatalogStats(products.Count, priced, products.Count(p => p.InStock));
+    }
+
     public async Task<StorefrontCardSetContent?> GetCardSetAsync(Guid cardSetId, CancellationToken cancellationToken)
     {
         if (tenant.WorkspaceId is not { } workspaceId)

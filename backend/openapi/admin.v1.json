@@ -7001,6 +7001,12 @@
           },
           "answer": {
             "type": "string"
+          },
+          "factKey": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
