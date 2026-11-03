@@ -7,6 +7,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Persian;
 using Pishkhan.SharedKernel;
 
 namespace Pishkhan.Modules.Conversations.Services;
@@ -90,6 +91,9 @@ internal sealed class ConversationActionsHandler(ConversationsDbContext db, ITen
                 case ConversationActionKinds.PauseAi:
                     conversation.SetAiPaused(true);
                     break;
+                case ConversationActionKinds.CapturePhone:
+                    CapturePhone(contact, action, now);
+                    break;
                 case ConversationActionKinds.Handoff:
                     if (conversation.HandOff(action.Reason ?? "automation", action.SuggestedReply, now))
                     {
@@ -108,6 +112,22 @@ internal sealed class ConversationActionsHandler(ConversationsDbContext db, ITen
             await Db.Messages
                 .Where(m => m.Id == inboundId && m.CreatedAt == inboundAt && m.HandledBy == null)
                 .ExecuteUpdateAsync(u => u.SetProperty(m => m.HandledBy, message.HandledBy).SetProperty(m => m.AutomationRuleId, message.RuleId), cancellationToken);
+        }
+    }
+
+    /// <summary>The customer's number and their consent from a flow (BE-2.7). The consent history keeps what they agreed to.</summary>
+    private void CapturePhone(Contact contact, ConversationAction action, DateTimeOffset now)
+    {
+        if (!PhoneNumber.TryParse(PersianDigits.ToLatin(action.Value ?? string.Empty).Trim(), out var phone))
+        {
+            logger.LogInformation("capture_phone skipped for contact {ContactId}: not a mobile number", contact.Id);
+            return;
+        }
+
+        contact.SetField(FieldKeys.Phone, phone.Value.National);
+        foreach (var channel in (action.Channels ?? [ConsentChannels.Sms]).Where(ConsentChannels.All.Contains).Distinct(StringComparer.Ordinal))
+        {
+            Db.Consents.Add(ContactConsent.Create(contact.WorkspaceId, contact.Id, channel, true, ConsentSources.Flow, action.Evidence, null, now));
         }
     }
 

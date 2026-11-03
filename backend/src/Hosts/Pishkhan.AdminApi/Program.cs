@@ -31,7 +31,7 @@ services
     .AddContentModule(configuration).AddContentBackoffice()
     .AddTenancyModule(configuration)
     .AddIdentityDirectory()
-    .AddChannelsDirectory()
+    .AddChannelsDirectory().AddChannelsOutage(configuration)
     .AddBillingModule(configuration).AddBillingBackoffice()
     .AddAgentModule(configuration).AddAgentBackoffice()
     .AddTemplatesModule(configuration).AddTemplatesBackoffice().AddAutomationTemplateValidator()
@@ -50,6 +50,7 @@ app.MapIdentityAdminEndpoints();
 app.MapBillingAdminEndpoints();
 app.MapAgentAdminEndpoints();
 app.MapTemplatesAdminEndpoints();
+app.MapChannelsAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>

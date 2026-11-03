@@ -124,6 +124,7 @@ internal sealed class InstagramAccountGateway(
     ISecretProtector secrets,
     RedisTokenBucket buckets,
     RateProfileProvider profiles,
+    InstagramHealth health,
     IClock clock,
     ILogger<InstagramAccountGateway> logger)
 {
@@ -149,10 +150,18 @@ internal sealed class InstagramAccountGateway(
 
         try
         {
-            return GatewayResult<T>.Ok(await call(secrets.Unprotect(account.TokenEnc, TokenPurposes.Instagram)));
+            var value = await call(secrets.Unprotect(account.TokenEnc, TokenPurposes.Instagram));
+            await health.RecordAsync(ok: true);
+            return GatewayResult<T>.Ok(value);
         }
         catch (InstagramApiException ex)
         {
+            // Meta's transient errors count towards the outage detector (BE-2.7); token, permission and rate-limit errors are the account's own.
+            if (ex.Kind == InstagramErrorKind.Transient)
+            {
+                await health.RecordAsync(ok: false);
+            }
+
             logger.LogWarning("Instagram {Family} call failed for account {ChannelAccountId}: {ErrorCode} ({Code}/{Subcode})", family, account.Id, ex.ErrorCode, ex.Code, ex.Subcode);
             if (ex.Kind == InstagramErrorKind.InvalidToken && account.RequireReauth(ex.ErrorCode, clock.UtcNow))
             {
@@ -165,6 +174,7 @@ internal sealed class InstagramAccountGateway(
         catch (HttpRequestException ex)
         {
             logger.LogWarning(ex, "Instagram unreachable during {Family} call for account {ChannelAccountId}", family, account.Id);
+            await health.RecordAsync(ok: false);
             return GatewayResult<T>.Failed("instagram.unreachable", retryable: true);
         }
     }

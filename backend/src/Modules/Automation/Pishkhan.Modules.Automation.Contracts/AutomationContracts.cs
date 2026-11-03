@@ -90,10 +90,10 @@ public static class ActionKinds
 
     public static readonly IReadOnlySet<string> Available = new HashSet<string>(StringComparer.Ordinal)
     {
-        SendMessage, SendCards, PrivateReply, PublicReply, StartFlow, AddTag, RemoveTag, SetField, Handoff, PauseAi, NotifyTeam, ScheduleFollowUp,
+        SendMessage, SendCards, PrivateReply, PublicReply, StartFlow, AddTag, RemoveTag, SetField, Handoff, PauseAi, NotifyTeam, ScheduleFollowUp, CapturePhone,
     };
 
-    public static readonly IReadOnlySet<string> Later = new HashSet<string>(StringComparer.Ordinal) { CapturePhone };
+    public static readonly IReadOnlySet<string> Later = new HashSet<string>(StringComparer.Ordinal);
 }
 
 /// <summary>Rules of a workspace changed: hosts drop their compiled rule sets (the cache tag is invalidated in the same transaction).</summary>

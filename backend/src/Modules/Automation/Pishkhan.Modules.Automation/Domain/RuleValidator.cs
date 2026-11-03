@@ -179,6 +179,10 @@ public static class RuleValidator
                 case ActionKinds.NotifyTeam when a.Title is { Length: > 100 }:
                     yield return (field + ".title", "automation.title_too_long");
                     break;
+                case ActionKinds.CapturePhone:
+                    // The number comes from a customer's answer, so only a flow can capture it.
+                    yield return (field, "automation.capture_phone_flow_only");
+                    break;
                 case ActionKinds.ScheduleFollowUp when FollowUps.Validate(a) is { } problem:
                     yield return (field + "." + problem.Field, problem.Code);
                     break;

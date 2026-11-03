@@ -37,6 +37,10 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
 
     public DbSet<ContactSegment> Segments => Set<ContactSegment>();
 
+    public DbSet<OutageCampaign> OutageCampaigns => Set<OutageCampaign>();
+
+    public DbSet<OutageCampaignRecipient> OutageCampaignRecipients => Set<OutageCampaignRecipient>();
+
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
 
     public DbSet<ContactConsent> Consents => Set<ContactConsent>();
@@ -96,6 +100,23 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
         });
 
         // Partitioned by month on created_at. The migration creates the parent table by hand (PARTITION BY RANGE).
+        modelBuilder.Entity<OutageCampaign>(b =>
+        {
+            b.ToTable("outage_campaigns");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Channel).HasMaxLength(10);
+            b.Property(x => x.Text).HasMaxLength(OutageCampaign.MaxText + 120);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<OutageCampaignRecipient>(b =>
+        {
+            b.ToTable("outage_campaign_recipients");
+            b.HasKey(x => new { x.CampaignId, x.ContactId });
+            b.Property(x => x.Status).HasMaxLength(10);
+        });
+
         modelBuilder.Entity<Message>(b =>
         {
             b.ToTable("messages");

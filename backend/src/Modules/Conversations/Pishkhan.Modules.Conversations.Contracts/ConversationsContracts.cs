@@ -103,6 +103,19 @@ public static class ConversationActionKinds
     public const string SetField = "set_field";
     public const string Handoff = "handoff";
     public const string PauseAi = "pause_ai";
+
+    /// <summary>
+    /// Save the customer's mobile (<see cref="ConversationAction.Value"/>) and record their consent for <see cref="ConversationAction.Channels"/>,
+    /// with <see cref="ConversationAction.Evidence"/> as what they agreed to (BE-2.7). An invalid number saves nothing.
+    /// </summary>
+    public const string CapturePhone = "capture_phone";
+}
+
+/// <summary>Channels a contact can consent to be reached on (the CRM's consent channels).</summary>
+public static class ConsentChannelNames
+{
+    public const string Sms = "sms";
+    public const string Bale = "bale";
 }
 
 public sealed record ConversationAction(
@@ -113,7 +126,9 @@ public sealed record ConversationAction(
     string? Field = null,
     string? Value = null,
     string? Reason = null,
-    string? SuggestedReply = null)
+    string? SuggestedReply = null,
+    string? Evidence = null,
+    IReadOnlyList<string>? Channels = null)
 {
     public static ConversationAction Send(OutboundContent content) => new(ConversationActionKinds.Send, content);
 
@@ -193,3 +208,7 @@ public sealed record ContactExportRequested(Guid ExportId, Guid WorkspaceId) : I
 /// <summary>A new customer wrote to an Instagram account: the outbound group reads their profile (name, username, picture).</summary>
 [IntegrationEvent(Topics.ContactProfileRequested)]
 public sealed record ContactProfileRequested(Guid WorkspaceId, Guid ContactId, Guid ChannelAccountId, string ExternalUserId) : IIntegrationEvent;
+
+/// <summary>The next batch of a "move my customers" campaign (BE-2.7), after the contact at <c>AfterCreatedAt</c>/<c>AfterContactId</c>.</summary>
+[IntegrationEvent(Topics.OutageCampaignBatchRequested)]
+public sealed record OutageCampaignBatchRequested(Guid WorkspaceId, Guid CampaignId, DateTimeOffset? AfterCreatedAt = null, Guid? AfterContactId = null) : IIntegrationEvent;

@@ -49,7 +49,7 @@ public sealed class AdminHost : IAsyncDisposable
         builder.Services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
         builder.Services.AddPishkhanOpenApi(ApiDocuments.Admin);
         builder.Services.AddBackofficeModule(builder.Configuration).AddContentModule(builder.Configuration).AddContentBackoffice()
-            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddBillingModule(builder.Configuration).AddBillingBackoffice()
+            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddChannelsOutage(builder.Configuration).AddBillingModule(builder.Configuration).AddBillingBackoffice()
             .AddAgentModule(builder.Configuration).AddAgentBackoffice()
             .AddTemplatesModule(builder.Configuration).AddTemplatesBackoffice().AddAutomationTemplateValidator().DecorateHandlers();
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-admin-api", m => m.AddCacheInvalidation());
@@ -62,6 +62,7 @@ public sealed class AdminHost : IAsyncDisposable
         app.MapBillingAdminEndpoints();
         app.MapAgentAdminEndpoints();
         app.MapTemplatesAdminEndpoints();
+        app.MapChannelsAdminEndpoints();
         await app.StartAsync(ct);
         return new AdminHost(app);
     }
