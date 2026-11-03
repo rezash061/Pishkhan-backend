@@ -39,6 +39,16 @@ public sealed record FlowRequest(string Name, FlowGraph? Graph);
 
 public sealed record FlowResponse(Guid Id, string Name, string Status, FlowGraph Graph, int? PublishedVersion, DateTimeOffset? PublishedAt, FlowValidation Validation, DateTimeOffset UpdatedAt);
 
+/// <summary>
+/// A scheduled follow-up message. <c>status</c>: pending, sent, cancelled or skipped. <c>reason</c> for cancelled and skipped ones: replied,
+/// purchased, owner, replaced, handed_off, window_closed or conversation_gone.
+/// </summary>
+public sealed record FollowUpResponse(
+    Guid Id, Guid ConversationId, string Source, Guid? RuleId, Guid? FlowId, OutboundContent Message, DateTimeOffset DueAt, bool CancelOnReply,
+    bool CancelOnPurchase, string Status, string? Reason, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
+
+public sealed record FollowUpSearch(string? Status, Guid? ConversationId, int? Limit);
+
 public sealed record SettingsRequest(bool AiEnabled, string? FallbackText, int? FallbackCooldownMinutes);
 
 /// <summary>Business hours are the workspace's (<c>GET/PUT /workspaces/{workspaceId}/business-hours</c>).</summary>
@@ -137,6 +147,19 @@ internal static class AutomationEndpoints
         root.MapGet("/settings", GetSettingsAsync)
             .RequireWorkspacePermission(Permissions.SettingsRead)
             .Produces<SettingsResponse>();
+
+        root.MapGet("/followups", ListFollowUpsAsync)
+            .RequireWorkspacePermission(Permissions.SettingsRead)
+            .WithSummary("Scheduled follow-ups, soonest first for pending ones and newest first otherwise")
+            .Produces<IReadOnlyList<FollowUpResponse>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        root.MapPost("/followups/{followUpId:guid}/cancel", CancelFollowUpAsync)
+            .RequireWorkspacePermission(Permissions.AutomationWrite)
+            .WithSummary("Cancel a pending follow-up")
+            .Produces<FollowUpResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         root.MapPut("/settings", PutSettingsAsync)
             .RequireWorkspacePermission(Permissions.AutomationWrite)
@@ -382,6 +405,52 @@ internal static class AutomationEndpoints
         db.Publish(new FlowPublished(workspaceId, flow.Id, version.Version), flow.Id.ToString());
         await db.SaveChangesAsync(ct);
         return Results.Ok(ToResponse(flow));
+    }
+
+    private static FollowUpResponse ToResponse(FollowUp f) =>
+        new(f.Id, f.ConversationId, f.Source, f.RuleId, f.FlowId, f.Message, f.DueAt, f.CancelOnReply, f.CancelOnPurchase, f.Status, f.Reason, f.CreatedAt, f.CompletedAt);
+
+    private static async Task<IResult> ListFollowUpsAsync(Guid workspaceId, [AsParameters] FollowUpSearch search, AutomationDbContext db, CancellationToken ct)
+    {
+        var query = db.FollowUps.AsNoTracking();
+        if (search.ConversationId is { } conversationId)
+        {
+            query = query.Where(f => f.ConversationId == conversationId);
+        }
+
+        var limit = Math.Clamp(search.Limit ?? 100, 1, 200);
+        if (string.IsNullOrWhiteSpace(search.Status))
+        {
+            query = query.OrderByDescending(f => f.CreatedAt);
+        }
+        else if (!FollowUpStatuses.All.Contains(search.Status))
+        {
+            return Invalid([("status", "validation.invalid")]);
+        }
+        else
+        {
+            query = query.Where(f => f.Status == search.Status);
+            query = search.Status == FollowUpStatuses.Pending ? query.OrderBy(f => f.DueAt) : query.OrderByDescending(f => f.CreatedAt);
+        }
+
+        return Results.Ok((await query.Take(limit).ToListAsync(ct)).Select(ToResponse).ToList());
+    }
+
+    private static async Task<IResult> CancelFollowUpAsync(Guid workspaceId, Guid followUpId, AutomationDbContext db, IClock clock, CancellationToken ct)
+    {
+        var followUp = await db.FollowUps.FirstOrDefaultAsync(f => f.Id == followUpId, ct);
+        if (followUp is null)
+        {
+            return Error.NotFound().ToProblem();
+        }
+
+        if (!followUp.Complete(FollowUpStatuses.Cancelled, FollowUpReasons.Owner, clock.UtcNow))
+        {
+            return Error.Conflict("automation.followup_not_pending").ToProblem();
+        }
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(ToResponse(followUp));
     }
 
     private static SettingsResponse ToResponse(AutomationSettings s) => new(s.AiEnabled, s.FallbackText, s.FallbackCooldownMinutes);

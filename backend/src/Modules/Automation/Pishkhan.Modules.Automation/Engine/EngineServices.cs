@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Infrastructure.Timers;
@@ -165,6 +166,15 @@ internal sealed class EnginePlan(Guid channelAccountId, string channelKind, stri
 {
     public List<ConversationAction> Actions { get; } = [];
 
+    /// <summary>Follow-ups scheduled by <c>schedule_followup</c> actions, saved with their timers by <see cref="PublishAsync"/>.</summary>
+    public List<FollowUp> FollowUps { get; } = [];
+
+    public Guid ChannelAccountId => channelAccountId;
+
+    public string ChannelKind => channelKind;
+
+    public string ExternalUserId => externalUserId;
+
     public Guid? RuleId { get; set; }
 
     public Guid? FlowRunId { get; set; }
@@ -196,6 +206,22 @@ internal sealed class EnginePlan(Guid channelAccountId, string channelKind, stri
         }
 
         _cards.Clear();
+        foreach (var followUp in FollowUps)
+        {
+            // One pending follow-up per conversation and source: the new one replaces the older.
+            var key = followUp.Key;
+            await db.FollowUps
+                .Where(f => f.ConversationId == followUp.ConversationId && f.Source == followUp.Source && f.Status == FollowUpStatuses.Pending)
+                .ExecuteUpdateAsync(
+                    u => u.SetProperty(f => f.Status, FollowUpStatuses.Cancelled).SetProperty(f => f.Reason, FollowUpReasons.Replaced)
+                        .SetProperty(f => f.CompletedAt, followUp.CreatedAt).SetProperty(f => f.UpdatedAt, followUp.CreatedAt),
+                    ct);
+            await TimerScheduler.CancelAsync(db, key, ct);
+            db.FollowUps.Add(followUp);
+            TimerScheduler.Schedule(db, Domain.FollowUps.TimerKind, followUp.DueAt, new FollowUpTimerPayload(followUp.Id), key, followUp.WorkspaceId);
+        }
+
+        FollowUps.Clear();
         if (Actions.Count > 0 || (Handled && inboundMessageId is not null))
         {
             db.Publish(ToEvent(), Key);
@@ -239,10 +265,22 @@ internal static class CardMessages
 }
 
 /// <summary>Turns rule actions into the plan. Comment replies are handled by the comment engine, which paces them.</summary>
+internal sealed record FollowUpTimerPayload(Guid FollowUpId);
+
+/// <summary>Where a scheduled follow-up comes from (a rule or a flow), and when it was scheduled.</summary>
+internal sealed record ActionSource(string Key, Guid? RuleId, Guid? FlowId, DateTimeOffset Now)
+{
+    public static ActionSource Rule(Guid ruleId, DateTimeOffset now) => new($"rule:{ruleId:N}", ruleId, null, now);
+
+    public static ActionSource Flow(Guid flowId, DateTimeOffset now) => new($"flow:{flowId:N}", null, flowId, now);
+}
+
 internal static class ActionPlanner
 {
-    /// <summary>Applies the actions; returns the flow to start, if any.</summary>
-    public static Guid? Apply(AutomationDbContext db, EnginePlan plan, IEnumerable<RuleAction> actions, IReadOnlyDictionary<string, string?> values, Guid workspaceId, Guid? conversationId)
+    /// <summary>Applies the actions; returns the flow to start, if any. Follow-ups need a conversation and a <paramref name="source"/>.</summary>
+    public static Guid? Apply(
+        AutomationDbContext db, EnginePlan plan, IEnumerable<RuleAction> actions, IReadOnlyDictionary<string, string?> values, Guid workspaceId, Guid? conversationId,
+        ActionSource? source = null)
     {
         Guid? flow = null;
         foreach (var action in actions)
@@ -279,6 +317,11 @@ internal static class ActionPlanner
                 case ActionKinds.StartFlow when action.FlowId is { } id:
                     flow ??= id;
                     break;
+                case ActionKinds.ScheduleFollowUp when conversationId is { } conversation && source is not null && action.Message is { } followUpMessage:
+                    plan.FollowUps.Add(FollowUp.Schedule(
+                        workspaceId, conversation, plan.ChannelAccountId, plan.ChannelKind, plan.ExternalUserId, source.Key, source.RuleId, source.FlowId,
+                        TemplateRenderer.Render(followUpMessage, values), action, source.Now));
+                    break;
             }
         }
 
@@ -290,7 +333,7 @@ internal static class ActionPlanner
 internal sealed record FlowTimerPayload(Guid RunId, string NodeId);
 
 /// <summary>Starts and advances flow runs, and turns their effects into the plan, timers and AI hand-offs.</summary>
-internal sealed class FlowEngine(AutomationDbContext db)
+internal sealed class FlowEngine(AutomationDbContext db, IChannelProfileReader profiles, ILogger<FlowEngine> logger)
 {
     public const string TimerKind = "automation.flow-delay";
 
@@ -318,7 +361,7 @@ internal sealed class FlowEngine(AutomationDbContext db)
         }
 
         db.FlowRuns.Add(run);
-        Apply(FlowRunner.Start(version.Graph, run, Context(conversation, settings, now)), run, conversation, plan);
+        Apply(FlowRunner.Start(version.Graph, run, await ContextAsync(version.Graph, conversation, settings, now, ct)), run, conversation, plan, now);
         Submitted(version.Graph, run, flow.Name, now);
         return run;
     }
@@ -326,14 +369,14 @@ internal sealed class FlowEngine(AutomationDbContext db)
     public async Task AnswerAsync(FlowRun run, string? text, string? payload, ConversationSnapshot conversation, SettingsView settings, EnginePlan plan, DateTimeOffset now, CancellationToken ct)
     {
         var graph = await GraphAsync(run, ct);
-        Apply(FlowRunner.Answer(graph, run, text, payload, Context(conversation, settings, now)), run, conversation, plan);
+        Apply(FlowRunner.Answer(graph, run, text, payload, await ContextAsync(graph, conversation, settings, now, ct)), run, conversation, plan, now);
         await SubmittedAsync(graph, run, now, ct);
     }
 
     public async Task TimerAsync(FlowRun run, string nodeId, ConversationSnapshot conversation, SettingsView settings, EnginePlan plan, DateTimeOffset now, CancellationToken ct)
     {
         var graph = await GraphAsync(run, ct);
-        Apply(FlowRunner.TimerFired(graph, run, nodeId, Context(conversation, settings, now)), run, conversation, plan);
+        Apply(FlowRunner.TimerFired(graph, run, nodeId, await ContextAsync(graph, conversation, settings, now, ct)), run, conversation, plan, now);
         await SubmittedAsync(graph, run, now, ct);
     }
 
@@ -367,10 +410,26 @@ internal sealed class FlowEngine(AutomationDbContext db)
     private async Task<FlowGraph> GraphAsync(FlowRun run, CancellationToken ct) =>
         (await db.FlowVersions.AsNoTracking().FirstAsync(v => v.FlowId == run.FlowId && v.Version == run.FlowVersion, ct)).Graph;
 
-    private static FlowContext Context(ConversationSnapshot conversation, SettingsView settings, DateTimeOffset now) =>
-        new(now, conversation.IsWindowOpen(now), conversation.Tags, conversation.Fields, EngineValues.For(conversation), settings.BusinessHours);
+    private async Task<FlowContext> ContextAsync(FlowGraph graph, ConversationSnapshot conversation, SettingsView settings, DateTimeOffset now, CancellationToken ct) =>
+        new(now, conversation.IsWindowOpen(now), conversation.Tags, conversation.Fields, EngineValues.For(conversation), settings.BusinessHours,
+            graph.Nodes.Any(n => n.Type == FlowNodeTypes.FollowGate) ? await FollowsAsync(conversation, ct) : null);
 
-    private void Apply(IReadOnlyList<FlowEffect> effects, FlowRun run, ConversationSnapshot conversation, EnginePlan plan)
+    /// <summary>Whether the customer follows the account, read fresh from the channel (a follow-gate re-checks on every answer).</summary>
+    private async Task<bool?> FollowsAsync(ConversationSnapshot conversation, CancellationToken ct)
+    {
+        try
+        {
+            return (await profiles.GetProfileAsync(conversation.ChannelAccountId, conversation.ExternalUserId, ct))?.FollowsBusiness;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            // Unknown lets the customer through: a gate must not trap customers while Instagram is unreachable.
+            logger.LogWarning(e, "Follow status of a customer on channel account {ChannelAccountId} could not be read", conversation.ChannelAccountId);
+            return null;
+        }
+    }
+
+    private void Apply(IReadOnlyList<FlowEffect> effects, FlowRun run, ConversationSnapshot conversation, EnginePlan plan, DateTimeOffset now)
     {
         plan.FlowRunId = run.Id;
         plan.Handled = true;
@@ -385,7 +444,7 @@ internal sealed class FlowEngine(AutomationDbContext db)
                     plan.AddCards(cards.CardSetId);
                     break;
                 case FlowEffect.Act act:
-                    ActionPlanner.Apply(db, plan, act.Actions, EngineValues.For(conversation), conversation.WorkspaceId, conversation.Id);
+                    ActionPlanner.Apply(db, plan, act.Actions, EngineValues.For(conversation), conversation.WorkspaceId, conversation.Id, ActionSource.Flow(run.FlowId, now));
                     break;
                 case FlowEffect.Timer timer:
                     TimerScheduler.Schedule(db, TimerKind, timer.DueAt, new FlowTimerPayload(run.Id, timer.NodeId), $"flow:{run.Id:N}:{timer.NodeId}", conversation.WorkspaceId);
