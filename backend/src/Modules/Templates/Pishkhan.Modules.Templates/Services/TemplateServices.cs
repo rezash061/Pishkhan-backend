@@ -18,10 +18,12 @@ internal sealed partial class TemplateContentValidator(IAutomationTemplateValida
 {
     public const int MaxFacts = 30;
     public const int MaxFaqs = 100;
+
+    // Knowledge stores FAQ questions up to 300 and answers up to 2,000 characters (KnowledgeSource.MaxQuestion and MaxAnswer).
     public const int MaxFlows = 20;
     public const int MaxRules = 30;
-    public const int MaxQuestion = 500;
-    public const int MaxAnswer = 4_000;
+    public const int MaxQuestion = 300;
+    public const int MaxAnswer = 2_000;
     public const int MaxLabel = 100;
     public const int MaxPrompt = 300;
     public const int MaxProfileName = 60;
