@@ -236,6 +236,11 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("revision");
 
+                    b.Property<string>("TemplateKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("template_key");
+
                     b.Property<string>("Trigger")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -267,6 +272,11 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                     b.HasIndex("WorkspaceId", "Enabled")
                         .HasDatabaseName("ix_rules_workspace_id_enabled")
                         .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("WorkspaceId", "TemplateKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rules_workspace_id_template_key")
+                        .HasFilter("template_key IS NOT NULL");
 
                     b.ToTable("rules", "automation");
                 });
@@ -508,6 +518,11 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<string>("TemplateKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("template_key");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -528,6 +543,11 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                     b.HasIndex("WorkspaceId")
                         .HasDatabaseName("ix_flows_workspace_id")
                         .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("WorkspaceId", "TemplateKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_flows_workspace_id_template_key")
+                        .HasFilter("template_key IS NOT NULL");
 
                     b.ToTable("flows", "automation");
                 });

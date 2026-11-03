@@ -3613,10 +3613,469 @@
           }
         ]
       }
+    },
+    "/admin/v1/industry-templates": {
+      "get": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Industry template versions",
+        "parameters": [
+          {
+            "name": "Industry",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAdminTemplateResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Create the first draft for an industry without a template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/industry-templates/{templateId}": {
+      "get": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "One template version",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Edit a draft; issues are returned, not rejected",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/industry-templates/{templateId}/versions": {
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Start a new draft from this version",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/industry-templates/{templateId}/publish": {
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Publish a draft; the industry's published version is archived",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TemplateActionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/industry-templates/{templateId}/archive": {
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Archive a version; an archived published version leaves the industry without a template",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTemplateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminTemplateResponse": {
+        "required": [
+          "id",
+          "industry",
+          "version",
+          "status",
+          "name",
+          "description",
+          "content",
+          "issues",
+          "createdAt",
+          "updatedAt",
+          "publishedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "content": {
+            "$ref": "#/components/schemas/TemplateContent"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "AdminUserActionRequest": {
         "required": [
           "reason"
@@ -4575,6 +5034,21 @@
           }
         }
       },
+      "CreateTemplateRequest": {
+        "required": [
+          "industry",
+          "template"
+        ],
+        "type": "object",
+        "properties": {
+          "industry": {
+            "type": "string"
+          },
+          "template": {
+            "$ref": "#/components/schemas/TemplateRequest"
+          }
+        }
+      },
       "Currency": {
         "enum": [
           "IRR"
@@ -5380,6 +5854,35 @@
           }
         }
       },
+      "PagedResultOfAdminTemplateResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminTemplateResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResultOfAdminUserSummary": {
         "required": [
           "items",
@@ -6066,6 +6569,25 @@
           }
         }
       },
+      "RequiredFact": {
+        "required": [
+          "key",
+          "label",
+          "prompt"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        }
+      },
       "StaffLoginRequest": {
         "required": [
           "username",
@@ -6367,6 +6889,201 @@
           }
         }
       },
+      "TemplateActionRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TemplateAgentProfile": {
+        "required": [
+          "name",
+          "tone",
+          "brandVoice",
+          "neverSay",
+          "handoffKeywords"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string"
+          },
+          "brandVoice": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "neverSay": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "handoffKeywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TemplateContent": {
+        "required": [
+          "requiredFacts",
+          "faqs",
+          "flows",
+          "rules",
+          "agentProfile"
+        ],
+        "type": "object",
+        "properties": {
+          "requiredFacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequiredFact"
+            }
+          },
+          "faqs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateFaq"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateFlow"
+            }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateRule"
+            }
+          },
+          "agentProfile": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TemplateAgentProfile"
+              }
+            ]
+          }
+        }
+      },
+      "TemplateFaq": {
+        "required": [
+          "key",
+          "question",
+          "answer"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        }
+      },
+      "TemplateFlow": {
+        "required": [
+          "key",
+          "name",
+          "graph"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "graph": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "TemplateRequest": {
+        "required": [
+          "name",
+          "description",
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TemplateContent"
+              }
+            ]
+          }
+        }
+      },
+      "TemplateRule": {
+        "required": [
+          "key",
+          "name",
+          "triggerKind",
+          "trigger",
+          "actions",
+          "priority"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "triggerKind": {
+            "type": "string"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "actions": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "TotpEnrollRequest": {
         "required": [
           "enrollmentToken",
@@ -6502,6 +7219,9 @@
     },
     {
       "name": "AI"
+    },
+    {
+      "name": "Templates"
     }
   ]
 }
