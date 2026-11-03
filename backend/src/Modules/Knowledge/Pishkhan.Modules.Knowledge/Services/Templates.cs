@@ -22,6 +22,7 @@ internal sealed class KnowledgeTemplates(KnowledgeDbContext db, IClock clock) : 
 
             // The answer is a suggestion with blanks for the owner's own details: the AI must not use it until the owner says it is right.
             source.Enabled = false;
+            source.FactKey = faq.FactKey is { Length: > 0 and <= 100 } fact ? fact : null;
             db.Sources.Add(source);
             db.TemplateItems.Add(new TemplateItem { WorkspaceId = workspaceId, Key = faq.Key, SourceId = source.Id, CreatedAt = now });
             db.Publish(new KnowledgeSourceChanged(workspaceId, source.Id, source.Revision), workspaceId.ToString(), workspaceId: workspaceId);

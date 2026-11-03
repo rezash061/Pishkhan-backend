@@ -90,4 +90,10 @@ public interface ICatalogQueries
 
     /// <summary>Active products whose title, description or tags contain the text (Persian normalized), best matches first.</summary>
     Task<IReadOnlyList<ProductSummary>> SearchAsync(string text, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Counts of the active products, for the knowledge score (BE-1.9).</summary>
+    Task<CatalogStats> GetStatsAsync(CancellationToken cancellationToken);
 }
+
+/// <summary><c>Priced</c>: active products with a price for every variant on sale. <c>InStock</c>: active products in stock.</summary>
+public sealed record CatalogStats(int Active, int Priced, int InStock);

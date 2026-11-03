@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\Catalog\Pishkhan.Modules.Catalog.Contracts\Pishkhan.Modules.Catalog.Contracts.csproj" />
     <ProjectReference Include="..\..\Files\Pishkhan.Modules.Files.Contracts\Pishkhan.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Templates\Pishkhan.Modules.Templates.Contracts\Pishkhan.Modules.Templates.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />

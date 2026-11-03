@@ -66,6 +66,7 @@ internal sealed partial class TemplateContentValidator(IAutomationTemplateValida
             Text(issues, label + ".prompt", f.Prompt, MaxPrompt);
         }
 
+        var factKeys = keys.ToHashSet(StringComparer.Ordinal);
         keys.Clear();
         foreach (var f in faqs)
         {
@@ -73,6 +74,10 @@ internal sealed partial class TemplateContentValidator(IAutomationTemplateValida
             Key(issues, label, f.Key, keys);
             Text(issues, label + ".question", f.Question, MaxQuestion);
             Text(issues, label + ".answer", f.Answer, MaxAnswer);
+            if (f.FactKey is { } fact && !factKeys.Contains(fact))
+            {
+                issues.Add($"{label}.factKey: templates.fact_unknown");
+            }
         }
 
         if (content.AgentProfile is { } p)

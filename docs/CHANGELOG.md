@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.9: knowledge score and onboarding interview, 2026-11-03)
+- `GET /workspaces/{id}/knowledge/score` (`workspace.settings.read`) returns `{score, industry, parts, facts, products, openUnanswered, suggestions}`. The score is 0–100, made of three parts:
+  - **facts**, 60 points: the share of the industry template's required facts answered by an enabled source with that `factKey`. Without a template, 10 or more enabled FAQs earn the full part.
+  - **products**, 25 points: half for priced active products, half for those in stock. `beauty_clinic` and `courses` workspaces without products skip this part, and facts are worth 85 instead.
+  - **unanswered**, 15 points: minus a tenth for each customer question from the last 7 days still open.
+  - `facts` lists every required fact with `covered` and `sourceId`, missing ones first.
+  - `suggestions` are message keys: `knowledge.suggest.answer_facts`, `.add_faqs`, `.add_products`, `.add_prices`, `.add_stock` and `.answer_unanswered`.
+- Onboarding interview (`workspace.knowledge.write`). For each missing fact the panel asks its `prompt`:
+  - `POST /knowledge/onboarding/draft` with `{factKey, answer}` (up to 1,000 characters) returns `{factKey, question, answer, drafted}`. The AI writes a customer-facing FAQ from the owner's own words, using prompt `knowledge.onboarding@1` and task `summarize`. Nothing is saved. With no model available, `drafted` is `fallback`: the fact's prompt becomes the question and the owner's words the answer.
+  - `POST /knowledge/onboarding/confirm` with `{factKey, question, answer}` saves the approved FAQ, enabled, and returns `{source, score}`. When the fact already has a FAQ (for example a template FAQ that is still switched off) that one is filled in and switched on.
+  - 422 `knowledge.fact_unknown` when the fact is not one of the workspace template's required facts.
+- Knowledge sources have `factKey` (`SourceResponse.factKey`). Migration `KnowledgeScore`.
+- Template FAQs can name the required fact they answer (`factKey`, checked: `templates.fact_unknown`), and the built-in templates do. Applying a template copies it to the FAQ, so filling in and switching on a template FAQ raises the score.
+- `ICatalogQueries.GetStatsAsync` returns active, priced and in-stock product counts.
+
 ### Added (Phase 1, BE-1.8: follow-gate and follow-ups, 2026-11-03)
 - Flow node `follow_gate`:
   - It continues on `true` when the customer follows the Instagram account. Otherwise it sends its `message` with a «دنبال کردم ✅» quick reply (payload `follow:check`) and waits.

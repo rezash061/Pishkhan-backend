@@ -34,7 +34,7 @@ public sealed record SourceUpdateRequest(string? Title, string? Question, string
 /// </summary>
 public sealed record SourceResponse(
     Guid Id, string Kind, string Title, string? Question, string Body, Guid? ProductId, bool Enabled, string Status, int Revision, int? IndexedRevision,
-    int ChunkCount, string? Error, DateTimeOffset? IndexedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, Guid? FileId, string? Url);
+    int ChunkCount, string? Error, DateTimeOffset? IndexedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, Guid? FileId, string? Url, string? FactKey = null);
 
 public sealed record KnowledgeSearchRequest(string Query, int? Limit);
 
@@ -92,7 +92,7 @@ internal static class KnowledgeEndpoints
 
     internal static SourceResponse ToResponse(KnowledgeSource s) => new(
         s.Id, s.Kind, s.Title, s.Question, s.Body, s.ProductId, s.Enabled, s.Status, s.Revision, s.IndexedRevision, s.ChunkCount, s.Error, s.IndexedAt,
-        s.CreatedAt, s.UpdatedAt, s.FileId, s.Url);
+        s.CreatedAt, s.UpdatedAt, s.FileId, s.Url, s.FactKey);
 
     private static async Task<IResult> ListAsync(
         Guid workspaceId, string? kind, string? q, string? status, string? cursor, int? limit, KnowledgeDbContext db, CancellationToken ct)
