@@ -923,6 +923,16 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("text");
 
+                    b.Property<string>("Transcript")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("transcript");
+
+                    b.Property<string>("TranscriptStatus")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("transcript_status");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -933,6 +943,10 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
 
                     b.HasKey("Id", "CreatedAt")
                         .HasName("pk_messages");
+
+                    b.HasIndex("WorkspaceId", "MediaFileId")
+                        .HasDatabaseName("ix_messages_workspace_id_media_file_id")
+                        .HasFilter("media_file_id IS NOT NULL");
 
                     b.HasIndex("ConversationId", "CreatedAt", "Id")
                         .HasDatabaseName("ix_messages_conversation_id_created_at_id");

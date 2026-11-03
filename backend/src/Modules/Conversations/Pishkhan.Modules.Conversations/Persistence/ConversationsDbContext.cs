@@ -102,6 +102,9 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.HasKey(x => new { x.Id, x.CreatedAt });
             b.Property(x => x.Direction).HasMaxLength(10);
             b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Transcript).HasMaxLength(4_000);
+            b.Property(x => x.TranscriptStatus).HasMaxLength(10);
+            b.HasIndex(x => new { x.WorkspaceId, x.MediaFileId }).HasFilter("media_file_id IS NOT NULL");
             b.Property(x => x.Text).HasMaxLength(4000);
             b.Property(x => x.NormalizedText).HasMaxLength(4000);
             b.Property(x => x.AttachmentsJson).HasColumnType("jsonb");

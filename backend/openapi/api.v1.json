@@ -14222,6 +14222,18 @@
             "items": {
               "$ref": "#/components/schemas/MessageAttachment"
             }
+          },
+          "transcript": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "transcriptStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
