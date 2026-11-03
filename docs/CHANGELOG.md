@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.5: feed import, 2026-11-03)
+- The owner can turn past Instagram posts into products and FAQs. Suggestions wait for review; nothing reaches customers until the owner accepts it.
+- Endpoints under `/workspaces/{id}/knowledge/feed-imports`:
+  - `POST` with `{channelAccountId, maxPosts}` (1–200, default 50) returns 202 with the import. Needs `workspace.knowledge.write`. One import runs per workspace: 409 `knowledge.feed_import_running`. An unknown account is 404 `knowledge.channel_not_found`.
+  - `GET` lists the last 20 imports. `GET /{importId}` returns the import with its suggestions, pending ones first.
+  - `PUT /{importId}/items/{itemId}` corrects a pending suggestion. A price set here counts as the owner's.
+  - `POST /{importId}/items/{itemId}/accept` with `{activate}` (default true) needs `workspace.knowledge.write` and `workspace.catalog.write`. A product is created in the catalog: on sale only when `activate` is true and its price is confirmed, otherwise as a draft. A FAQ becomes an enabled knowledge source. 422 `knowledge.feed_item_invalid` carries the catalog's error keys.
+  - `POST /{importId}/accept` with `{itemIds, activate}` accepts up to 100 at once and returns `{accepted, failed}`.
+  - `POST /{importId}/items/{itemId}/reject`.
+  - 409 `knowledge.feed_item_not_pending` for items already accepted or rejected.
+- How posts are read:
+  - The AI group reads 10 posts per page (`knowledge.feed-import-page-requested.v1`, retried when Instagram is rate limited) and asks the model about each caption. The model uses prompt `knowledge.feed_extract@1`, task `summarize`, with the caption as the user message.
+  - Each post gives up to 5 products and 5 FAQs.
+  - Prices come back in Toman and are stored in Rial. `priceInCaption` is false when the number isn't written in the caption (as it is, or in thousands or millions: «۴۵۰ تومن» = 450,000 Toman). Such a product is never put on sale automatically.
+  - Posts without a caption are skipped. Posts the model could not be asked about are counted in `postsFailed`.
+  - Each suggestion keeps the post's `mediaId`, `permalink` and `imageUrl` (Instagram's CDN, for the review screen). Images are not copied into the catalog yet.
+- New: `ICatalogCommands.CreateProductAsync` and `IChannelMediaReader.ListMediaAsync`. Migration `FeedImports` (`knowledge.feed_imports`, `knowledge.feed_import_items`).
+
 ### Added (Phase 2, BE-2.3: Finglish, 2026-11-03)
 - `Pishkhan.Persian.Finglish` handles Persian written in Latin letters («salam gheymatesh chande?»).
   - `Detect` looks at character classes (at least 70% Latin letters) and at two word lists: a Finglish lexicon of common shop words, and English stop words. A text is Finglish when it has more lexicon words than English ones. English, Persian script, emoji and digits alone are not Finglish.

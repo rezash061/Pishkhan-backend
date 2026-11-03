@@ -20,6 +20,10 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
 
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
 
+    public DbSet<FeedImport> FeedImports => Set<FeedImport>();
+
+    public DbSet<FeedImportItem> FeedImportItems => Set<FeedImportItem>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<KnowledgeSource>(b =>
@@ -37,6 +41,34 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
             b.HasIndex(x => new { x.WorkspaceId, x.ProductId }).IsUnique().HasFilter("product_id IS NOT NULL");
             b.Property(x => x.FactKey).HasMaxLength(100);
             b.HasIndex(x => new { x.WorkspaceId, x.FactKey }).HasFilter("fact_key IS NOT NULL");
+        });
+
+        modelBuilder.Entity<FeedImport>(b =>
+        {
+            b.ToTable("feed_imports");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Error).HasMaxLength(100);
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+
+            // One running import per workspace.
+            b.HasIndex(x => x.WorkspaceId, "ix_feed_imports_workspace_running").IsUnique().HasFilter("status = 'running'");
+        });
+
+        modelBuilder.Entity<FeedImportItem>(b =>
+        {
+            b.ToTable("feed_import_items");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Kind).HasMaxLength(10);
+            b.Property(x => x.MediaId).HasMaxLength(100);
+            b.Property(x => x.Permalink).HasMaxLength(500);
+            b.Property(x => x.ImageUrl).HasMaxLength(2_000);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.Title).HasMaxLength(FeedImportItem.MaxTitle);
+            b.Property(x => x.Description).HasMaxLength(FeedImportItem.MaxDescription);
+            b.Property(x => x.Question).HasMaxLength(KnowledgeSource.MaxQuestion);
+            b.Property(x => x.Answer).HasMaxLength(KnowledgeSource.MaxAnswer);
+            b.HasIndex(x => new { x.WorkspaceId, x.ImportId, x.Status });
         });
 
         modelBuilder.Entity<TemplateItem>(b =>

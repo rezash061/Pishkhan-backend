@@ -17,6 +17,7 @@ public static class CatalogModule
     {
         services.AddModuleDbContext<CatalogDbContext>(CatalogDbContext.SchemaName);
         services.AddScoped<ICatalogQueries, CatalogQueries>();
+        services.AddScoped<ICatalogCommands, CatalogCommands>();
         services.AddScoped<PriceChanges>();
         return services;
     }

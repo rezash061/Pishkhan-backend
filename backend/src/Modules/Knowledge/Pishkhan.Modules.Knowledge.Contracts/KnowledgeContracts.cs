@@ -26,6 +26,10 @@ public static class KnowledgeSourceKinds
 [IntegrationEvent(Topics.KnowledgeSourceChanged)]
 public sealed record KnowledgeSourceChanged(Guid WorkspaceId, Guid SourceId, int Revision) : IIntegrationEvent;
 
+/// <summary>Read the next page of an Instagram feed import (BE-2.5); <see cref="After"/> is the feed cursor, null for the first page.</summary>
+[IntegrationEvent(Topics.FeedImportPageRequested)]
+public sealed record FeedImportPageRequested(Guid WorkspaceId, Guid ImportId, string? After) : IIntegrationEvent;
+
 /// <summary>One retrieved chunk. <see cref="Score"/> is the fused rank score (higher is better); the ids make every answer traceable.</summary>
 public sealed record KnowledgeHit(Guid ChunkId, Guid SourceId, string SourceKind, string Title, string Text, double Score, double? Similarity, Guid? ProductId);
 

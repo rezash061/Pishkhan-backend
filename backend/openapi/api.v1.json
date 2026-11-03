@@ -9918,6 +9918,507 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Read the newest posts of an Instagram account into product and FAQ suggestions",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedImportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "The last 20 imports, newest first",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedImportResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports/{importId}": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "An import and its suggestions, pending first",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedImportDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports/{importId}/items/{itemId}": {
+      "put": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Correct a pending suggestion",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedItemUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports/{importId}/items/{itemId}/accept": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Accept a suggestion: a catalog product, or an enabled FAQ",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FeedItemAccept"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports/{importId}/accept": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Accept several suggestions (up to 100)",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedItemsAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedItemsAcceptResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/knowledge/feed-imports/{importId}/items/{itemId}/reject": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "summary": "Reject a suggestion",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/templates": {
       "get": {
         "tags": [
@@ -12612,6 +13113,327 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "FeedImportDetail": {
+        "required": [
+          "import",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "import": {
+            "$ref": "#/components/schemas/FeedImportResponse"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedItemResponse"
+            }
+          }
+        }
+      },
+      "FeedImportRequest": {
+        "required": [
+          "channelAccountId",
+          "maxPosts"
+        ],
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxPosts": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FeedImportResponse": {
+        "required": [
+          "id",
+          "channelAccountId",
+          "status",
+          "maxPosts",
+          "postsRead",
+          "postsAnalyzed",
+          "postsFailed",
+          "itemsFound",
+          "pending",
+          "error",
+          "createdAt",
+          "completedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "maxPosts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postsRead": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postsAnalyzed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postsFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemsFound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedItemAccept": {
+        "required": [
+          "activate"
+        ],
+        "type": "object",
+        "properties": {
+          "activate": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "FeedItemResponse": {
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "mediaId",
+          "permalink",
+          "imageUrl",
+          "title",
+          "description",
+          "price",
+          "priceInCaption",
+          "tags",
+          "question",
+          "answer",
+          "createdId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "mediaId": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "price": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "priceInCaption": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "question": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "FeedItemsAccept": {
+        "required": [
+          "itemIds",
+          "activate"
+        ],
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "activate": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "FeedItemsAcceptResult": {
+        "required": [
+          "accepted",
+          "failed"
+        ],
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedItemResponse"
+            }
+          },
+          "failed": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "FeedItemUpdate": {
+        "required": [
+          "title",
+          "description",
+          "price",
+          "tags",
+          "question",
+          "answer"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "price": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "tags": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "question": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
