@@ -253,6 +253,9 @@ public interface IChannelMediaReader
 {
     Task<ChannelReadResult<ChannelMedia>> GetMediaAsync(Guid channelAccountId, string mediaId, CancellationToken cancellationToken);
 
+    /// <summary>One page of the account's posts and reels, newest first (BE-2.5 feed import).</summary>
+    Task<ChannelReadResult<ChannelMediaPage>> ListMediaAsync(Guid channelAccountId, string? after, int limit, CancellationToken cancellationToken);
+
     /// <summary>One page of a media's top-level comments, newest first.</summary>
     Task<ChannelReadResult<ChannelCommentPage>> ListCommentsAsync(Guid channelAccountId, string mediaId, string? after, CancellationToken cancellationToken);
 }

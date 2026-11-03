@@ -234,6 +234,20 @@ internal sealed class ChannelMediaReader(InstagramAccountGateway gateway, Instag
             m.Id, m.Caption, m.MediaType, ChannelProfileReader.ToUri(m.MediaUrl), ChannelProfileReader.ToUri(m.ThumbnailUrl), ChannelProfileReader.ToUri(m.Permalink), m.Timestamp));
     }
 
+    public async Task<ChannelReadResult<ChannelMediaPage>> ListMediaAsync(Guid channelAccountId, string? after, int limit, CancellationToken cancellationToken)
+    {
+        var result = await gateway.CallAsync(channelAccountId, RateFamilies.Read, token => instagram.ListMediaAsync(token, after, limit, cancellationToken), cancellationToken);
+        if (result.Value is not { } page)
+        {
+            return ChannelReadResult<ChannelMediaPage>.Failed(result.ErrorCode ?? "channel.unavailable", result.Retryable);
+        }
+
+        return ChannelReadResult<ChannelMediaPage>.Ok(new ChannelMediaPage(
+            [.. page.Items.Select(m => new ChannelMedia(
+                m.Id, m.Caption, m.MediaType, ChannelProfileReader.ToUri(m.MediaUrl), ChannelProfileReader.ToUri(m.ThumbnailUrl), ChannelProfileReader.ToUri(m.Permalink), m.Timestamp))],
+            page.NextCursor));
+    }
+
     public async Task<ChannelReadResult<ChannelCommentPage>> ListCommentsAsync(Guid channelAccountId, string mediaId, string? after, CancellationToken cancellationToken)
     {
         var result = await gateway.CallAsync(channelAccountId, RateFamilies.Read, token => instagram.ListCommentsAsync(token, mediaId, after, cancellationToken), cancellationToken);

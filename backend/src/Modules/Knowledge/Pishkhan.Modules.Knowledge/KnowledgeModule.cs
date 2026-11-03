@@ -24,6 +24,7 @@ public static class KnowledgeModule
         services.AddScoped<IKnowledgeTemplates, KnowledgeTemplates>();
         services.AddScoped<KnowledgeIndexer>();
         services.AddScoped<KnowledgeContentReader>();
+        services.AddScoped<FeedExtractor>();
         return services;
     }
 
@@ -39,13 +40,16 @@ public static class KnowledgeModule
     public static MessagingBuilder AddKnowledgeConsumers(this MessagingBuilder messaging) => messaging
         .AddConsumer<KnowledgeSourceChanged, KnowledgeSourceChangedHandler>("ai")
         .AddConsumer<ProductChanged, ProductKnowledgeHandler>("ai")
-        .AddConsumer<UnansweredQuestionRaised, UnansweredQuestionHandler>("ai");
+        .AddConsumer<UnansweredQuestionRaised, UnansweredQuestionHandler>("ai")
+        .AddConsumer<FeedImportPageRequested, FeedImportPageHandler>(
+            "ai", new RetryPolicy(5, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(10)));
 
     public static IEndpointRouteBuilder MapKnowledgeEndpoints(this IEndpointRouteBuilder app)
     {
         KnowledgeEndpoints.Map(app);
         UnansweredEndpoints.Map(app);
         OnboardingEndpoints.Map(app);
+        FeedImportEndpoints.Map(app);
         return app;
     }
 }

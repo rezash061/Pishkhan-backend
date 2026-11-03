@@ -97,3 +97,16 @@ public interface ICatalogQueries
 
 /// <summary><c>Priced</c>: active products with a price for every variant on sale. <c>InStock</c>: active products in stock.</summary>
 public sealed record CatalogStats(int Active, int Priced, int InStock);
+
+/// <summary>
+/// A product written from somewhere else, such as an Instagram post the owner imported (BE-2.5). <see cref="Price"/> is in Rial. It is created
+/// <c>active</c> when <see cref="Activate"/> is true and it has a price, otherwise as a <c>draft</c>.
+/// </summary>
+public sealed record NewProduct(string Title, string? Description, IReadOnlyList<string> Tags, long? Price, string? LinkUrl, bool Activate);
+
+/// <summary>In-process writes of the Catalog module, in the current workspace.</summary>
+public interface ICatalogCommands
+{
+    /// <summary>Creates the product. Returns its id, or the validation error keys (<c>field: code</c>) and no id.</summary>
+    Task<(Guid? ProductId, IReadOnlyList<string> Errors)> CreateProductAsync(NewProduct product, CancellationToken cancellationToken);
+}
