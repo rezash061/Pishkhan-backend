@@ -261,13 +261,13 @@ internal static class TemplateEndpoints
             return Invalid(errors);
         }
 
-        if (await db.Templates.AnyAsync(t => t.Industry == request.Industry, ct))
+        if (await db.Templates.AnyAsync(t => t.Industry == request.Industry!, ct))
         {
             return Error.Conflict("templates.industry_taken").ToProblem();
         }
 
         var now = clock.UtcNow;
-        var template = IndustryTemplate.Create(request.Industry, request.Template.Name, request.Template.Description, request.Template.Content!, audit.StaffId, now);
+        var template = IndustryTemplate.Create(request.Industry!, request.Template.Name, request.Template.Description, request.Template.Content!, audit.StaffId, now);
         db.Templates.Add(template);
         await audit.RecordAsync(db, template, "industry_template.create", null, ct);
         try
