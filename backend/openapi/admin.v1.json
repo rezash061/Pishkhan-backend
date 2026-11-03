@@ -4007,10 +4007,124 @@
           }
         ]
       }
+    },
+    "/admin/v1/platform/outage": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The Instagram outage status and the detector's counts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOutageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Set the outage mode: let the detector decide, or declare Instagram down or up",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutageModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOutageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminOutageResponse": {
+        "required": [
+          "kind",
+          "status",
+          "mode",
+          "since",
+          "modeReason",
+          "ok",
+          "failed",
+          "windowMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modeReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ok": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "windowMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "AdminTemplateResponse": {
         "required": [
           "id",
@@ -5873,6 +5987,21 @@
           }
         }
       },
+      "OutageModeRequest": {
+        "required": [
+          "mode",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "PagedResultOfAdminTemplateResponse": {
         "required": [
           "items",
@@ -7247,6 +7376,9 @@
     },
     {
       "name": "Templates"
+    },
+    {
+      "name": "Platform"
     }
   ]
 }

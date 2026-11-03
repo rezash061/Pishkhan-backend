@@ -954,6 +954,101 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
                     b.ToTable("messages", "conversations");
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.OutageCampaign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("channel");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Failed")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed");
+
+                    b.Property<int>("Scanned")
+                        .HasColumnType("integer")
+                        .HasColumnName("scanned");
+
+                    b.Property<int>("Sent")
+                        .HasColumnType("integer")
+                        .HasColumnName("sent");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(420)
+                        .HasColumnType("character varying(420)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outage_campaigns");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_outage_campaigns_workspace_id_created_at");
+
+                    b.ToTable("outage_campaigns", "conversations");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.OutageCampaignRecipient", b =>
+                {
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("campaign_id");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("CampaignId", "ContactId")
+                        .HasName("pk_outage_campaign_recipients");
+
+                    b.ToTable("outage_campaign_recipients", "conversations");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Conversations.Domain.PrivateReplyKey", b =>
                 {
                     b.Property<Guid>("ChannelAccountId")
