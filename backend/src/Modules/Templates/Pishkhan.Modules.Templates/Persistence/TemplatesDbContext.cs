@@ -37,7 +37,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                     (a, c) => JsonSerializer.Serialize(a, EnvelopeJson.Options) == JsonSerializer.Serialize(c, EnvelopeJson.Options),
                     v => JsonSerializer.Serialize(v, EnvelopeJson.Options).GetHashCode(StringComparison.Ordinal),
                     v => JsonSerializer.Deserialize<TemplateContent>(JsonSerializer.Serialize(v, EnvelopeJson.Options), EnvelopeJson.Options)!));
-            b.HasIndex(x => new { x.Industry, x.Version }).IsUnique();
+            b.HasIndex(x => new { x.Industry, x.VersionNumber }).IsUnique();
 
             // One published and one draft version per industry at a time.
             b.HasIndex(x => x.Industry, "ix_industry_templates_industry_published").IsUnique().HasFilter("status = 'published'");

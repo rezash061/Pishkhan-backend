@@ -125,7 +125,7 @@ public class IndustryTemplateTests
         Should.Throw<DomainException>(() => template.Update("پوشاک ۲", null, Content(), null, Now));
 
         var next = template.NextVersion(2, Guid.NewGuid(), Now);
-        next.Version.ShouldBe(2);
+        next.VersionNumber.ShouldBe(2);
         next.Status.ShouldBe(TemplateStatuses.Draft);
         next.Industry.ShouldBe("clothing");
     }

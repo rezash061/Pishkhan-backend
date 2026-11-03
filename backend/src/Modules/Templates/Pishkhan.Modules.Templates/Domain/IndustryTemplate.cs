@@ -45,7 +45,8 @@ public sealed class IndustryTemplate : AggregateRoot<Guid>
     /// <summary>One of the workspace industries: clothing, cosmetics, jewelry, beauty_clinic, courses or other.</summary>
     public string Industry { get; private set; } = string.Empty;
 
-    public int Version { get; private set; }
+    /// <summary>1 for an industry's first version, counting up.</summary>
+    public int VersionNumber { get; private set; }
 
     public string Status { get; private set; } = TemplateStatuses.Draft;
 
@@ -66,7 +67,7 @@ public sealed class IndustryTemplate : AggregateRoot<Guid>
     {
         Id = Uuid.NewV7(now),
         Industry = industry,
-        Version = 1,
+        VersionNumber = 1,
         Name = name.Trim(),
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
         Content = content,
@@ -94,7 +95,7 @@ public sealed class IndustryTemplate : AggregateRoot<Guid>
     {
         Id = Uuid.NewV7(now),
         Industry = Industry,
-        Version = version,
+        VersionNumber = version,
         Name = Name,
         Description = Description,
         Content = Content,
@@ -138,7 +139,7 @@ public sealed class TemplateApplication : Entity<Guid>, ITenantOwned
 
     public string Industry { get; private set; } = string.Empty;
 
-    public int Version { get; private set; }
+    public int TemplateVersion { get; private set; }
 
     public Guid? AppliedBy { get; private set; }
 
@@ -161,7 +162,7 @@ public sealed class TemplateApplication : Entity<Guid>, ITenantOwned
         WorkspaceId = workspaceId,
         TemplateId = template.Id,
         Industry = template.Industry,
-        Version = template.Version,
+        TemplateVersion = template.VersionNumber,
         AppliedBy = userId,
         FaqsAdded = faqsAdded,
         FlowsAdded = flowsAdded,

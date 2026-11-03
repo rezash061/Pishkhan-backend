@@ -144,11 +144,11 @@ internal static class TemplateEndpoints
     // ---- Panel ----
 
     private static TemplateSummaryResponse Summary(IndustryTemplate t, string? industry, DateTimeOffset? lastApplied) =>
-        new(t.Id, t.Industry, t.Version, t.Name, t.Description, t.Content.RequiredFacts?.Count ?? 0, t.Content.Faqs?.Count ?? 0,
+        new(t.Id, t.Industry, t.VersionNumber, t.Name, t.Description, t.Content.RequiredFacts?.Count ?? 0, t.Content.Faqs?.Count ?? 0,
             t.Content.Flows?.Count ?? 0, t.Content.Rules?.Count ?? 0, t.Content.AgentProfile is not null, t.Industry == industry, lastApplied);
 
     private static TemplateApplicationResponse ToResponse(TemplateApplication a) =>
-        new(a.Id, a.TemplateId, a.Industry, a.Version, a.FaqsAdded, a.FlowsAdded, a.RulesAdded, a.ProfileApplied, a.Skipped, a.CreatedAt);
+        new(a.Id, a.TemplateId, a.Industry, a.TemplateVersion, a.FaqsAdded, a.FlowsAdded, a.RulesAdded, a.ProfileApplied, a.Skipped, a.CreatedAt);
 
     private static async Task<IResult> ListPublishedAsync(Guid workspaceId, TemplatesDbContext db, IWorkspaceQueries workspaces, CancellationToken ct)
     {
@@ -202,7 +202,7 @@ internal static class TemplateEndpoints
             AuditActor.User(caller.UserId, caller.ActorStaffId, caller.IpAddress), "workspace.template_applied", "industry_template", template.Id.ToString(), workspaceId, now,
             after: new
             {
-                template.Industry, template.Version, outcome.FaqsAdded, outcome.FlowsAdded, outcome.RulesAdded, outcome.ProfileApplied, outcome.Skipped,
+                template.Industry, version = template.VersionNumber, outcome.FaqsAdded, outcome.FlowsAdded, outcome.RulesAdded, outcome.ProfileApplied, outcome.Skipped,
             });
         db.Publish(entry, entry.PartitionKey(), workspaceId);
         await db.SaveChangesAsync(ct);
@@ -215,7 +215,7 @@ internal static class TemplateEndpoints
     // ---- Back office ----
 
     private static AdminTemplateResponse ToAdmin(IndustryTemplate t, TemplateContentValidator validator) =>
-        new(t.Id, t.Industry, t.Version, t.Status, t.Name, t.Description, t.Content, validator.Validate(t.Content), t.CreatedAt, t.UpdatedAt, t.PublishedAt);
+        new(t.Id, t.Industry, t.VersionNumber, t.Status, t.Name, t.Description, t.Content, validator.Validate(t.Content), t.CreatedAt, t.UpdatedAt, t.PublishedAt);
 
     private static async Task<IResult> AdminListAsync([AsParameters] TemplateSearch search, TemplatesDbContext db, TemplateContentValidator validator, CancellationToken ct)
     {
@@ -238,7 +238,7 @@ internal static class TemplateEndpoints
         var page = Math.Max(1, search.Page ?? 1);
         var pageSize = Math.Clamp(search.PageSize ?? DefaultPageSize, 1, MaxPageSize);
         var total = await query.CountAsync(ct);
-        var rows = await query.OrderBy(t => t.Industry).ThenByDescending(t => t.Version).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var rows = await query.OrderBy(t => t.Industry).ThenByDescending(t => t.VersionNumber).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return Results.Ok(new PagedResult<AdminTemplateResponse>([.. rows.Select(t => ToAdmin(t, validator))], total, page, pageSize));
     }
 
@@ -316,13 +316,13 @@ internal static class TemplateEndpoints
             return Error.NotFound().ToProblem();
         }
 
-        var versions = await db.Templates.AsNoTracking().Where(t => t.Industry == source.Industry).Select(t => new { t.Version, t.Status }).ToListAsync(ct);
+        var versions = await db.Templates.AsNoTracking().Where(t => t.Industry == source.Industry).Select(t => new { t.VersionNumber, t.Status }).ToListAsync(ct);
         if (versions.Any(v => v.Status == TemplateStatuses.Draft))
         {
             return Error.Conflict("templates.draft_exists").ToProblem();
         }
 
-        var next = source.NextVersion(versions.Max(v => v.Version) + 1, audit.StaffId, clock.UtcNow);
+        var next = source.NextVersion(versions.Max(v => v.VersionNumber) + 1, audit.StaffId, clock.UtcNow);
         db.Templates.Add(next);
         await audit.RecordAsync(db, next, "industry_template.version", null, ct);
         try
@@ -378,7 +378,7 @@ internal static class TemplateEndpoints
             }
 
             template.Publish(audit.StaffId, now);
-            await audit.RecordAsync(db, template, "industry_template.publish", request?.Reason, token, new { replacedVersion = previous?.Version });
+            await audit.RecordAsync(db, template, "industry_template.publish", request?.Reason, token, new { replacedVersion = previous?.VersionNumber });
             await db.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
             return Results.Ok(ToAdmin(template, validator));
@@ -453,7 +453,7 @@ internal sealed class TemplateAudit(ICurrentUser caller, IStaffDirectory staff, 
         var entry = AuditEntries.Create(
             AuditActor.Staff(caller.UserId, await staff.GetUsernameAsync(caller.UserId, ct), caller.IpAddress), action, "industry_template", template.Id.ToString(), null,
             clock.UtcNow,
-            after: new { template.Industry, template.Version, template.Status, faqs = template.Content.Faqs?.Count, flows = template.Content.Flows?.Count, rules = template.Content.Rules?.Count, extra },
+            after: new { template.Industry, version = template.VersionNumber, template.Status, faqs = template.Content.Faqs?.Count, flows = template.Content.Flows?.Count, rules = template.Content.Rules?.Count, extra },
             reason: string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
         db.Publish(entry, entry.PartitionKey(), workspaceId: null);
     }
