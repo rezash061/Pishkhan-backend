@@ -21,6 +21,7 @@ public static class KnowledgeModule
         services.AddModuleDbContext<KnowledgeDbContext>(KnowledgeDbContext.SchemaName);
         services.AddPishkhanAi(configuration);
         services.AddScoped<IKnowledgeSearch, KnowledgeSearch>();
+        services.AddScoped<IKnowledgeTemplates, KnowledgeTemplates>();
         services.AddScoped<KnowledgeIndexer>();
         services.AddScoped<KnowledgeContentReader>();
         return services;

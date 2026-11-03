@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Pishkhan.Web\Pishkhan.Web.csproj" />
+    <ProjectReference Include="..\Pishkhan.Modules.Templates.Contracts\Pishkhan.Modules.Templates.Contracts.csproj" />
+    <ProjectReference Include="..\..\Knowledge\Pishkhan.Modules.Knowledge.Contracts\Pishkhan.Modules.Knowledge.Contracts.csproj" />
+    <ProjectReference Include="..\..\Automation\Pishkhan.Modules.Automation.Contracts\Pishkhan.Modules.Automation.Contracts.csproj" />
+    <ProjectReference Include="..\..\Agent\Pishkhan.Modules.Agent.Contracts\Pishkhan.Modules.Agent.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tenancy\Pishkhan.Modules.Tenancy.Contracts\Pishkhan.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Pishkhan.Modules.Audit.Contracts\Pishkhan.Modules.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Backoffice\Pishkhan.Modules.Backoffice.Contracts\Pishkhan.Modules.Backoffice.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Seeds\*.json" LogicalName="Pishkhan.Modules.Templates.Seeds.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pishkhan.IntegrationTests" />
+    <InternalsVisibleTo Include="Pishkhan.UnitTests" />
+    <InternalsVisibleTo Include="Pishkhan.ArchitectureTests" />
+  </ItemGroup>
+</Project>

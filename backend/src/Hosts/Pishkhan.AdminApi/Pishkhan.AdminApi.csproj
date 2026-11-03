@@ -12,6 +12,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Automation\Pishkhan.Modules.Automation\Pishkhan.Modules.Automation.csproj" />
+    <ProjectReference Include="..\..\Modules\Templates\Pishkhan.Modules.Templates\Pishkhan.Modules.Templates.csproj" />
     <ProjectReference Include="..\..\Modules\Billing\Pishkhan.Modules.Billing\Pishkhan.Modules.Billing.csproj" />
     <ProjectReference Include="..\..\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />
     <ProjectReference Include="..\..\Modules\Content\Pishkhan.Modules.Content\Pishkhan.Modules.Content.csproj" />

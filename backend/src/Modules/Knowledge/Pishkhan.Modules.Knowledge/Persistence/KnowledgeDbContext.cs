@@ -18,6 +18,8 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
 
     public DbSet<UnansweredQuestion> Unanswered => Set<UnansweredQuestion>();
 
+    public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<KnowledgeSource>(b =>
@@ -33,6 +35,13 @@ public sealed class KnowledgeDbContext(DbContextOptions<KnowledgeDbContext> opti
             b.Property(x => x.Error).HasMaxLength(200);
             b.HasIndex(x => new { x.WorkspaceId, x.Kind, x.CreatedAt });
             b.HasIndex(x => new { x.WorkspaceId, x.ProductId }).IsUnique().HasFilter("product_id IS NOT NULL");
+        });
+
+        modelBuilder.Entity<TemplateItem>(b =>
+        {
+            b.ToTable("template_items");
+            b.HasKey(x => new { x.WorkspaceId, x.Key });
+            b.Property(x => x.Key).HasMaxLength(100);
         });
 
         modelBuilder.Entity<KnowledgeChunk>(b =>

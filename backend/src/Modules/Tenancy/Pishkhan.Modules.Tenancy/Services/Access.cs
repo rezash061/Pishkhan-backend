@@ -130,4 +130,11 @@ internal sealed class WorkspaceQueries(TenancyDbContext db, HybridCache cache) :
             .Where(w => w.Id == workspaceId)
             .Select(w => w.Name)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<string?> GetIndustryAsync(Guid workspaceId, CancellationToken cancellationToken) =>
+        await db.Workspaces.AsNoTracking()
+            .IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(w => w.Id == workspaceId)
+            .Select(w => w.Industry)
+            .FirstOrDefaultAsync(cancellationToken);
 }

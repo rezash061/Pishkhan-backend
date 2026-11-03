@@ -58,6 +58,8 @@ public sealed class AutomationDbContext(DbContextOptions<AutomationDbContext> op
             Json(b.Property(x => x.Trigger));
             Json(b.Property(x => x.Actions));
             b.HasIndex(x => new { x.WorkspaceId, x.Enabled }).HasFilter("deleted_at IS NULL");
+            b.Property(x => x.TemplateKey).HasMaxLength(100);
+            b.HasIndex(x => new { x.WorkspaceId, x.TemplateKey }).IsUnique().HasFilter("template_key IS NOT NULL");
             b.Ignore(x => x.DomainEvents);
         });
 
@@ -69,6 +71,8 @@ public sealed class AutomationDbContext(DbContextOptions<AutomationDbContext> op
             b.Property(x => x.Status).HasMaxLength(20);
             Json(b.Property(x => x.Draft));
             b.HasIndex(x => x.WorkspaceId).HasFilter("deleted_at IS NULL");
+            b.Property(x => x.TemplateKey).HasMaxLength(100);
+            b.HasIndex(x => new { x.WorkspaceId, x.TemplateKey }).IsUnique().HasFilter("template_key IS NOT NULL");
             b.Ignore(x => x.DomainEvents);
         });
 

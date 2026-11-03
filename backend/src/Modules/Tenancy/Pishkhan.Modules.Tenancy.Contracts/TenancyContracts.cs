@@ -47,4 +47,7 @@ public interface IWorkspaceQueries
 
     /// <summary>The workspace's display name (the shop name customers see), or null for an unknown workspace.</summary>
     Task<string?> GetNameAsync(Guid workspaceId, CancellationToken cancellationToken);
+
+    /// <summary>The workspace's industry (clothing, cosmetics, jewelry, beauty_clinic, courses or other), or null for an unknown workspace.</summary>
+    Task<string?> GetIndustryAsync(Guid workspaceId, CancellationToken cancellationToken);
 }

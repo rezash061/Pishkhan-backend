@@ -1,0 +1,58 @@
+name: codegen
+
+# For sessions without a .NET SDK: generates EF Core migrations and the OpenAPI export on a feature branch
+# and commits them back. Push a commit whose message contains "[codegen]". Migrations to add are listed in
+# backend/.codegen, one per line: "<Module> <MigrationName>" (for example "Automation IndustryTemplates").
+# The file is deleted by the run. OpenAPI documents are always regenerated.
+
+on:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codegen-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  codegen:
+    if: contains(github.event.head_commit.message, '[codegen]')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+      - name: Restore
+        run: dotnet restore Pishkhan.slnx
+      - name: Build
+        run: dotnet build Pishkhan.slnx --no-restore -c Debug
+      - name: Add migrations
+        run: |
+          if [ -f .codegen ]; then
+            dotnet tool install --global dotnet-ef --version "10.*"
+            while read -r module name; do
+              [ -z "$module" ] && continue
+              project="src/Modules/$module/Pishkhan.Modules.$module"
+              dotnet ef migrations add "$name" --project "$project" --startup-project src/Hosts/Pishkhan.Migrator \
+                --context "${module}DbContext" --output-dir Persistence/Migrations --no-build
+            done < .codegen
+            git rm -q .codegen
+          fi
+      - name: Rebuild (exports OpenAPI)
+        run: dotnet build Pishkhan.slnx --no-restore -c Release
+      - name: Commit
+        run: |
+          git config user.name "codegen"
+          git config user.email "codegen@users.noreply.github.com"
+          git add -A .
+          if git diff --cached --quiet; then echo "Nothing generated"; exit 0; fi
+          git commit -m "codegen: migrations and OpenAPI"
+          git push origin HEAD:${{ github.ref_name }}

@@ -12,6 +12,7 @@ using Pishkhan.Modules.Knowledge;
 using Pishkhan.Modules.Catalog;
 using Pishkhan.Modules.Orders;
 using Pishkhan.Modules.Payments;
+using Pishkhan.Modules.Templates;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Conversations;
@@ -50,6 +51,7 @@ services
     .AddBillingModule(configuration).AddBillingCheckout(configuration)
     .AddAgentModule(configuration).AddAgentReplies()
     .AddKnowledgeModule(configuration)
+    .AddTemplatesModule(configuration).AddTemplatesApply()
     .DecorateHandlers();
 services.AddPishkhanRealtime();
 services.AddPishkhanMessaging(configuration, "api", m => m
@@ -72,6 +74,7 @@ app.MapOrderEndpoints();
 app.MapPaymentsEndpoints();
 app.MapBillingEndpoints();
 app.MapKnowledgeEndpoints();
+app.MapTemplatesEndpoints();
 app.MapAgentEndpoints();
 app.MapAuditEndpoints();
 app.MapNotificationsEndpoints();

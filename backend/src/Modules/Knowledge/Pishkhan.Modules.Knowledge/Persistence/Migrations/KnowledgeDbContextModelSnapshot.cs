@@ -346,6 +346,31 @@ namespace Pishkhan.Modules.Knowledge.Persistence.Migrations
                     b.ToTable("sources", "knowledge");
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.TemplateItem", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("WorkspaceId", "Key")
+                        .HasName("pk_template_items");
+
+                    b.ToTable("template_items", "knowledge");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Knowledge.Domain.UnansweredQuestion", b =>
                 {
                     b.Property<Guid>("Id")
