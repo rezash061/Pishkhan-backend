@@ -2,20 +2,20 @@
 
 ## Unreleased
 
-### Added (Phase 2, BE-2.4: voice notes, 2026-11-03)
-- Customers' Instagram voice notes are transcribed and answered like typed messages.
-  1. The inbound pipeline marks a voice note `transcriptStatus: pending`. It publishes `InboundMessageReceived` with the new flag `awaitingTranscript`, so the inbox shows the note at once, and the new event `conversations.voice-note-received.v1` (`VoiceNoteReceived`).
-  2. The outbound group downloads the audio from Instagram's CDN (25 MB cap) into the Files module (purpose `message_attachment`), which scans it.
-  3. On a clean scan (`files.scan-completed.v1`) the audio is transcribed (task `transcribe`, language `fa`). The transcript is stored on the message, and the message is announced again as a text message (`isRepeat`) with the transcript as its text. Rules, flows and the AI then answer it.
-  4. When the audio cannot be downloaded, isn't clean, no speech model answers, or the transcript is empty, `transcriptStatus` is `failed` and the conversation is handed off with reason `voice_unavailable`. A voice note never goes unanswered in silence.
-- `Pishkhan.AI.ISpeechTranscriber` uses the OpenAI-compatible `/audio/transcriptions` endpoint. It tries the routes of task `transcribe` in order, with the chat circuit breakers and usage metering. Fake providers return a fixed Persian sentence.
-- `MessageResponse` has `transcript` and `transcriptStatus` (`pending`, `done` or `failed`). The inbox gets the transcript through the usual `message.created` push when it arrives, for the same message id.
-- Consumers of `InboundMessageReceived`:
-  - Automation and the echo spike ignore `awaitingTranscript` announcements.
-  - Analytics doesn't count `isRepeat` ones.
-  - The AI's conversation history uses the transcript.
-- Migration `VoiceNotes`: `transcript` and `transcript_status` on messages, and an index on `media_file_id`.
-- Not chunked: Instagram voice notes are at most a minute long, well under the endpoints' limits.
+### Added (Phase 2, BE-2.3: Finglish, 2026-11-03)
+- `Pishkhan.Persian.Finglish` handles Persian written in Latin letters («salam gheymatesh chande?»).
+  - `Detect` looks at character classes (at least 70% Latin letters) and at two word lists: a Finglish lexicon of common shop words, and English stop words. A text is Finglish when it has more lexicon words than English ones. English, Persian script, emoji and digits alone are not Finglish.
+  - `Transliterate` writes it in Persian script. Lexicon words, with common suffixes such as -esh, -am and -ha, use their spelling; other words are spelled by letter rules (kh→خ, gh→ق, sh→ش, a final e→ه, an initial vowel→ا/آ). It reports `coverage` and the unknown words.
+- AI replies (`FinglishReader`):
+  - The handoff phrases, the classifier and retrieval read a Finglish turn in Persian script. The classifier sees the original with the Persian reading; generation still sees the customer's own words.
+  - When the rules knew less than 60% of the words, a model writes the text in Persian. This uses the new prompt `text.transliterate@1` with task `classify`, cached per word sequence for 30 days. A model outage falls back to the rules, and failures are not cached.
+  - The trace's `language` is `finglish` for these turns.
+- Automation: when no DM rule matches a Finglish message, the rules are tried again on its Persian reading, so «gheymat» matches a «قیمت» keyword. The sandbox test run does the same.
+- Eval runs score the Finglish cases separately:
+  - New fields `finglishCaseCount`, `finglishIntentAccuracy` and `scriptIntentAccuracy` on eval runs. Migration Agent `FinglishEval`.
+  - The eval gate adds the check `finglish_gap` when a set has both kinds of case. Finglish may trail Persian script by at most `Ai:EvalGate:MaxFinglishGap`, default 0.05, which is the plan's 5 points.
+  - Eval cases are read with the rules only, so a run does not depend on the transliteration model.
+  - New sample set `tools/Pishkhan.EvalRunner/samples/finglish.jsonl`: 30 cases over the five verticals.
 
 ### Added (Phase 1, BE-1.9: knowledge score and onboarding interview, 2026-11-03)
 - `GET /workspaces/{id}/knowledge/score` (`workspace.settings.read`) returns `{score, industry, parts, facts, products, openUnanswered, suggestions}`. The score is 0–100, made of three parts:

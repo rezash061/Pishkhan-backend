@@ -1,0 +1,30 @@
+{"ref": "fg-0001", "vertical": "clothing", "input": "salam gheymatesh chande?", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0002", "vertical": "clothing", "input": "in manto size 40 mojood dari?", "expected": {"intent": "availability", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0003", "vertical": "clothing", "input": "rang meshki ham dare?", "expected": {"intent": "availability", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0004", "vertical": "clothing", "input": "mikham 2 ta sefaresh bedam", "expected": {"intent": "order", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0005", "vertical": "clothing", "input": "ersal be shiraz chand rooz mikeshe?", "expected": {"intent": "shipping", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0006", "vertical": "clothing", "input": "lebasi ke ferestadin pare boode, kheili narahatam", "expected": {"intent": "complaint", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0007", "vertical": "clothing", "input": "takhfif nadarin baraye 3 ta?", "expected": {"intent": "discount_request", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0008", "vertical": "cosmetics", "input": "in kerem asle?", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0009", "vertical": "cosmetics", "input": "gheymate rozhlab chande", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0010", "vertical": "cosmetics", "input": "baraye poost charb chi pishnahad mikonid?", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0011", "vertical": "cosmetics", "input": "sefaresh dadam vali hanooz naresideh, 10 roze", "expected": {"intent": "complaint", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0012", "vertical": "cosmetics", "input": "mojoodi darid?", "expected": {"intent": "availability", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0013", "vertical": "jewelry", "input": "gheymat emrooz in angoshtar chande?", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0014", "vertical": "jewelry", "input": "ojratesh chand darsade?", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0015", "vertical": "jewelry", "input": "mishe ghesti kharid?", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0016", "vertical": "jewelry", "input": "mikham ba forooshande sohbat konam", "expected": {"intent": "human_request", "handoff": true}, "tags": ["finglish"]}
+{"ref": "fg-0017", "vertical": "beauty_clinic", "input": "salam vaght khali barai farda darid?", "expected": {"intent": "availability", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0018", "vertical": "beauty_clinic", "input": "hazine leyzer chande?", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0019", "vertical": "beauty_clinic", "input": "nobat mikham baraye pakdasazi", "expected": {"intent": "order", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0020", "vertical": "beauty_clinic", "input": "bad az leyzer poostam soukhte", "expected": {"intent": "complaint", "handoff": true}, "tags": ["finglish"]}
+{"ref": "fg-0021", "vertical": "courses", "input": "doreh kei shoroo mishe?", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0022", "vertical": "courses", "input": "shahrie doreh chande?", "expected": {"intent": "price_question", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0023", "vertical": "courses", "input": "sabtenam mikonam, chetori pardakht konam?", "expected": {"intent": "order", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0024", "vertical": "courses", "input": "madrak midid?", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0025", "vertical": "clothing", "input": "salaam khoobi?", "expected": {"intent": "greeting", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0026", "vertical": "cosmetics", "input": "mersi kheili mamnoon", "expected": {"intent": "other", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0027", "vertical": "clothing", "input": "lotfan ye adam vaghei javab bede", "expected": {"intent": "human_request", "handoff": true}, "tags": ["finglish"]}
+{"ref": "fg-0028", "vertical": "jewelry", "input": "pool variz kardam, resid ro befrestam?", "expected": {"intent": "order", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0029", "vertical": "clothing", "input": "peyk baraye tehran darid?", "expected": {"intent": "shipping", "handoff": false}, "tags": ["finglish"]}
+{"ref": "fg-0030", "vertical": "courses", "input": "takhfif daneshjooii darid?", "expected": {"intent": "discount_request", "handoff": false}, "tags": ["finglish"]}

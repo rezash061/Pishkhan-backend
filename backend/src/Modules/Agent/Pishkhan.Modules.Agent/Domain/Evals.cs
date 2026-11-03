@@ -71,6 +71,14 @@ public sealed class EvalRun
     /// <summary>Of the cases that expected a handoff, the share the pipeline would hand off.</summary>
     public decimal? HandoffRecall { get; set; }
 
+    /// <summary>Cases written in Finglish (BE-2.3), scored separately from the Persian-script ones.</summary>
+    public int FinglishCaseCount { get; set; }
+
+    public decimal? FinglishIntentAccuracy { get; set; }
+
+    /// <summary>Intent accuracy over the cases that are not Finglish.</summary>
+    public decimal? ScriptIntentAccuracy { get; set; }
+
     public long InputTokens { get; set; }
 
     public long OutputTokens { get; set; }
