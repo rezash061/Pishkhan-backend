@@ -56,6 +56,15 @@ public sealed record RuleAction
 
     /// <summary>notify_team: the notification's title.</summary>
     public string? Title { get; init; }
+
+    /// <summary>schedule_followup: how long after the action the message is sent (60 seconds to 23 hours, inside Meta's 24-hour window).</summary>
+    public int? DelaySeconds { get; init; }
+
+    /// <summary>schedule_followup: drop the follow-up when the customer writes again (default true).</summary>
+    public bool? CancelOnReply { get; init; }
+
+    /// <summary>schedule_followup: drop the follow-up when an order of the conversation is paid (default true).</summary>
+    public bool? CancelOnPurchase { get; init; }
 }
 
 /// <summary>An automation rule: one trigger, a list of actions, a priority (higher wins).</summary>

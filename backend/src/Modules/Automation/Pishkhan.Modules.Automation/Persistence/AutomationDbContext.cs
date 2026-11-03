@@ -46,6 +46,8 @@ public sealed class AutomationDbContext(DbContextOptions<AutomationDbContext> op
 
     public DbSet<PacingSlot> Pacing => Set<PacingSlot>();
 
+    public DbSet<FollowUp> FollowUps => Set<FollowUp>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AutomationRule>(b =>
@@ -81,6 +83,21 @@ public sealed class AutomationDbContext(DbContextOptions<AutomationDbContext> op
             b.ToTable("flow_versions");
             b.HasKey(x => new { x.FlowId, x.Version });
             Json(b.Property(x => x.Graph));
+        });
+
+        modelBuilder.Entity<FollowUp>(b =>
+        {
+            b.ToTable("followups");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.ChannelKind).HasMaxLength(20);
+            b.Property(x => x.ExternalUserId).HasMaxLength(100);
+            b.Property(x => x.Source).HasMaxLength(60);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Reason).HasMaxLength(30);
+            Json(b.Property(x => x.Message));
+            b.Ignore(x => x.Key);
+            b.HasIndex(x => new { x.WorkspaceId, x.ConversationId, x.Status });
+            b.HasIndex(x => new { x.WorkspaceId, x.DueAt });
         });
 
         modelBuilder.Entity<FlowRun>(b =>

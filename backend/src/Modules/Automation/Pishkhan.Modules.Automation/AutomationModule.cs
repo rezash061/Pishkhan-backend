@@ -11,6 +11,7 @@ using Pishkhan.Modules.Automation.Features;
 using Pishkhan.Modules.Automation.Persistence;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Modules.Orders.Contracts;
 
 namespace Pishkhan.Modules.Automation;
 
@@ -38,7 +39,8 @@ public static class AutomationModule
         .AddConsumer<InboundMessageReceived, InboundEngineHandler>("engine")
         .AddConsumer<InboundCommentReceived, CommentEngineHandler>("engine")
         .AddConsumer<TimerFired, AutomationTimerHandler>("engine")
-        .AddConsumer<BacklogPageRequested, BacklogPageHandler>("engine");
+        .AddConsumer<BacklogPageRequested, BacklogPageHandler>("engine")
+        .AddConsumer<OrderStatusChanged, FollowUpPurchaseHandler>("engine");
 
     /// <summary>Outbound group: public comment replies, retried while the account is rate limited.</summary>
     public static MessagingBuilder AddAutomationOutboundConsumers(this MessagingBuilder messaging) =>

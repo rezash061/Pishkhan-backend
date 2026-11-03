@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Added (Phase 1, BE-1.8: follow-gate and follow-ups, 2026-11-03)
+- Flow node `follow_gate`:
+  - It continues on `true` when the customer follows the Instagram account. Otherwise it sends its `message` with a «دنبال کردم ✅» quick reply (payload `follow:check`) and waits.
+  - Every answer re-checks the follow status with the Instagram API. `retryText` is sent while the customer still doesn't follow.
+  - After `maxRetries` (0–5, default 2) it leaves on `false`, or the run is `abandoned` when there is no `false` edge.
+  - When the follow status is unknown (the API does not say, or Instagram is unreachable) the customer is let through on `true`.
+  - The status is read only for flows that have a gate.
+  - Validation keys: `flow.message_required` and `flow.max_retries_invalid`.
+- Action `schedule_followup`, in rules and in flow `action` nodes. It takes:
+  - `message`;
+  - `delaySeconds`, from 60 to 82,800 (23 hours), since a follow-up must fit inside Meta's 24-hour window;
+  - `cancelOnReply` (default true);
+  - `cancelOnPurchase` (default true).
+- How follow-ups behave:
+  - The message is rendered when scheduled.
+  - There is one pending follow-up per conversation and source (`rule:{id}` or `flow:{id}`); a newer one replaces the older (reason `replaced`).
+  - A customer message cancels the follow-ups that have `cancelOnReply` (`replied`).
+  - A paid order of the conversation cancels the ones that have `cancelOnPurchase` (`purchased`). Automation now consumes `orders.order-status-changed.v1` in the engine group.
+  - At the due time a follow-up is sent only if it is still pending, the conversation isn't handed off (`handed_off`) and the 24-hour window is open. Otherwise its status is `skipped` with reason `window_closed`.
+- Validation keys: `automation.followup_delay_invalid`, `automation.one_followup`, `flow.followup_invalid`. Comment rules cannot schedule follow-ups (`automation.action_needs_conversation`).
+- Endpoints under `/workspaces/{id}/automation`:
+  - `GET /followups` (`workspace.settings.read`) with `status` (`pending`, `sent`, `cancelled` or `skipped`), `conversationId` and `limit` (up to 200). Pending ones are listed soonest first; the rest newest first.
+  - `POST /followups/{followUpId}/cancel` (`workspace.automation.write`): reason `owner`; 409 `automation.followup_not_pending`.
+- Migration `FollowUps` (`automation.followups`). A data-deletion request also deletes the customer's follow-ups.
+
 ### Added (Phase 2, BE-2.9: industry templates, 2026-11-03)
 - New Templates module (`templates` schema). Migrations `InitialTemplates`, Automation `IndustryTemplates` (`template_key` on rules and flows) and Knowledge `IndustryTemplates` (`knowledge.template_items`). Decisions are in ADR 0012.
 - Built-in templates for the five launch verticals: `clothing`, `cosmetics`, `jewelry`, `beauty_clinic` and `courses`. The Migrator adds one only for an industry that has no template yet, published as version 1.
