@@ -71,7 +71,8 @@ public sealed record EvalGate(bool Passed, IReadOnlyList<EvalGateCheck> Checks);
 public sealed record EvalRunResponse(
     Guid Id, Guid SetId, string SetName, string Task, string PromptKey, string PromptVersion, string? Route, string Status, int CaseCount, int ErrorCount,
     decimal? IntentAccuracy, long InputTokens, long OutputTokens, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, EvalGate Gate,
-    decimal? HandoffPrecision = null, decimal? HandoffRecall = null);
+    decimal? HandoffPrecision = null, decimal? HandoffRecall = null, int FinglishCaseCount = 0, decimal? FinglishIntentAccuracy = null,
+    decimal? ScriptIntentAccuracy = null);
 
 public sealed record EvalResultResponse(
     Guid CaseId, string Ref, string? Vertical, string Input, string? ExpectedIntent, string? PredictedIntent, bool? Correct, string? Route, int LatencyMs, string? Error,
@@ -597,6 +598,14 @@ internal static partial class AiAdminEndpoints
             new("intent_accuracy", gate.MinIntentAccuracy, run.IntentAccuracy, run.IntentAccuracy is { } a && a >= gate.MinIntentAccuracy),
             new("error_rate", gate.MaxErrorRate, errorRate, errorRate is { } e && e <= gate.MaxErrorRate),
         ];
+
+        // BE-2.3: Finglish must not trail Persian script by more than the allowed gap. Only checked when the set has both.
+        if (run.FinglishIntentAccuracy is { } finglish && run.ScriptIntentAccuracy is { } script)
+        {
+            var gap = Math.Max(0, script - finglish);
+            checks = [.. checks, new EvalGateCheck("finglish_gap", gate.MaxFinglishGap, gap, gap <= gate.MaxFinglishGap)];
+        }
+
         return new EvalGate(checks.All(c => c.Passed), checks);
     }
 
@@ -605,7 +614,8 @@ internal static partial class AiAdminEndpoints
 
     private static EvalRunResponse ToRun(EvalRun r, string setName, AiEvalGateOptions gate) =>
         new(r.Id, r.SetId, setName, r.Task, r.PromptKey, r.PromptVersion, r.Route, r.Status, r.CaseCount, r.ErrorCount, r.IntentAccuracy, r.InputTokens,
-            r.OutputTokens, r.StartedAt, r.FinishedAt, Gate(r, gate), r.HandoffPrecision, r.HandoffRecall);
+            r.OutputTokens, r.StartedAt, r.FinishedAt, Gate(r, gate), r.HandoffPrecision, r.HandoffRecall, r.FinglishCaseCount, r.FinglishIntentAccuracy,
+            r.ScriptIntentAccuracy);
 
     private static AiProviderResponse ToProvider(string name, AiSettingsStore.Snapshot snapshot, AiProvider? row)
     {

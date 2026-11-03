@@ -63,7 +63,14 @@ internal sealed class InboundEngineHandler(
 
         var rules = await cache.RulesAsync(workspaceId, message.ChannelAccountId, cancellationToken);
         var dm = new DmInput(message.ChannelAccountId, message.Kind, message.NormalizedText ?? message.Text, message.Payload, message.IsNewConversation);
-        var fired = await FireFirstAsync(RuleEvaluator.DmCandidates(rules, dm), message, conversation, settings, plan, now, cancellationToken)
+        var candidates = RuleEvaluator.DmCandidates(rules, dm);
+        if (candidates.Count == 0 && Finglish.Detect(message.Text).IsFinglish)
+        {
+            // «gheymat» matches a «قیمت» keyword (BE-2.3): nothing matched the Latin letters, so try the Persian reading.
+            candidates = RuleEvaluator.DmCandidates(rules, dm with { Text = PersianNormalizer.Normalize(Finglish.Transliterate(message.Text).Persian) });
+        }
+
+        var fired = await FireFirstAsync(candidates, message, conversation, settings, plan, now, cancellationToken)
             || (!settings.BusinessHours.IsOpen(now)
                 && await FireFirstAsync(RuleEvaluator.OutsideHoursCandidates(rules, message.ChannelAccountId), message, conversation, settings, plan, now, cancellationToken));
 

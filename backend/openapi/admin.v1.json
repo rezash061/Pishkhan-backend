@@ -5676,6 +5676,25 @@
               "number"
             ],
             "format": "double"
+          },
+          "finglishCaseCount": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "finglishIntentAccuracy": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "scriptIntentAccuracy": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         }
       },

@@ -31,7 +31,9 @@ public sealed record EvalImportExpected(string? Intent, bool? Handoff, IReadOnly
 
 public sealed record EvalImportReport(int Imported, int Updated, IReadOnlyList<string> Errors);
 
-public sealed record EvalRunReport(Guid RunId, int Cases, int Errors, decimal? IntentAccuracy, string? Route, decimal? HandoffPrecision = null, decimal? HandoffRecall = null);
+public sealed record EvalRunReport(
+    Guid RunId, int Cases, int Errors, decimal? IntentAccuracy, string? Route, decimal? HandoffPrecision = null, decimal? HandoffRecall = null,
+    decimal? FinglishIntentAccuracy = null, decimal? ScriptIntentAccuracy = null);
 
 public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptRegistry prompts, IClock clock, ILogger<EvalService> logger)
 {
@@ -154,22 +156,27 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
         var client = router.GetChatClient(AiTasks.Classify);
         var routes = new Dictionary<string, int>(StringComparer.Ordinal);
         int scored = 0, correct = 0, predictedHandoffs = 0, expectedHandoffs = 0, truePositives = 0;
+        int finglishCases = 0, finglishScored = 0, finglishCorrect = 0;
         var rules = new HandoffRules();
         foreach (var c in cases)
         {
             var started = Stopwatch.GetTimestamp();
             string? output = null, predicted = null, error = null, route = null, handoffReason = null;
             bool? handoff = null;
+
+            // As the reply pipeline reads it (rules only here, so a run does not depend on the transliteration model).
+            var reading = FinglishReader.ReadWithRules(PersianNormalizer.Normalize(c.Input));
+            finglishCases += reading.IsFinglish ? 1 : 0;
             try
             {
                 var response = await client.GetResponseAsync(
-                    [new ChatMessage(ChatRole.System, prompt.Text), new ChatMessage(ChatRole.User, PersianNormalizer.Normalize(c.Input))],
+                    [new ChatMessage(ChatRole.System, prompt.Text), new ChatMessage(ChatRole.User, reading.ForClassifier)],
                     new ChatOptions { ResponseFormat = ChatResponseFormat.Json },
                     ct);
                 output = response.Text;
                 route = response.AdditionalProperties?.TryGetValue("pishkhan.route", out var r) == true ? r?.ToString() : null;
                 predicted = ReadIntent(output);
-                var input = PersianNormalizer.Normalize(c.Input);
+                var input = reading.IsFinglish ? $"{reading.Original} {reading.Persian}" : reading.Original;
                 handoffReason = HandoffPolicy.Before(input, [], rules) ?? HandoffPolicy.After(Classification.Parse(output), rules);
                 handoff = handoffReason is not null;
                 run.InputTokens += response.Usage?.InputTokenCount ?? 0;
@@ -187,6 +194,11 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
             {
                 scored++;
                 correct += ok ? 1 : 0;
+                if (reading.IsFinglish)
+                {
+                    finglishScored++;
+                    finglishCorrect += ok ? 1 : 0;
+                }
             }
 
             bool? handoffCorrect = c.ExpectedHandoff is { } expected && handoff is { } got ? expected == got : null;
@@ -221,13 +233,17 @@ public sealed class EvalService(AgentDbContext db, IModelRouter router, IPromptR
 
         run.CaseCount = cases.Count;
         run.IntentAccuracy = scored == 0 ? null : decimal.Round((decimal)correct / scored, 4);
+        run.FinglishCaseCount = finglishCases;
+        run.FinglishIntentAccuracy = finglishScored == 0 ? null : decimal.Round((decimal)finglishCorrect / finglishScored, 4);
+        run.ScriptIntentAccuracy = scored - finglishScored == 0 ? null : decimal.Round((decimal)(correct - finglishCorrect) / (scored - finglishScored), 4);
         run.HandoffPrecision = predictedHandoffs == 0 ? null : decimal.Round((decimal)truePositives / predictedHandoffs, 4);
         run.HandoffRecall = expectedHandoffs == 0 ? null : decimal.Round((decimal)truePositives / expectedHandoffs, 4);
         run.Route = routes.Count == 0 ? null : routes.MaxBy(kv => kv.Value).Key;
         run.Status = "completed";
         run.FinishedAt = clock.UtcNow;
         await db.SaveChangesAsync(ct);
-        return new EvalRunReport(run.Id, run.CaseCount, run.ErrorCount, run.IntentAccuracy, run.Route, run.HandoffPrecision, run.HandoffRecall);
+        return new EvalRunReport(
+            run.Id, run.CaseCount, run.ErrorCount, run.IntentAccuracy, run.Route, run.HandoffPrecision, run.HandoffRecall, run.FinglishIntentAccuracy, run.ScriptIntentAccuracy);
     }
 
     private static string? ReadIntent(string? output)

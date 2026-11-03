@@ -162,7 +162,7 @@ internal sealed record ReplyInput(
 /// </summary>
 internal sealed class ReplyPipeline(
     IModelRouter router, IPromptRegistry prompts, IKnowledgeSearch knowledge, ICatalogQueries catalog, IOrderCommands orders, IClock clock,
-    ILogger<ReplyPipeline> logger)
+    FinglishReader finglish, ILogger<ReplyPipeline> logger)
 {
     public const string ClassifyPrompt = "intent.classify";
     public const string ReplyPrompt = "agent.reply";
@@ -208,7 +208,9 @@ internal sealed class ReplyPipeline(
             return new ReplyDecision(outcome, reply, reason, suggested, unanswered, trace);
         }
 
-        if (HandoffPolicy.Before(turn, conversation.Tags, profile.Handoff) is { } early)
+        // Finglish is read in Persian script for the handoff phrases, the classifier and retrieval (BE-2.3).
+        var reading = await finglish.ReadAsync(turn, conversation.WorkspaceId, ct);
+        if (HandoffPolicy.Before(reading.IsFinglish ? $"{turn} {reading.Persian}" : turn, conversation.Tags, profile.Handoff) is { } early)
         {
             return Finish(AiReplyOutcomes.HandedOff, null, early, null, null);
         }
@@ -220,7 +222,7 @@ internal sealed class ReplyPipeline(
             var prompt = prompts.Get(ClassifyPrompt);
             usage.Prompt(prompt);
             var response = await router.GetChatClient(AiTasks.Classify, conversation.WorkspaceId).GetResponseAsync(
-                [new ChatMessage(ChatRole.System, prompt.Text), new ChatMessage(ChatRole.User, turn)], new ChatOptions { ResponseFormat = ChatResponseFormat.Json }, ct);
+                [new ChatMessage(ChatRole.System, prompt.Text), new ChatMessage(ChatRole.User, reading.ForClassifier)], new ChatOptions { ResponseFormat = ChatResponseFormat.Json }, ct);
             usage.Add(response);
             classification = Classification.Parse(response.Text);
         }
@@ -230,7 +232,7 @@ internal sealed class ReplyPipeline(
         }
 
         trace.Intent = classification.Intent;
-        trace.Language = classification.Language;
+        trace.Language = reading.IsFinglish ? "finglish" : classification.Language;
         trace.Sentiment = classification.Sentiment;
         trace.ClassifierConfidence = classification.Confidence;
         if (HandoffPolicy.After(classification, profile.Handoff) is { } rule)
@@ -239,7 +241,7 @@ internal sealed class ReplyPipeline(
         }
 
         // Retrieve.
-        var hits = await knowledge.SearchAsync(turn, FactCount, ct);
+        var hits = await knowledge.SearchAsync(reading.Persian, FactCount, ct);
         trace.Facts = [.. hits.Select(h => new TraceFact(h.ChunkId, h.SourceId, h.SourceKind, h.Title, Math.Round(h.Score, 5), h.Similarity is { } s ? Math.Round(s, 4) : null))];
 
         // Generate, guard, and regenerate once.

@@ -667,6 +667,15 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("error_count");
 
+                    b.Property<int>("FinglishCaseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("finglish_case_count");
+
+                    b.Property<decimal?>("FinglishIntentAccuracy")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("finglish_intent_accuracy");
+
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
@@ -710,6 +719,11 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("route");
+
+                    b.Property<decimal?>("ScriptIntentAccuracy")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("script_intent_accuracy");
 
                     b.Property<Guid>("SetId")
                         .HasColumnType("uuid")
