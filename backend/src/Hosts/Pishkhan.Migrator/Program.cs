@@ -27,6 +27,9 @@ using Pishkhan.Modules.Knowledge.Persistence;
 using Pishkhan.Modules.Conversations.Persistence;
 using Pishkhan.Modules.Files.Persistence;
 using Pishkhan.Modules.Identity.Persistence;
+using Pishkhan.Modules.Templates;
+using Pishkhan.Modules.Templates.Persistence;
+using Pishkhan.Modules.Templates.Services;
 using Pishkhan.Modules.Tenancy.Persistence;
 using Pishkhan.Web.Auth;
 
@@ -53,6 +56,7 @@ services.AddModuleDbContext<NotificationsDbContext>(NotificationsDbContext.Schem
 services.AddModuleDbContext<AnalyticsDbContext>(AnalyticsDbContext.SchemaName);
 services.AddModuleDbContext<BillingDbContext>(BillingDbContext.SchemaName);
 services.AddModuleDbContext<KnowledgeDbContext>(KnowledgeDbContext.SchemaName);
+services.AddTemplatesModule(builder.Configuration);
 // Staff provisioning reuses the Backoffice handlers, which need the staff token setup.
 services.AddRouting();
 services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
@@ -99,7 +103,7 @@ static async Task MigrateAsync(IServiceProvider services, IConfiguration configu
     [
         typeof(PlatformDbContext), typeof(IdentityDbContext), typeof(TenancyDbContext), typeof(BackofficeDbContext),
         typeof(FilesDbContext), typeof(ChannelsDbContext), typeof(ConversationsDbContext), typeof(AgentDbContext), typeof(AutomationDbContext), typeof(CatalogDbContext), typeof(OrdersDbContext), typeof(PaymentsDbContext),
-        typeof(AuditDbContext), typeof(ContentDbContext), typeof(NotificationsDbContext), typeof(AnalyticsDbContext), typeof(BillingDbContext), typeof(KnowledgeDbContext),
+        typeof(AuditDbContext), typeof(ContentDbContext), typeof(NotificationsDbContext), typeof(AnalyticsDbContext), typeof(BillingDbContext), typeof(KnowledgeDbContext), typeof(TemplatesDbContext),
     ];
     await using (var scope = services.CreateAsyncScope())
     {
@@ -110,6 +114,9 @@ static async Task MigrateAsync(IServiceProvider services, IConfiguration configu
             await db.Database.MigrateAsync(ct);
             logger.LogInformation("{Context}: {Count} migration(s) applied", type.Name, pending.Count);
         }
+
+        var seeded = await scope.ServiceProvider.GetRequiredService<ITemplateSeeder>().SeedAsync(ct);
+        logger.LogInformation("Industry templates: {Count} built-in template(s) added", seeded);
     }
 
     await using (var connection = await dataSource.OpenConnectionAsync(ct))

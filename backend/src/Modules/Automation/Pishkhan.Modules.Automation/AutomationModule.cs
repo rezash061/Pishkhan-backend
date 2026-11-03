@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pishkhan.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
@@ -21,6 +22,14 @@ public static class AutomationModule
         services.AddScoped<AutomationCache>();
         services.AddScoped<FlowEngine>();
         services.AddScoped<IFlowQueries, FlowQueries>();
+        services.AddScoped<IAutomationTemplates, AutomationTemplates>();
+        return services.AddAutomationTemplateValidator();
+    }
+
+    /// <summary>AdminApi: checks industry templates' flows and rules without the rest of the module.</summary>
+    public static IServiceCollection AddAutomationTemplateValidator(this IServiceCollection services)
+    {
+        services.TryAddSingleton<IAutomationTemplateValidator, AutomationTemplateValidator>();
         return services;
     }
 

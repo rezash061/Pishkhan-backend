@@ -12,6 +12,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Templates\Pishkhan.Modules.Templates\Pishkhan.Modules.Templates.csproj" />
     <ProjectReference Include="..\..\Modules\Billing\Pishkhan.Modules.Billing\Pishkhan.Modules.Billing.csproj" />
     <ProjectReference Include="..\..\Modules\Knowledge\Pishkhan.Modules.Knowledge\Pishkhan.Modules.Knowledge.csproj" />
     <ProjectReference Include="..\..\Modules\Agent\Pishkhan.Modules.Agent\Pishkhan.Modules.Agent.csproj" />

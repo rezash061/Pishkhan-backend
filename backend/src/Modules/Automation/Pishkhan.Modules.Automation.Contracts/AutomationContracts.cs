@@ -149,3 +149,13 @@ public interface IAutomationTemplates
     /// </summary>
     Task<TemplateAutomationResult> ApplyAsync(Guid workspaceId, IReadOnlyList<TemplateFlow> flows, IReadOnlyList<TemplateRule> rules, CancellationToken cancellationToken);
 }
+
+/// <summary>Checks an industry template's flows and rules (BE-2.9). Needs no database, so the AdminApi can use it without the engine.</summary>
+public interface IAutomationTemplateValidator
+{
+    /// <summary>
+    /// Checks the flows and rules the way the panel's endpoints would. Returns error keys (empty when valid), each naming the item, for
+    /// example <c>flows[size-help]: flow.start_missing</c>.
+    /// </summary>
+    IReadOnlyList<string> Validate(IReadOnlyList<TemplateFlow> flows, IReadOnlyList<TemplateRule> rules);
+}

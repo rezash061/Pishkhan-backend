@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.9: industry templates, 2026-11-03)
+- New Templates module (`templates` schema). Migrations `InitialTemplates`, Automation `IndustryTemplates` (`template_key` on rules and flows) and Knowledge `IndustryTemplates` (`knowledge.template_items`). Decisions are in ADR 0012.
+- Built-in templates for the five launch verticals: `clothing`, `cosmetics`, `jewelry`, `beauty_clinic` and `courses`. The Migrator adds one only for an industry that has no template yet, published as version 1.
+- Each template has:
+  - `requiredFacts`: `{key, label, prompt}`, the facts every shop of the industry should give the AI (for the knowledge score, BE-1.9). `ITemplateQueries.GetRequiredFactsAsync(industry)` returns them.
+  - `faqs`: `{key, question, answer}`. Answers have blanks such as «[مبلغ] تومان» for the owner to fill in.
+  - `flows`: `{key, name, graph}`, the graph in the flows API's shape.
+  - `rules`: `{key, name, triggerKind, trigger, actions, priority}`, in the rules API's shape, except that a `start_flow` action names its flow with `flowKey`. Templates cannot hold `flowId`, `cardSetId` or `postId`.
+  - `agentProfile`: `{name, tone, brandVoice, neverSay, handoffKeywords}`.
+- Panel endpoints under `/workspaces/{id}/templates`:
+  - `GET` lists the published templates, the workspace's own industry first. Each has counts, `recommended` and `lastApplied`. Needs `workspace.settings.read`.
+  - `GET /{templateId}` previews everything applying would add (`requiredFacts`, `faqs`, `flows`, `rules`, `agentProfile`). 404 for an unknown or unpublished template.
+  - `POST /{templateId}/apply` (`workspace.settings.write`, accepts `Idempotency-Key`) returns `{id, templateId, industry, version, faqsAdded, flowsAdded, rulesAdded, profileApplied, skipped, appliedAt}`. Audited as `workspace.template_applied`.
+    - FAQs are added switched off and rules are added switched off, for the owner to check and switch on. Flows are published.
+    - The agent profile is set only when the workspace has none (`profileApplied: false` otherwise).
+    - Applying again adds only what the workspace never had. Items the owner deleted are not brought back and items the owner edited are not touched; both count in `skipped`, as does a rule whose flow the owner deleted.
+  - `GET /applications`: the last 50 applies, newest first.
+- Back-office endpoints under `/admin/v1/industry-templates` (read: SuperAdmin, AIOps, Support, ReadOnly; write: AIOps or SuperAdmin):
+  - `GET` (`industry`, `status`, `page`, `pageSize`) and `GET /{templateId}`. Each version has `status` (`draft`, `published`, `archived`), `content` and `issues`.
+  - `POST` with `{industry, template: {name, description, content}}` creates the first draft of an industry. 409 `templates.industry_taken` when it already has one.
+  - `PUT /{templateId}` edits a draft (409 `templates.not_draft` otherwise). Content problems do not reject the save; they come back in `issues`, for example `rules[size-keyword]: template.flow_key_unknown` or `flows[size-help]: flow.start_missing`.
+  - `POST /{templateId}/versions` starts a new draft from a version (409 `templates.draft_exists`).
+  - `POST /{templateId}/publish` (step-up, optional `reason`) publishes a draft with no issues and archives the industry's published version. 422 `templates.invalid` with the `issues` list otherwise.
+  - `POST /{templateId}/archive` (step-up, `reason` required).
+  - Every change is audited (`industry_template.create`, `.update`, `.version`, `.publish`, `.archive`).
+- `IWorkspaceQueries.GetIndustryAsync`.
+- `.github/workflows/codegen.yml`: for sessions without a .NET SDK. A commit whose message contains `[codegen]` on a feature branch makes CI add the migrations listed in `backend/.codegen` and regenerate the OpenAPI documents, and commit them back.
+
 ### Added (Phase 2, BE-2.8: subscription checkout, 2026-11-02)
 - Sellers buy, renew, upgrade and downgrade their plan themselves. They pay Pishkhan's own Zarinpal account (`Billing:Checkout:MerchantId`, `Sandbox`, `ApiBaseUrl`, `ReturnUrl`). Migration `Checkout` (`billing.checkouts`, sequence `billing.invoice_numbers` from 1001, and `cycle`, `paid_amount`, `checkout_id` on subscriptions).
 - Endpoints under `/workspaces/{id}/billing`, all needing `workspace.billing.manage`:

@@ -142,6 +142,12 @@ public sealed class InfraFixture : IAsyncLifetime
         await Migrate<Modules.Notifications.Persistence.NotificationsDbContext>("notifications");
         await Migrate<Modules.Billing.Persistence.BillingDbContext>("billing");
         await Migrate<Modules.Knowledge.Persistence.KnowledgeDbContext>("knowledge");
+        await Migrate<Modules.Templates.Persistence.TemplatesDbContext>("templates");
+        await using (var templates = new Modules.Templates.Persistence.TemplatesDbContext(
+            PersistenceExtensions.DesignTimeOptions<Modules.Templates.Persistence.TemplatesDbContext>("templates", PostgresConnectionString), new TenantContext()))
+        {
+            await new Modules.Templates.Services.TemplateSeeder(templates, new SharedKernel.SystemClock()).SeedAsync(CancellationToken.None);
+        }
 
         await using var conn = new NpgsqlConnection(PostgresConnectionString);
         await conn.OpenAsync();

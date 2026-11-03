@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pishkhan.AI;
+using Pishkhan.Modules.Agent.Contracts;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
