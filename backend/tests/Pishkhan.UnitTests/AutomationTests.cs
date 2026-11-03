@@ -155,7 +155,7 @@ public class RuleValidatorTests
         RuleValidator.Validate(dm).ShouldContain(("trigger.keywords", "automation.keywords_required"));
         RuleValidator.Validate(dm with { TriggerKind = TriggerKinds.OrderStatusChanged }).ShouldContain(("triggerKind", "automation.trigger_unavailable"));
         RuleValidator.Validate(dm with { TriggerKind = "nope" }).ShouldContain(("triggerKind", "automation.trigger_unknown"));
-        RuleValidator.Validate(dm with { TriggerKind = TriggerKinds.NewConversation, Actions = [new RuleAction { Kind = ActionKinds.ScheduleFollowUp }] })
+        RuleValidator.Validate(dm with { TriggerKind = TriggerKinds.NewConversation, Actions = [new RuleAction { Kind = ActionKinds.CapturePhone }] })
             .ShouldContain(("actions[0]", "automation.action_unavailable"));
         RuleValidator.Validate(Comment(PrivateReply) with { Trigger = new TriggerConfig { Keywords = ["a"], Scope = CommentScopes.NextPost }, ChannelAccountId = null })
             .ShouldContain(("channelAccountId", "automation.channel_required"));
@@ -346,7 +346,7 @@ public class FlowTests
             [new FlowEdge("a", "b"), new FlowEdge("b", "a", FlowHandles.True), new FlowEdge("a", "zzz"), new FlowEdge("a", "b", "maybe")]);
 
         var codes = FlowValidator.Validate(bad).Errors.Select(e => e.Code).ToList();
-        codes.ShouldContain("flow.node_type_unavailable");
+        codes.ShouldContain("flow.message_required");
         codes.ShouldContain("flow.answer_type_invalid");
         codes.ShouldContain("flow.variable_invalid");
         codes.ShouldContain("flow.prompt_required");

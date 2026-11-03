@@ -19,18 +19,21 @@ public static class FlowNodeTypes
     public const string Ai = "ai";
     public const string End = "end";
 
-    /// <summary>Follow-gate (BE-1.8).</summary>
+    /// <summary>
+    /// Follow-gate (BE-1.8): continues on <c>true</c> when the customer follows the account; otherwise sends <c>message</c> with an
+    /// «دنبال کردم» quick reply and waits, checking again on every answer. After <c>maxRetries</c> failed checks it leaves on <c>false</c>.
+    /// </summary>
     public const string FollowGate = "follow_gate";
 
     public static readonly IReadOnlySet<string> Available = new HashSet<string>(StringComparer.Ordinal)
     {
-        Message, Question, Condition, Delay, Storefront, Action, Ai, End,
+        Message, Question, Condition, Delay, Storefront, Action, Ai, End, FollowGate,
     };
 
-    public static readonly IReadOnlySet<string> Later = new HashSet<string>(StringComparer.Ordinal) { FollowGate };
+    public static readonly IReadOnlySet<string> Later = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>Node types where a run stops and waits (for an answer or a timer).</summary>
-    public static readonly IReadOnlySet<string> Waits = new HashSet<string>(StringComparer.Ordinal) { Question, Delay };
+    public static readonly IReadOnlySet<string> Waits = new HashSet<string>(StringComparer.Ordinal) { Question, Delay, FollowGate };
 }
 
 public static class FlowHandles
@@ -43,7 +46,7 @@ public static class FlowHandles
     public static IReadOnlySet<string> For(string nodeType) => nodeType switch
     {
         FlowNodeTypes.Question => new HashSet<string>(StringComparer.Ordinal) { Next, Invalid },
-        FlowNodeTypes.Condition => new HashSet<string>(StringComparer.Ordinal) { True, False },
+        FlowNodeTypes.Condition or FlowNodeTypes.FollowGate => new HashSet<string>(StringComparer.Ordinal) { True, False },
         FlowNodeTypes.Ai or FlowNodeTypes.End => new HashSet<string>(StringComparer.Ordinal),
         _ => new HashSet<string>(StringComparer.Ordinal) { Next },
     };
@@ -131,6 +134,7 @@ public static partial class FlowValidator
     private static readonly IReadOnlySet<string> FlowActionKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         ActionKinds.AddTag, ActionKinds.RemoveTag, ActionKinds.SetField, ActionKinds.Handoff, ActionKinds.PauseAi, ActionKinds.NotifyTeam,
+        ActionKinds.ScheduleFollowUp,
     };
 
     [GeneratedRegex("^[a-z][a-z0-9_]{0,39}$", RegexOptions.CultureInvariant)]
@@ -301,6 +305,31 @@ public static partial class FlowValidator
                 if (node.Actions is not { Count: >= 1 and <= 10 } || node.Actions.Any(a => !FlowActionKinds.Contains(a.Kind)))
                 {
                     yield return "flow.actions_invalid";
+                }
+                else if (node.Actions.Any(a => a.Kind == ActionKinds.ScheduleFollowUp && FollowUps.Validate(a) is not null))
+                {
+                    yield return "flow.followup_invalid";
+                }
+
+                break;
+            case FlowNodeTypes.FollowGate:
+                if (node.Message is null || string.IsNullOrWhiteSpace(node.Message.Text))
+                {
+                    yield return "flow.message_required";
+                }
+                else if (MessageValidator.Validate(node.Message) is { } code)
+                {
+                    yield return code;
+                }
+
+                if (node.RetryText is { Length: > 1000 })
+                {
+                    yield return "validation.message.text_length";
+                }
+
+                if (node.MaxRetries is < 0 or > 5)
+                {
+                    yield return "flow.max_retries_invalid";
                 }
 
                 break;
@@ -610,7 +639,13 @@ public abstract record FlowEffect
 }
 
 /// <summary>What the runner may read: time, the customer, the variables and the workspace's business hours.</summary>
-public sealed record FlowContext(DateTimeOffset Now, bool WindowOpen, IReadOnlyList<string> Tags, IReadOnlyDictionary<string, string> Fields, IReadOnlyDictionary<string, string?> Values, BusinessHours Hours);
+/// <remarks>
+/// <see cref="FollowsBusiness"/> is read by the engine only for flows with a follow-gate; null when unknown (the channel did not say, or
+/// the lookup failed). An unknown status lets the customer through rather than blocking them.
+/// </remarks>
+public sealed record FlowContext(
+    DateTimeOffset Now, bool WindowOpen, IReadOnlyList<string> Tags, IReadOnlyDictionary<string, string> Fields, IReadOnlyDictionary<string, string?> Values,
+    BusinessHours Hours, bool? FollowsBusiness = null);
 
 /// <summary>
 /// The flow state machine (backend plan 9.5): enters nodes until one waits (question, delay) or the run ends. Pure: it changes the
@@ -622,16 +657,33 @@ public static class FlowRunner
     public const int MaxSteps = 50;
     public const int DefaultMaxRetries = 2;
 
+    /// <summary>The quick reply a follow-gate adds to its message; any answer re-checks, this one just makes it easy.</summary>
+    public const string FollowCheckPayload = "follow:check";
+
+    public const string FollowCheckTitle = "دنبال کردم ✅";
+
     public static IReadOnlyList<FlowEffect> Start(FlowGraph graph, FlowRun run, FlowContext context) =>
         Enter(graph, run, graph.Start, context);
 
     /// <summary>The customer answered while the run waits at a question. <paramref name="payload"/> is a quick reply payload, if any.</summary>
     public static IReadOnlyList<FlowEffect> Answer(FlowGraph graph, FlowRun run, string? text, string? payload, FlowContext context)
     {
-        if (run.Status != FlowRunStatuses.WaitingInput || run.CurrentNode is null || graph.Node(run.CurrentNode) is not { Type: FlowNodeTypes.Question } question)
+        if (run.Status != FlowRunStatuses.WaitingInput || run.CurrentNode is null || graph.Node(run.CurrentNode) is not { } waiting)
         {
             return [];
         }
+
+        if (waiting.Type == FlowNodeTypes.FollowGate)
+        {
+            return RecheckFollow(graph, run, waiting, context);
+        }
+
+        if (waiting.Type != FlowNodeTypes.Question)
+        {
+            return [];
+        }
+
+        var question = waiting;
 
         if (ReadAnswer(question, text, payload) is { } answer)
         {
@@ -671,6 +723,38 @@ public static class FlowRunner
         }
 
         return Follow(graph, run, nodeId, FlowHandles.Next, context);
+    }
+
+    private static IReadOnlyList<FlowEffect> RecheckFollow(FlowGraph graph, FlowRun run, FlowNode gate, FlowContext context)
+    {
+        if (context.FollowsBusiness != false)
+        {
+            run.ResetRetries();
+            return Follow(graph, run, gate.Id, FlowHandles.True, context);
+        }
+
+        if (run.Retry() > (gate.MaxRetries ?? DefaultMaxRetries))
+        {
+            run.ResetRetries();
+            if (graph.Next(gate.Id, FlowHandles.False) is { } notFollowed)
+            {
+                return Enter(graph, run, notFollowed, context);
+            }
+
+            run.End(FlowRunStatuses.Abandoned, context.Now);
+            return [];
+        }
+
+        var again = string.IsNullOrWhiteSpace(gate.RetryText) ? gate.Message! : gate.Message! with { Text = gate.RetryText };
+        return [new FlowEffect.Send(FollowPrompt(again, WithVariables(context, run)))];
+    }
+
+    private static OutboundContent FollowPrompt(OutboundContent prompt, IReadOnlyDictionary<string, string?> values)
+    {
+        var rendered = TemplateRenderer.Render(prompt, values);
+        return rendered.Buttons is { Count: > 0 } || rendered.QuickReplies is { Count: > 0 }
+            ? rendered
+            : rendered with { QuickReplies = [new QuickReply(FollowCheckTitle, FollowCheckPayload)] };
     }
 
     private static IReadOnlyList<FlowEffect> Follow(FlowGraph graph, FlowRun run, string from, string handle, FlowContext context)
@@ -718,6 +802,13 @@ public static class FlowRunner
                     break;
                 case FlowNodeTypes.Question:
                     effects.Add(new FlowEffect.Send(Prompt(node, node.Message!, context with { Values = values })));
+                    run.WaitForInput(node.Id);
+                    return effects;
+                case FlowNodeTypes.FollowGate when context.FollowsBusiness != false:
+                    current = graph.Next(node.Id, FlowHandles.True);
+                    break;
+                case FlowNodeTypes.FollowGate:
+                    effects.Add(new FlowEffect.Send(FollowPrompt(node.Message!, values)));
                     run.WaitForInput(node.Id);
                     return effects;
                 case FlowNodeTypes.Delay:

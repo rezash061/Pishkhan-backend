@@ -684,6 +684,102 @@ namespace Pishkhan.Modules.Automation.Persistence.Migrations
                     b.ToTable("flow_versions", "automation");
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Automation.Domain.FollowUp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CancelOnPurchase")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_on_purchase");
+
+                    b.Property<bool>("CancelOnReply")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_on_reply");
+
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channel_account_id");
+
+                    b.Property<string>("ChannelKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("channel_kind");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_user_id");
+
+                    b.Property<Guid?>("FlowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flow_id");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("RuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_followups");
+
+                    b.HasIndex("WorkspaceId", "DueAt")
+                        .HasDatabaseName("ix_followups_workspace_id_due_at");
+
+                    b.HasIndex("WorkspaceId", "ConversationId", "Status")
+                        .HasDatabaseName("ix_followups_workspace_id_conversation_id_status");
+
+                    b.ToTable("followups", "automation");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Automation.Domain.RuleFiring", b =>
                 {
                     b.Property<Guid>("RuleId")

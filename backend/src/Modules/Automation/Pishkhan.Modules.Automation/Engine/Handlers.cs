@@ -12,6 +12,7 @@ using Pishkhan.Modules.Automation.Persistence;
 using Pishkhan.Modules.Catalog.Contracts;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
+using Pishkhan.Modules.Orders.Contracts;
 using Pishkhan.Persian;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
@@ -43,6 +44,10 @@ internal sealed class InboundEngineHandler(
         }
 
         var now = clock.UtcNow;
+
+        // The customer wrote again: follow-ups waiting for silence are no longer needed (BE-1.8).
+        await FollowUpCancellation.CancelAsync(Db, conversation.Id, FollowUpReasons.Replied, now, cancellationToken, onReplyOnly: true);
+
         var settings = await cache.SettingsAsync(workspaceId, cancellationToken);
         var plan = new EnginePlan(message.ChannelAccountId, message.ChannelKind, conversation.ExternalUserId, message.MessageId, message.MessageCreatedAt);
 
@@ -96,7 +101,7 @@ internal sealed class InboundEngineHandler(
             }
 
             plan.RuleId = rule.Id;
-            var flowId = ActionPlanner.Apply(Db, plan, rule.Actions, EngineValues.For(conversation), conversation.WorkspaceId, conversation.Id);
+            var flowId = ActionPlanner.Apply(Db, plan, rule.Actions, EngineValues.For(conversation), conversation.WorkspaceId, conversation.Id, ActionSource.Rule(rule.Id, now));
             var started = flowId is { } id
                 && await flows.StartAsync(id, rule.Id, conversation, message.ChannelKind, message.MessageId, message.MessageCreatedAt, settings, plan, now, ct) is not null;
             await RuleBookkeeping.CountAsync(Db, conversation.WorkspaceId, rule.Id, now, ct, flowsStarted: started ? 1 : 0);
@@ -194,7 +199,7 @@ internal sealed class CommentEngineHandler(
             }
         }
 
-        ActionPlanner.Apply(Db, plan, rule.Actions.Where(a => a.Kind is not (ActionKinds.SendMessage or ActionKinds.StartFlow)), values, workspaceId, conversation?.Id);
+        ActionPlanner.Apply(Db, plan, rule.Actions.Where(a => a.Kind is not (ActionKinds.SendMessage or ActionKinds.StartFlow or ActionKinds.ScheduleFollowUp)), values, workspaceId, conversation?.Id);
         if (plan.Actions.Count > 0)
         {
             Dispatch(plan.ToEvent(), plan.Key, ActionsTimerKind, dueAt, $"comment:{comment.ChannelAccountId:N}:{comment.CommentId}:actions", workspaceId, now);
@@ -347,7 +352,45 @@ internal sealed class AutomationTimerHandler(
             case FlowEngine.TimerKind:
                 await ResumeFlowAsync(message.Payload.Deserialize<FlowTimerPayload>(EnvelopeJson.Options)!, cancellationToken);
                 break;
+            case FollowUps.TimerKind:
+                await SendFollowUpAsync(message.Payload.Deserialize<FollowUpTimerPayload>(EnvelopeJson.Options)!, cancellationToken);
+                break;
         }
+    }
+
+    /// <summary>A follow-up is due: sent only if still pending, the conversation is not with a person, and the 24-hour window is open.</summary>
+    private async Task SendFollowUpAsync(FollowUpTimerPayload payload, CancellationToken ct)
+    {
+        var followUp = await Db.FollowUps.FirstOrDefaultAsync(f => f.Id == payload.FollowUpId, ct);
+        if (followUp is not { Status: FollowUpStatuses.Pending })
+        {
+            return;
+        }
+
+        var now = clock.UtcNow;
+        var conversation = await conversations.GetAsync(followUp.ConversationId, ct);
+        if (conversation is null)
+        {
+            followUp.Complete(FollowUpStatuses.Cancelled, FollowUpReasons.ConversationGone, now);
+            return;
+        }
+
+        if (conversation.Status == ConversationStatuses.HandedOff)
+        {
+            followUp.Complete(FollowUpStatuses.Cancelled, FollowUpReasons.HandedOff, now);
+            return;
+        }
+
+        if (!conversation.IsWindowOpen(now))
+        {
+            followUp.Complete(FollowUpStatuses.Skipped, FollowUpReasons.WindowClosed, now);
+            return;
+        }
+
+        followUp.Complete(FollowUpStatuses.Sent, null, now);
+        var plan = new EnginePlan(followUp.ChannelAccountId, followUp.ChannelKind, followUp.ExternalUserId, null, null) { RuleId = followUp.RuleId };
+        plan.Actions.Add(ConversationAction.Send(followUp.Message));
+        await plan.PublishAsync(Db, catalog, ct);
     }
 
     private async Task ResumeFlowAsync(FlowTimerPayload payload, CancellationToken ct)
@@ -454,6 +497,34 @@ internal sealed class AutomationDataDeletionHandler(AutomationDbContext db) : Id
         var runs = await Db.FlowRuns.IgnoreQueryFilters()
             .Where(r => r.ExternalUserId == message.ExternalUserId && r.ChannelKind == message.ChannelKind)
             .ExecuteDeleteAsync(cancellationToken);
-        Db.Publish(new DataDeletionCompleted(message.RequestId, ModuleName, comments + runs), message.RequestId.ToString());
+        var followUps = await Db.FollowUps.IgnoreQueryFilters()
+            .Where(f => f.ExternalUserId == message.ExternalUserId && f.ChannelKind == message.ChannelKind)
+            .ExecuteDeleteAsync(cancellationToken);
+        Db.Publish(new DataDeletionCompleted(message.RequestId, ModuleName, comments + runs + followUps), message.RequestId.ToString());
+    }
+}
+
+/// <summary>Drops pending follow-ups of a conversation (their timers then find them no longer pending).</summary>
+internal static class FollowUpCancellation
+{
+    public static Task<int> CancelAsync(AutomationDbContext db, Guid conversationId, string reason, DateTimeOffset now, CancellationToken ct, bool onReplyOnly = false, bool onPurchaseOnly = false) =>
+        db.FollowUps
+            .Where(f => f.ConversationId == conversationId && f.Status == FollowUpStatuses.Pending
+                && (!onReplyOnly || f.CancelOnReply) && (!onPurchaseOnly || f.CancelOnPurchase))
+            .ExecuteUpdateAsync(
+                u => u.SetProperty(f => f.Status, FollowUpStatuses.Cancelled).SetProperty(f => f.Reason, reason)
+                    .SetProperty(f => f.CompletedAt, now).SetProperty(f => f.UpdatedAt, now),
+                ct);
+}
+
+/// <summary>Commerce group: a paid order ends the follow-ups of its conversation that wait for a purchase (BE-1.8).</summary>
+internal sealed class FollowUpPurchaseHandler(AutomationDbContext db, IClock clock) : IdempotentHandler<OrderStatusChanged, AutomationDbContext>(db)
+{
+    protected override async Task HandleOnceAsync(OrderStatusChanged message, EventEnvelope envelope, CancellationToken cancellationToken)
+    {
+        if (message.ToStatus == OrderStatuses.Paid && message.ConversationId is { } conversationId)
+        {
+            await FollowUpCancellation.CancelAsync(Db, conversationId, FollowUpReasons.Purchased, clock.UtcNow, cancellationToken, onPurchaseOnly: true);
+        }
     }
 }

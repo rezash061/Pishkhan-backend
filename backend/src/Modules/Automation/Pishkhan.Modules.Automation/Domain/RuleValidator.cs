@@ -138,7 +138,7 @@ public static class RuleValidator
             }
 
             // A commenter has not opened a conversation: only the private reply (one per comment) may reach their DMs.
-            if (comment && a.Kind is ActionKinds.SendMessage or ActionKinds.SendCards or ActionKinds.StartFlow)
+            if (comment && a.Kind is ActionKinds.SendMessage or ActionKinds.SendCards or ActionKinds.StartFlow or ActionKinds.ScheduleFollowUp)
             {
                 yield return (field, "automation.action_needs_conversation");
             }
@@ -179,6 +179,9 @@ public static class RuleValidator
                 case ActionKinds.NotifyTeam when a.Title is { Length: > 100 }:
                     yield return (field + ".title", "automation.title_too_long");
                     break;
+                case ActionKinds.ScheduleFollowUp when FollowUps.Validate(a) is { } problem:
+                    yield return (field + "." + problem.Field, problem.Code);
+                    break;
             }
         }
 
@@ -190,6 +193,11 @@ public static class RuleValidator
         if (actions.Count(a => a.Kind == ActionKinds.PublicReply) > 1)
         {
             yield return ("actions", "automation.one_public_reply");
+        }
+
+        if (actions.Count(a => a.Kind == ActionKinds.ScheduleFollowUp) > 1)
+        {
+            yield return ("actions", "automation.one_followup");
         }
 
         if (actions.Count(a => a.Kind == ActionKinds.StartFlow) > 1)
