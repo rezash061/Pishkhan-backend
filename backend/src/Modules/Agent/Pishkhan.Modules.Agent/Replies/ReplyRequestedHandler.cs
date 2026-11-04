@@ -66,9 +66,10 @@ internal sealed class ReplyRequestedHandler(
             // Only media (a photo of a product, a receipt): a person looks at it until image understanding arrives (Phase 2).
             decision = Bare(conversation, message, profile, "media", AiReplyOutcomes.HandedOff);
         }
-        else if (await OverLimitAsync(workspaceId, cancellationToken))
+        else if (await entitlements.CheckAiAsync(workspaceId, conversation.Id, cancellationToken) is { Allowed: false, Reason: var reason })
         {
-            decision = Bare(conversation, message, profile, "plan_limit", AiReplyOutcomes.Failed);
+            // Out of AI conversations (no overage, overage off, at the cap, or overage unpaid): a person takes it, never silence.
+            decision = Bare(conversation, message, profile, reason ?? AiAllowanceReasons.PlanLimit, AiReplyOutcomes.Failed);
         }
         else
         {
@@ -107,18 +108,6 @@ internal sealed class ReplyRequestedHandler(
         }
 
         Db.Traces.Add(decision.Trace);
-    }
-
-    private async Task<bool> OverLimitAsync(Guid workspaceId, CancellationToken ct)
-    {
-        var plan = await entitlements.GetAsync(workspaceId, ct);
-        if (plan.Limit(BillingMeters.AiMessages) is null)
-        {
-            return false;
-        }
-
-        var used = await entitlements.GetUsageAsync(workspaceId, BillingMeters.AiMessages, ct);
-        return !plan.Allows(BillingMeters.AiMessages, used + 1);
     }
 
     private ReplyDecision Bare(ConversationSnapshot conversation, ReplyRequested message, AgentProfile profile, string reason, string outcome) =>

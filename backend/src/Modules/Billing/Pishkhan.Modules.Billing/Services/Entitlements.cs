@@ -57,6 +57,40 @@ internal sealed class EntitlementService(HybridCache cache, IServiceScopeFactory
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<AiAllowance> CheckAiAsync(Guid workspaceId, Guid conversationId, CancellationToken cancellationToken)
+    {
+        var plan = await GetAsync(workspaceId, cancellationToken);
+        if (plan.Limit(BillingMeters.AiMessages) is not null
+            && !plan.Allows(BillingMeters.AiMessages, await GetUsageAsync(workspaceId, BillingMeters.AiMessages, cancellationToken) + 1))
+        {
+            return AiAllowance.Refused(AiAllowanceReasons.PlanLimit);
+        }
+
+        if (plan.Limit(BillingMeters.AiConversations) is not { } limit)
+        {
+            return AiAllowance.Within;
+        }
+
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var now = clock.UtcNow;
+        var period = BillingPeriod.For(now);
+        var counted = await db.UsageSubjects.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .AnyAsync(s => s.WorkspaceId == workspaceId && s.Meter == BillingMeters.AiConversations && s.PeriodStart == period.Start && s.SubjectId == conversationId, cancellationToken);
+        if (counted)
+        {
+            return AiAllowance.Within;
+        }
+
+        var used = await GetUsageAsync(workspaceId, BillingMeters.AiConversations, cancellationToken);
+        var settings = await db.Settings.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]).FirstOrDefaultAsync(s => s.WorkspaceId == workspaceId, cancellationToken)
+            ?? BillingSettings.Default(workspaceId);
+        var overdue = now - OverageRules.UnpaidGrace;
+        var unpaid = await db.OverageCharges.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .AnyAsync(c => c.WorkspaceId == workspaceId && c.Status == OverageChargeStatuses.Due && c.PeriodEnd < overdue, cancellationToken);
+        return OverageRules.Decide(limit, used, false, plan.OveragePrice, settings.OverageEnabled, settings.Cap ?? OverageRules.DefaultCap(plan.MonthlyPrice), unpaid);
+    }
+
     internal static async Task<Entitlements> LoadAsync(BillingDbContext db, Guid workspaceId, DateTimeOffset now, CancellationToken ct)
     {
         var subscription = await Subscription.Current(db.Subscriptions.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]), workspaceId, now)
@@ -64,7 +98,8 @@ internal sealed class EntitlementService(HybridCache cache, IServiceScopeFactory
         if (subscription is not null && await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == subscription.PlanId, ct) is { } plan)
         {
             return new Entitlements(
-                workspaceId, "subscription", plan.Id, plan.Code, plan.Name, plan.VersionNumber, subscription.Trial, subscription.EndsAt, new(plan.Limits, StringComparer.Ordinal));
+                workspaceId, "subscription", plan.Id, plan.Code, plan.Name, plan.VersionNumber, subscription.Trial, subscription.EndsAt, new(plan.Limits, StringComparer.Ordinal),
+                plan.MonthlyPrice, subscription.Trial ? null : plan.OveragePerConversation);
         }
 
         var free = await FreePlanAsync(db, ct);
@@ -88,7 +123,7 @@ internal sealed class EntitlementService(HybridCache cache, IServiceScopeFactory
 /// Adds <see cref="UsageRecorded"/> events to the period's counters (platform group). A distinct meter counts a subject once per period.
 /// One message per transaction for now; the plan's batching comes with Phase 2 overage billing.
 /// </summary>
-internal sealed class UsageRecordedHandler(BillingDbContext db) : IdempotentHandler<UsageRecorded, BillingDbContext>(db)
+internal sealed class UsageRecordedHandler(BillingDbContext db, IEntitlements entitlements) : IdempotentHandler<UsageRecorded, BillingDbContext>(db)
 {
     protected override async Task HandleOnceAsync(UsageRecorded message, EventEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -124,5 +159,68 @@ internal sealed class UsageRecordedHandler(BillingDbContext db) : IdempotentHand
             ON CONFLICT (workspace_id, meter, period_start) DO UPDATE SET quantity = billing.usage_counters.quantity + EXCLUDED.quantity, updated_at = now()
             """,
             cancellationToken);
+
+        if (message.Meter == BillingMeters.AiConversations)
+        {
+            await AlertAsync(message.WorkspaceId, period, cancellationToken);
+        }
     }
+
+    /// <summary>
+    /// The owner hears once per period when the plan's AI conversations are used up (overage starts, or the AI stops when there is none)
+    /// and once when the overage cap is reached (BE-2.8 acceptance: overage never surprises).
+    /// </summary>
+    private async Task AlertAsync(Guid workspaceId, BillingPeriod period, CancellationToken ct)
+    {
+        var plan = await entitlements.GetAsync(workspaceId, ct);
+        if (plan.Limit(BillingMeters.AiConversations) is not { } limit)
+        {
+            return;
+        }
+
+        var used = await Db.UsageCounters.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter])
+            .Where(c => c.WorkspaceId == workspaceId && c.Meter == BillingMeters.AiConversations && c.PeriodStart == period.Start)
+            .Select(c => c.Quantity).FirstOrDefaultAsync(ct);
+        var settings = await Db.Settings.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]).FirstOrDefaultAsync(s => s.WorkspaceId == workspaceId, ct)
+            ?? BillingSettings.Default(workspaceId);
+        var overage = plan.OveragePrice is > 0 && settings.OverageEnabled;
+        var day = period.Start.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (used >= limit)
+        {
+            await NotifyOnceAsync(
+                workspaceId, $"quota_used:{day}", "گفتگوهای هوش مصنوعی این ماه تمام شد",
+                overage
+                    ? "از این به بعد هر گفتگوی تازه با هزینه‌ی اضافه پاسخ داده می‌شود؛ سقف آن را در صورتحساب ببینید."
+                    : "گفتگوهای تازه به همکاران شما سپرده می‌شود. برای ادامه‌ی پاسخ خودکار، طرح را ارتقا دهید یا هزینه‌ی اضافه را روشن کنید.",
+                ct);
+        }
+
+        if (overage && used >= limit)
+        {
+            var cap = settings.Cap ?? OverageRules.DefaultCap(plan.MonthlyPrice);
+            if ((used - limit + 1) * plan.OveragePrice!.Value > cap)
+            {
+                await NotifyOnceAsync(
+                    workspaceId, $"overage_cap:{day}", "سقف هزینه‌ی اضافه پر شد",
+                    "تا پایان این دوره گفتگوهای تازه به همکاران شما سپرده می‌شود. می‌توانید سقف را بالا ببرید یا طرح را ارتقا دهید.", ct);
+            }
+        }
+    }
+
+    private async Task NotifyOnceAsync(Guid workspaceId, string key, string title, string body, CancellationToken ct)
+    {
+        var added = await Db.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO billing.billing_alerts (workspace_id, key, created_at) VALUES ({workspaceId}, {key}, now()) ON CONFLICT DO NOTHING", ct);
+        if (added > 0)
+        {
+            Db.Publish(new NotificationRequested(workspaceId, null, BillingNotices.Kind, title, body, BillingNotices.Link), workspaceId.ToString(), workspaceId: workspaceId);
+        }
+    }
+}
+
+internal static class BillingNotices
+{
+    public const string Kind = "billing";
+
+    public const string Link = "/billing";
 }

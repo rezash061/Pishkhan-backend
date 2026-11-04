@@ -174,7 +174,7 @@ internal static class CheckoutEndpoints
     private static CheckoutQuoteResponse ToResponse(CheckoutQuote q, Plan plan) => new(
         q.Kind, plan.Id, plan.Code, plan.Name, q.Cycle, Money.Rial(q.Price), Money.Rial(q.Credit), Money.Rial(q.Amount), q.StartsAt, q.EndsAt);
 
-    private static CheckoutResponse ToResponse(Checkout c, DateTimeOffset now) => new(
+    internal static CheckoutResponse ToResponse(Checkout c, DateTimeOffset now) => new(
         c.Id, c.Kind, c.PlanId, c.PlanCode, c.PlanName, c.PlanVersion, c.Cycle, Money.Rial(c.Price), Money.Rial(c.Credit), Money.Rial(c.Amount), c.StatusAt(now),
         c.Error, c.InvoiceNumber, c.ReferenceId, c.CardMask, c.SubscriptionId, c.CreatedBy, c.CreatedAt, c.PaidAt);
 }

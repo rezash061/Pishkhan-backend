@@ -29,6 +29,12 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
 
     public DbSet<UsageSubject> UsageSubjects => Set<UsageSubject>();
 
+    public DbSet<BillingSettings> Settings => Set<BillingSettings>();
+
+    public DbSet<OverageCharge> OverageCharges => Set<OverageCharge>();
+
+    public DbSet<BillingAlert> Alerts => Set<BillingAlert>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Plan>(b =>
@@ -98,6 +104,28 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.ToTable("usage_subjects");
             b.HasKey(x => new { x.WorkspaceId, x.Meter, x.PeriodStart, x.SubjectId });
             b.Property(x => x.Meter).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<BillingSettings>(b =>
+        {
+            b.ToTable("billing_settings");
+            b.HasKey(x => x.WorkspaceId);
+        });
+
+        modelBuilder.Entity<OverageCharge>(b =>
+        {
+            b.ToTable("overage_charges");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasIndex(x => new { x.WorkspaceId, x.PeriodStart }).IsUnique();
+            b.HasIndex(x => x.CheckoutId);
+            b.Property(x => x.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<BillingAlert>(b =>
+        {
+            b.ToTable("billing_alerts");
+            b.HasKey(x => new { x.WorkspaceId, x.Key });
+            b.Property(x => x.Key).HasMaxLength(80);
         });
     }
 

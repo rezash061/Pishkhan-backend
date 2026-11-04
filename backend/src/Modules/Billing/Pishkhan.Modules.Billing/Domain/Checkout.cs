@@ -16,6 +16,9 @@ public static class CheckoutKinds
 
     /// <summary>A smaller (or equally priced) plan: starts when the current period ends.</summary>
     public const string Downgrade = "downgrade";
+
+    /// <summary>Pays the workspace's due overage charges (BE-2.8); buys no subscription. The plan fields name the current plan.</summary>
+    public const string Overage = "overage";
 }
 
 public static class CheckoutStatuses
@@ -104,6 +107,23 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
         UpdatedAt = now,
     };
 
+    /// <summary>A checkout for the due overage charges, <paramref name="amount"/> already at least the minimum.</summary>
+    public static Checkout ForOverage(Guid workspaceId, long amount, Guid planId, string planCode, string planName, int planVersion, Guid userId, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = workspaceId,
+        Kind = CheckoutKinds.Overage,
+        PlanId = planId,
+        PlanCode = planCode,
+        PlanName = planName,
+        PlanVersion = planVersion,
+        Price = amount,
+        Amount = amount,
+        CreatedBy = userId,
+        CreatedAt = now,
+        UpdatedAt = now,
+    };
+
     public string StatusAt(DateTimeOffset now) => Status == CheckoutStatuses.Pending && now - CreatedAt > Lifetime ? CheckoutStatuses.Expired : Status;
 
     public void Started(string authority, DateTimeOffset now)
@@ -124,7 +144,7 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
         UpdatedAt = now;
     }
 
-    public void MarkPaid(string referenceId, string? cardMask, long invoiceNumber, Guid subscriptionId, DateTimeOffset now)
+    public void MarkPaid(string referenceId, string? cardMask, long invoiceNumber, Guid? subscriptionId, DateTimeOffset now)
     {
         Status = CheckoutStatuses.Paid;
         ReferenceId = referenceId;

@@ -34,7 +34,7 @@ public sealed record UsageRecorded(Guid WorkspaceId, string Meter, int Quantity,
 /// </summary>
 public sealed record Entitlements(
     Guid WorkspaceId, string Source, Guid? PlanId, string? PlanCode, string? PlanName, int? PlanVersion, bool Trial, DateTimeOffset? EndsAt,
-    Dictionary<string, int?> Limits)
+    Dictionary<string, int?> Limits, long MonthlyPrice = 0, long? OveragePrice = null)
 {
     /// <summary>The limit of <paramref name="meter"/>, or null when unlimited.</summary>
     public int? Limit(string meter) => Limits.GetValueOrDefault(meter);
@@ -51,4 +51,32 @@ public interface IEntitlements
 
     /// <summary>Usage of a counted meter in the current billing period.</summary>
     Task<long> GetUsageAsync(Guid workspaceId, string meter, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the AI may answer in this conversation now (BE-2.8): within the plan, in paid overage, or refused (then the conversation goes
+    /// to a person, never silence). A conversation already counted this period always continues.
+    /// </summary>
+    Task<AiAllowance> CheckAiAsync(Guid workspaceId, Guid conversationId, CancellationToken cancellationToken);
+}
+
+public static class AiAllowanceReasons
+{
+    /// <summary>The plan's AI quota is used and the plan has no overage, or the owner switched overage off.</summary>
+    public const string PlanLimit = "plan_limit";
+
+    /// <summary>This period's overage reached the owner's cap.</summary>
+    public const string OverageCap = "overage_cap";
+
+    /// <summary>An earlier period's overage is unpaid.</summary>
+    public const string OverageUnpaid = "overage_unpaid";
+}
+
+/// <summary><c>Overage</c>: the conversation is beyond the plan's included ones and is charged. <c>Reason</c> is set when refused.</summary>
+public sealed record AiAllowance(bool Allowed, bool Overage, string? Reason)
+{
+    public static readonly AiAllowance Within = new(true, false, null);
+
+    public static readonly AiAllowance InOverage = new(true, true, null);
+
+    public static AiAllowance Refused(string reason) => new(false, false, reason);
 }

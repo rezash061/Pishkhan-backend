@@ -76,7 +76,7 @@ if (groups.IsEnabled("platform"))
 {
     services.AddOutboxRelay(configuration);
     services.AddHostedService<TimerDispatcher>();
-    services.AddPishkhanJobs(configuration, [.. QuartzExtensions.PlatformJobs, .. ChannelsModule.Jobs, .. TenancyModule.Jobs, .. ContentModule.Jobs]);
+    services.AddPishkhanJobs(configuration, [.. QuartzExtensions.PlatformJobs, .. ChannelsModule.Jobs, .. TenancyModule.Jobs, .. ContentModule.Jobs, .. BillingModule.Jobs]);
 }
 
 var app = builder.Build();
