@@ -5,6 +5,7 @@ using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Sms;
 using Pishkhan.Modules.Billing.Contracts;
+using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
@@ -26,10 +27,10 @@ internal static class CampaignAudience
 /// recorded as failed and not retried.
 /// </summary>
 internal sealed class OutageCampaignBatchHandler(
-    ConversationsDbContext db, IEntitlements entitlements, ISmsSender sms, IClock clock, ILogger<OutageCampaignBatchHandler> logger)
+    ConversationsDbContext db, IEntitlements entitlements, ISmsSender sms, IChannelDirectory channels, IBaleLinks links, IClock clock, ILogger<OutageCampaignBatchHandler> logger)
     : IdempotentHandler<OutageCampaignBatchRequested, ConversationsDbContext>(db)
 {
-    private readonly List<(Guid ContactId, PhoneNumber Phone)> _sends = [];
+    private readonly List<(Guid ContactId, PhoneNumber Phone, string Text)> _sends = [];
     private OutageCampaign? _campaign;
 
     protected override async Task HandleOnceAsync(OutageCampaignBatchRequested message, EventEnvelope envelope, CancellationToken cancellationToken)
@@ -68,6 +69,10 @@ internal sealed class OutageCampaignBatchHandler(
         var used = limit is null ? 0 : await entitlements.GetUsageAsync(campaign.WorkspaceId, BillingMeters.Sms, cancellationToken);
         var allowance = limit is { } l ? Math.Max(0, l - used) : long.MaxValue;
 
+        // {link}: each recipient's own link to the Bale bot, so their Bale chat joins their contact. Without a bot the placeholder is removed.
+        var bale = campaign.Text.Contains(OutageCampaign.LinkPlaceholder, StringComparison.Ordinal)
+            ? await Features.OutageCampaignEndpoints.BaleBotAsync(channels, cancellationToken)
+            : null;
         var limitReached = false;
         foreach (var c in contacts.Where(c => !already.Contains(c.Id)))
         {
@@ -86,7 +91,21 @@ internal sealed class OutageCampaignBatchHandler(
             {
                 WorkspaceId = campaign.WorkspaceId, CampaignId = campaign.Id, ContactId = c.Id, Status = RecipientStatuses.Sent, CreatedAt = now,
             });
-            _sends.Add((c.Id, phone));
+            var text = campaign.Text;
+            if (text.Contains(OutageCampaign.LinkPlaceholder, StringComparison.Ordinal))
+            {
+                var link = string.Empty;
+                if (bale is { Username: { } username })
+                {
+                    var token = ContactLinkToken.Create(campaign.WorkspaceId, c.Id, bale.Id, now);
+                    Db.ContactLinkTokens.Add(token);
+                    link = links.DeepLink(username, token.Token);
+                }
+
+                text = text.Replace(OutageCampaign.LinkPlaceholder, link, StringComparison.Ordinal);
+            }
+
+            _sends.Add((c.Id, phone, text));
         }
 
         campaign.Batch(contacts.Count, _sends.Count, 0, now);
@@ -120,11 +139,11 @@ internal sealed class OutageCampaignBatchHandler(
         }
 
         var failed = new List<Guid>();
-        foreach (var (contactId, phone) in _sends)
+        foreach (var (contactId, phone, text) in _sends)
         {
             try
             {
-                await sms.SendAsync(new SmsMessage(phone, _campaign.Text), cancellationToken);
+                await sms.SendAsync(new SmsMessage(phone, text), cancellationToken);
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException && !cancellationToken.IsCancellationRequested)
             {

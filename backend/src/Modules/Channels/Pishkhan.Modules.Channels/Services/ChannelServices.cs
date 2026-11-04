@@ -18,6 +18,7 @@ namespace Pishkhan.Modules.Channels.Services;
 internal static class TokenPurposes
 {
     public const string Instagram = "channels.instagram-token";
+    public const string Bale = "channels.bale-token";
 }
 
 internal static class ChannelStatusEvents
@@ -187,7 +188,8 @@ internal sealed record GatewayResult<T>(bool Success, T? Value, string? ErrorCod
     public static GatewayResult<T> Failed(string code, bool retryable, TimeSpan? retryAfter = null) => new(false, default, code, retryable, retryAfter);
 }
 
-internal sealed class ChannelMessageSender(InstagramAccountGateway gateway, InstagramGraphClient instagram) : IChannelMessageSender
+internal sealed class ChannelMessageSender(
+    InstagramAccountGateway gateway, InstagramGraphClient instagram, ChannelsDbContext db, Bale.BaleBotClient bale, ISecretProtector secrets) : IChannelMessageSender
 {
     public async Task<SendResult> SendAsync(Guid channelAccountId, OutboundRecipient recipient, OutboundContent content, CancellationToken cancellationToken)
     {
@@ -196,10 +198,35 @@ internal sealed class ChannelMessageSender(InstagramAccountGateway gateway, Inst
             return SendResult.Failed("channel.empty_message", retryable: false);
         }
 
+        var kind = await db.Accounts.AsNoTracking().Where(a => a.Id == channelAccountId).Select(a => a.Kind).FirstOrDefaultAsync(cancellationToken);
+        if (kind == ChannelKinds.Bale)
+        {
+            return await SendBaleAsync(channelAccountId, recipient, content, cancellationToken);
+        }
+
         var family = recipient.CommentId is null ? RateFamilies.Send : RateFamilies.PrivateReply;
         var body = InstagramMessageBuilder.Build(recipient, content);
         var result = await gateway.CallAsync(channelAccountId, family, token => instagram.SendAsync(token, body, cancellationToken), cancellationToken);
         return result.Success ? SendResult.Sent(result.Value) : SendResult.Failed(result.ErrorCode!, result.Retryable, result.RetryAfter);
+    }
+
+    /// <summary>Bale has no 24-hour window or comments: a message to a customer who started the bot.</summary>
+    private async Task<SendResult> SendBaleAsync(Guid channelAccountId, OutboundRecipient recipient, OutboundContent content, CancellationToken ct)
+    {
+        var account = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == channelAccountId, ct);
+        if (account is not { TokenEnc: { } enc } || account.Status != ChannelStatuses.Active || recipient.UserId is not { } chatId)
+        {
+            return SendResult.Failed("channel.unavailable", retryable: false);
+        }
+
+        try
+        {
+            return SendResult.Sent(await bale.SendAsync(secrets.Unprotect(enc, TokenPurposes.Bale), chatId, content, ct));
+        }
+        catch (Bale.BaleApiException e)
+        {
+            return SendResult.Failed(e.ErrorCode, e.Retryable, e.Status == 429 ? TimeSpan.FromSeconds(5) : null);
+        }
     }
 
     public async Task<SendResult> ReplyToCommentAsync(Guid channelAccountId, string commentId, string text, CancellationToken cancellationToken)

@@ -68,33 +68,7 @@ internal sealed class InstagramIngestHandler(
                 continue;
             }
 
-            var (conversation, isNew) = await FindOrOpenConversationAsync(account, inbound.SenderExternalId, now, cancellationToken);
-            var normalized = inbound.Text is null ? null : PersianNormalizer.Normalize(inbound.Text);
-            // The story a customer replied to is kept with the attachments, so the inbox can show what they answered.
-            IReadOnlyList<InboundAttachment> media = inbound.ReplyToStoryId is null ? inbound.Attachments : [.. inbound.Attachments, new InboundAttachment("story_reply", inbound.ReplyToStoryUrl)];
-            var attachments = media.Count == 0 ? null : JsonSerializer.Serialize(media, EnvelopeJson.Options);
-            var stored = Message.Inbound(account.WorkspaceId, conversation.Id, inbound.Kind, Truncate(inbound.Text), Truncate(normalized), inbound.ExternalMessageId, attachments, now);
-
-            // A voice note without text is answered once it is transcribed (BE-2.4).
-            var voice = string.IsNullOrWhiteSpace(inbound.Text) ? VoiceNotes.AudioUrl(inbound.Attachments) : null;
-            if (voice is not null)
-            {
-                stored.AwaitTranscript();
-            }
-
-            Db.Messages.Add(stored);
-            Db.ExternalMessageKeys.Add(new ExternalMessageKey { ChannelAccountId = account.Id, ExternalId = inbound.ExternalMessageId, MessageId = stored.Id, CreatedAt = now });
-            conversation.RecordInbound(inbound.SentAt, inbound.Text ?? $"[{inbound.Kind}]");
-
-            Db.Publish(
-                new InboundMessageReceived(
-                    conversation.Id, stored.Id, stored.CreatedAt, account.Id, account.Kind, conversation.ContactId, stored.Kind, stored.Text, stored.NormalizedText,
-                    inbound.Attachments.Count, inbound.Postback, inbound.ReplyToStoryId, inbound.SenderExternalId, isNew, AwaitingTranscript: voice is not null),
-                conversation.Id.ToString());
-            if (voice is not null)
-            {
-                Db.Publish(new VoiceNoteReceived(account.WorkspaceId, conversation.Id, stored.Id, stored.CreatedAt, voice), conversation.Id.ToString(), workspaceId: account.WorkspaceId);
-            }
+            await InboundRecorder.RecordAsync(Db, account, inbound, now, cancellationToken);
         }
 
         // Comments are not conversation messages: Automation decides what to do with them (private reply, public reply, tags).
@@ -135,9 +109,6 @@ internal sealed class InstagramIngestHandler(
             Db.Publish(new MessagesRead(target.ConversationId, target.Id, readAt, count), target.ConversationId.ToString());
         }
     }
-
-    private Task<(Conversation Conversation, bool IsNew)> FindOrOpenConversationAsync(ChannelAccountInfo account, string externalUserId, DateTimeOffset now, CancellationToken ct) =>
-        ConversationLookup.FindOrOpenAsync(Db, account.WorkspaceId, account.Id, account.Kind, externalUserId, now, ct);
 
     private static string? Truncate(string? s) => s is { Length: > 4000 } ? s[..4000] : s;
 }

@@ -140,6 +140,9 @@ public static class ConsentSources
 
     /// <summary>The customer agreed in a flow (BE-2.7 <c>capture_phone</c>); the evidence is the question they answered.</summary>
     public const string Flow = "flow";
+
+    /// <summary>The customer started the shop's bot from a link (BE-2.7): choosing the channel is the consent.</summary>
+    public const string Channel = "channel";
 }
 
 /// <summary>Contact fields with a meaning of their own.</summary>

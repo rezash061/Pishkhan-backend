@@ -245,7 +245,8 @@ internal static class ChannelEndpoints
     }
 
     private static async Task<IResult> DisconnectAsync(
-        Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, ICurrentUser caller, IClock clock, ILoggerFactory loggers, CancellationToken ct)
+        Guid workspaceId, Guid channelId, ChannelsDbContext db, ISecretProtector secrets, InstagramGraphClient instagram, Bale.BaleBotClient bale, ICurrentUser caller,
+        IClock clock, ILoggerFactory loggers, CancellationToken ct)
     {
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == channelId && a.Status != ChannelStatuses.Disconnected, ct);
         if (account is null)
@@ -263,6 +264,19 @@ internal static class ChannelEndpoints
             {
                 // Best effort: the token may already be revoked. Webhooks for a disconnected account are dropped by ingest anyway.
                 loggers.CreateLogger(typeof(ChannelEndpoints)).LogInformation("Unsubscribe on disconnect failed for {ChannelAccountId}: {Message}", account.Id, ex.Message);
+            }
+        }
+
+        if (account is { Kind: ChannelKinds.Bale, TokenEnc: { } baleEnc })
+        {
+            try
+            {
+                await bale.DeleteWebhookAsync(secrets.Unprotect(baleEnc, TokenPurposes.Bale), ct);
+            }
+            catch (Bale.BaleApiException ex)
+            {
+                // Best effort: updates for a disconnected bot are dropped by the webhook anyway.
+                loggers.CreateLogger(typeof(ChannelEndpoints)).LogInformation("Bale webhook removal failed for {ChannelAccountId}: {Message}", account.Id, ex.Message);
             }
         }
 

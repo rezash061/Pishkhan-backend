@@ -27,7 +27,8 @@ public static class ConversationsModule
     }
 
     public static MessagingBuilder AddConversationsIngestConsumers(this MessagingBuilder messaging) =>
-        messaging.AddConsumer<InstagramWebhookReceived, InstagramIngestHandler>("ingest");
+        messaging.AddConsumer<InstagramWebhookReceived, InstagramIngestHandler>("ingest")
+            .AddConsumer<BaleUpdateReceived, BaleIngestHandler>("ingest");
 
     /// <summary>Platform group: privacy requests and contact exports.</summary>
     public static MessagingBuilder AddConversationsPlatformConsumers(this MessagingBuilder messaging) =>

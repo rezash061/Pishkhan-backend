@@ -26,6 +26,9 @@ public sealed class OutageCampaign : Entity<Guid>, ITenantOwned
     public const int MaxText = 300;
     public const int BatchSize = 100;
 
+    /// <summary>Replaced in each recipient's text by their own link to the shop's Bale bot.</summary>
+    public const string LinkPlaceholder = "{link}";
+
     /// <summary>One campaign per workspace per this many hours: it is an outage tool, not bulk marketing.</summary>
     public const int CooldownHours = 24;
 
