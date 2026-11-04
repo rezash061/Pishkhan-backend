@@ -28,7 +28,15 @@ internal static class ImageHash
 {
     public static long? Compute(byte[] bytes)
     {
-        using var original = SKBitmap.Decode(bytes);
+        // SKBitmap.Decode throws for bytes no codec reads; asking for the codec first keeps "not an image" a null.
+        using var data = SKData.CreateCopy(bytes);
+        using var codec = SKCodec.Create(data);
+        if (codec is null)
+        {
+            return null;
+        }
+
+        using var original = SKBitmap.Decode(codec);
         if (original is null)
         {
             return null;
