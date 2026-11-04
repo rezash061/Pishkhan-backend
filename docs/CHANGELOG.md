@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.8: overage billing, cap, alerts and dunning, 2026-11-04)
+
+- **Overage** (gap G31): once a paid plan's AI conversations are used, each new conversation is answered and charged at the plan's
+  `overagePerConversation`, up to a cap per period (default: the plan's monthly price; the owner can set 0 to 10× it or switch overage off).
+  Trials and plans without an overage price stop at the limit as before.
+- `IEntitlements.CheckAiAsync(workspaceId, conversationId)` returns `AiAllowance` (within / overage / refused with `plan_limit`,
+  `overage_cap` or `overage_unpaid`). The Agent uses it before every reply: a conversation already counted this period always continues;
+  a refused one is handed to a person (`ai:<reason>`, the profile's handoff message), never left silent. `ai_conversations` is now enforced
+  (before, only `ai_messages` was).
+- Panel: `GET/PUT /workspaces/{id}/billing/overage` (state this period, price, cap, extra conversations, amount so far, due, blocked),
+  `GET …/overage/charges`, `POST …/overage/checkout` (Idempotency-Key; Zarinpal checkout of kind `overage` settling every charge due
+  when it was opened; 409 `billing.overage.checkout_pending`, 422 `billing.overage.nothing_due`). A paid overage checkout is an invoice
+  with no `subscriptionId`. Changes are audited (`billing.overage_updated`).
+- Alerts (notification kind `billing`, link `/billing`, each once): the plan's AI conversations used up this period, the overage cap reached.
+- `billing.daily` job (Workers, 01:10 UTC): makes the previous Jalali month's `OverageCharge` (never above the cap), and reminds of a paid
+  subscription ending within 3 days (not already renewed), a charge still due after 7 days, and overage stopped once a charge is 14 days
+  unpaid (until paid, new conversations beyond the plan go to a person).
+- Tables `billing.billing_settings`, `billing.overage_charges`, `billing.billing_alerts` (migration `Overage`).
+- Deferred: wallet/prepaid credit and installments.
+
 ### Added (Phase 2, BE-2.7 part 2: Bale, 2026-11-04)
 - Bale (بله), the first domestic messenger:
   - **Connecting:** `POST /workspaces/{id}/channels/bale/connect` with `{botToken}` (`workspace.channels.manage`) connects the seller's own bot. The token is checked with Bale's `getMe`, stored encrypted, and the bot's webhook is registered. Errors: 422 `channels.bale_token_invalid`, 409 `channels.bale_bot_taken`, 402 `billing.plan_limit` (the plan's `channel_accounts`), 503 `channels.bale_unavailable`. Disconnecting removes the webhook.

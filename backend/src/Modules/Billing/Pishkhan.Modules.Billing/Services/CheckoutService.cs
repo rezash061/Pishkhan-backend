@@ -99,6 +99,50 @@ internal sealed class CheckoutService(
         return new StartedCheckout(checkout, started.RedirectUrl, null);
     }
 
+    /// <summary>
+    /// Pays every due overage charge at once (BE-2.8). Refused with <c>billing.overage.nothing_due</c> when nothing is due and
+    /// <c>billing.overage.checkout_pending</c> while another overage payment is open, so the same charges are never paid twice.
+    /// </summary>
+    public async Task<StartedCheckout> StartOverageAsync(Guid workspaceId, Guid userId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(options.Value.MerchantId))
+        {
+            return new StartedCheckout(null, null, "billing.checkout.unavailable");
+        }
+
+        var now = clock.UtcNow;
+        var due = await db.OverageCharges.Where(c => c.Status == OverageChargeStatuses.Due).SumAsync(c => (long?)c.Amount, ct) ?? 0;
+        if (due <= 0)
+        {
+            return new StartedCheckout(null, null, "billing.overage.nothing_due");
+        }
+
+        var open = now - Checkout.Lifetime;
+        if (await db.Checkouts.AnyAsync(c => c.Kind == CheckoutKinds.Overage && c.Status == CheckoutStatuses.Pending && c.CreatedAt > open, ct))
+        {
+            return new StartedCheckout(null, null, "billing.overage.checkout_pending");
+        }
+
+        var standing = await StandingAsync(workspaceId, ct);
+        var plan = standing.CurrentPlan;
+        var checkout = Checkout.ForOverage(
+            workspaceId, Math.Max(due, CheckoutPlanner.MinimumAmount), plan?.Id ?? Guid.Empty, plan?.Code ?? CheckoutKinds.Overage, plan?.Name ?? "هزینه‌ی اضافه",
+            plan?.VersionNumber ?? 0, userId, now);
+        db.Checkouts.Add(checkout);
+        var callback = new Uri($"{options.Value.ApiBaseUrl.TrimEnd('/')}/billing/checkout/callback");
+        var started = await zarinpal.StartAsync(options.Value.MerchantId!, options.Value.Sandbox, checkout.Amount, callback, "هزینه‌ی اضافه‌ی پیشخوان", ct);
+        if (!started.Ok)
+        {
+            checkout.Fail(started.Error!, now);
+            await db.SaveChangesAsync(ct);
+            return new StartedCheckout(checkout, null, "billing.checkout.gateway_unavailable");
+        }
+
+        checkout.Started(started.Authority!, now);
+        await db.SaveChangesAsync(ct);
+        return new StartedCheckout(checkout, started.RedirectUrl, null);
+    }
+
     /// <summary>Zarinpal's callback. Returns the checkout (to send the payer back to it), or null for an unknown authority.</summary>
     public async Task<Checkout?> CompleteAsync(string? authority, bool customerFinished, CancellationToken ct)
     {
@@ -168,12 +212,29 @@ internal sealed class CheckoutService(
     private async Task PayAsync(Checkout checkout, ZarinpalVerify verified, DateTimeOffset now, CancellationToken token)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(token);
-        var subscription = await ApplyAsync(checkout, now, token);
+        Guid? subscriptionId = null;
+        var settled = 0;
+        if (checkout.Kind == CheckoutKinds.Overage)
+        {
+            // The charges it was opened for: those due when it was made (a charge made later is paid next time).
+            var charges = await db.OverageCharges.Where(c => c.Status == OverageChargeStatuses.Due && c.CreatedAt <= checkout.CreatedAt).ToListAsync(token);
+            foreach (var charge in charges)
+            {
+                charge.Settle(checkout.Id, now);
+            }
+
+            settled = charges.Count;
+        }
+        else
+        {
+            subscriptionId = (await ApplyAsync(checkout, now, token)).Id;
+        }
+
         var invoice = await db.Database.SqlQueryRaw<long>(NextInvoiceSql).SingleAsync(token);
-        checkout.MarkPaid(verified.ReferenceId!, verified.CardMask, invoice, subscription.Id, now);
+        checkout.MarkPaid(verified.ReferenceId!, verified.CardMask, invoice, subscriptionId, now);
         var entry = AuditEntries.Create(
             AuditActor.User(checkout.CreatedBy, null, null), "billing.checkout_paid", "checkout", checkout.Id.ToString(), checkout.WorkspaceId, now,
-            after: new { checkout.Kind, checkout.PlanCode, checkout.Cycle, checkout.Amount, checkout.Credit, invoice, referenceId = verified.ReferenceId });
+            after: new { checkout.Kind, checkout.PlanCode, checkout.Cycle, checkout.Amount, checkout.Credit, invoice, referenceId = verified.ReferenceId, overageCharges = settled });
         db.Publish(entry, entry.PartitionKey(), checkout.WorkspaceId);
         cache.Enqueue(db, BillingCacheTags.Workspace(checkout.WorkspaceId));
         await db.SaveChangesAsync(token);

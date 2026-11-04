@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Modules.Billing.Contracts;
@@ -12,7 +13,7 @@ namespace Pishkhan.Modules.Billing;
 
 /// <summary>
 /// Billing (backend plan 9.13, BE-1.11): versioned plans and the public price list, subscriptions granted by staff, usage per period
-/// and entitlements (<see cref="IEntitlements"/>) for other modules. Checkout (BE-2.8) sells plans through Zarinpal; overage is later.
+/// and entitlements (<see cref="IEntitlements"/>) for other modules. Checkout (BE-2.8) sells plans through Zarinpal; overage beyond the plan is charged per period up to the owner's cap.
 /// </summary>
 public static class BillingModule
 {
@@ -39,6 +40,12 @@ public static class BillingModule
         return services;
     }
 
+    /// <summary>Workers (platform group): overage charges and billing reminders, daily at 01:10 UTC.</summary>
+    public static readonly IReadOnlyList<RecurringJob> Jobs =
+    [
+        new(typeof(BillingDailyJob), "billing.daily", "0 10 1 * * ?"),
+    ];
+
     /// <summary>Workers (platform group): counts <c>billing.usage-recorded</c> events into the period's usage.</summary>
     public static MessagingBuilder AddBillingConsumers(this MessagingBuilder messaging) =>
         messaging.AddConsumer<UsageRecorded, UsageRecordedHandler>("platform");
@@ -49,6 +56,7 @@ public static class BillingModule
         PlanEndpoints.MapPublic(app);
         SubscriptionEndpoints.MapPanel(app);
         CheckoutEndpoints.Map(app);
+        OverageEndpoints.Map(app);
         return app;
     }
 

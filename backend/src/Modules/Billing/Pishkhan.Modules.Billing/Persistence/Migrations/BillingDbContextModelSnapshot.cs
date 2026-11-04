@@ -193,6 +193,52 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.BillingAlert", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("WorkspaceId", "Key")
+                        .HasName("pk_billing_alerts");
+
+                    b.ToTable("billing_alerts", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.BillingSettings", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<long?>("Cap")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cap");
+
+                    b.Property<bool>("OverageEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("overage_enabled");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("WorkspaceId")
+                        .HasName("pk_billing_settings");
+
+                    b.ToTable("billing_settings", "billing");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Checkout", b =>
                 {
                     b.Property<Guid>("Id")
@@ -324,6 +370,71 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasDatabaseName("ix_checkouts_workspace_id_created_at");
 
                     b.ToTable("checkouts", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.OverageCharge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid?>("CheckoutId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_id");
+
+                    b.Property<int>("Conversations")
+                        .HasColumnType("integer")
+                        .HasColumnName("conversations");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_start");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("UnitPrice")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_overage_charges");
+
+                    b.HasIndex("CheckoutId")
+                        .HasDatabaseName("ix_overage_charges_checkout_id");
+
+                    b.HasIndex("WorkspaceId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_overage_charges_workspace_id_period_start");
+
+                    b.ToTable("overage_charges", "billing");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Plan", b =>
