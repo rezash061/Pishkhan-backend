@@ -239,7 +239,17 @@ public interface IChannelWebhookParser
 
     /// <summary>Comments and live comments in the entry's <c>changes</c>.</summary>
     IReadOnlyList<InboundChannelComment> ParseInstagramComments(JsonElement entry);
+
+    /// <summary>
+    /// A Bale bot update (BE-2.7): a private-chat message or a button press, or null for anything else (groups, edits, channel posts).
+    /// The sender is the chat id; a button press comes back as a <see cref="InboundKinds.Postback"/> with its callback data.
+    /// </summary>
+    InboundChannelMessage? ParseBaleUpdate(JsonElement update, string botId);
 }
+
+/// <summary>A Bale bot update, posted to the Api host's webhook and checked there; keyed by channel account.</summary>
+[IntegrationEvent(Topics.BaleUpdateReceived)]
+public sealed record BaleUpdateReceived(Guid ChannelAccountId, Guid WorkspaceId, JsonElement Update) : IIntegrationEvent;
 
 public interface IChannelMessageSender
 {
@@ -286,3 +296,10 @@ public interface IChannelHealth
 /// <summary>Instagram went down or came back (BE-2.7). Workspaces with an Instagram account are notified separately.</summary>
 [IntegrationEvent(Topics.ChannelOutageChanged)]
 public sealed record ChannelOutageChanged(string Kind, string Status, string Mode, DateTimeOffset Since) : IIntegrationEvent;
+
+/// <summary>Links to the shop's Bale bot (BE-2.7).</summary>
+public interface IBaleLinks
+{
+    /// <summary><c>https://ble.ir/{botUsername}?start={token}</c>: opens the bot, whose first message then carries the token.</summary>
+    string DeepLink(string botUsername, string token);
+}

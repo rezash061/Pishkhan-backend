@@ -79,6 +79,25 @@ public sealed class ChannelAccount : AggregateRoot<Guid>, ITenantOwned
         return account;
     }
 
+    /// <summary>A seller's own Bale bot (BE-2.7). Bot tokens do not expire; <see cref="ExternalId"/> is the bot's id.</summary>
+    public static ChannelAccount ConnectBale(Guid workspaceId, string botId, string? username, string? name, string tokenEnc, Guid connectedBy, DateTimeOffset now)
+    {
+        var account = new ChannelAccount
+        {
+            Id = Uuid.NewV7(now),
+            WorkspaceId = workspaceId,
+            Kind = ChannelKinds.Bale,
+            ExternalId = botId,
+            Username = username,
+            DisplayName = name,
+            TokenEnc = tokenEnc,
+            ConnectedBy = connectedBy,
+            CreatedAt = now,
+        };
+        account.MoveTo(ChannelStatuses.Active, "connected", now);
+        return account;
+    }
+
     public bool Reconnect(string? username, string? name, string tokenEnc, DateTimeOffset tokenExpiresAt, IEnumerable<string> scopes, DateTimeOffset now)
     {
         Username = username;

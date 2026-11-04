@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Tenancy;
 using Pishkhan.Modules.Conversations.Domain;
+using Pishkhan.Modules.Conversations.Services;
 
 namespace Pishkhan.Modules.Conversations.Persistence;
 
@@ -38,6 +39,8 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
     public DbSet<ContactSegment> Segments => Set<ContactSegment>();
 
     public DbSet<OutageCampaign> OutageCampaigns => Set<OutageCampaign>();
+
+    public DbSet<ContactLinkToken> ContactLinkTokens => Set<ContactLinkToken>();
 
     public DbSet<OutageCampaignRecipient> OutageCampaignRecipients => Set<OutageCampaignRecipient>();
 
@@ -108,6 +111,14 @@ public sealed class ConversationsDbContext(DbContextOptions<ConversationsDbConte
             b.Property(x => x.Text).HasMaxLength(OutageCampaign.MaxText + 120);
             b.Property(x => x.Status).HasMaxLength(20);
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ContactLinkToken>(b =>
+        {
+            b.ToTable("contact_link_tokens");
+            b.HasKey(x => x.Token);
+            b.Property(x => x.Token).HasMaxLength(64);
+            b.HasIndex(x => new { x.WorkspaceId, x.ContactId });
         });
 
         modelBuilder.Entity<OutageCampaignRecipient>(b =>

@@ -151,4 +151,45 @@ public sealed class InstagramWebhookParser : IChannelWebhookParser
 
     private static bool Bool(JsonElement element, string name) =>
         element.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+
+    public InboundChannelMessage? ParseBaleUpdate(JsonElement update, string botId)
+    {
+        if (update.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (update.TryGetProperty("callback_query", out var callback) && callback.ValueKind == JsonValueKind.Object)
+        {
+            if (!callback.TryGetProperty("from", out var from) || !from.TryGetProperty("id", out var fromId)
+                || !callback.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            var callbackId = callback.TryGetProperty("id", out var cid) ? cid.ToString() : Guid.NewGuid().ToString("N");
+            return new InboundChannelMessage(
+                fromId.ToString(), botId, "cb:" + callbackId, DateTimeOffset.UtcNow, InboundKinds.Postback, data.GetString(), [], null, data.GetString(), false);
+        }
+
+        if (!update.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.Object
+            || !message.TryGetProperty("chat", out var chat) || !chat.TryGetProperty("id", out var chatId)
+            || (chat.TryGetProperty("type", out var type) && type.GetString() != "private"))
+        {
+            return null;
+        }
+
+        var sentAt = message.TryGetProperty("date", out var date) && date.TryGetInt64(out var unix) ? DateTimeOffset.FromUnixTimeSeconds(unix) : DateTimeOffset.UtcNow;
+        var text = message.TryGetProperty("text", out var t) ? t.GetString() : message.TryGetProperty("caption", out var c) ? c.GetString() : null;
+        var hasMedia = message.TryGetProperty("photo", out _) || message.TryGetProperty("voice", out _) || message.TryGetProperty("audio", out _)
+            || message.TryGetProperty("video", out _) || message.TryGetProperty("document", out _);
+        if (text is null && !hasMedia)
+        {
+            return null;
+        }
+
+        var messageId = message.TryGetProperty("message_id", out var mid) ? mid.ToString() : Guid.NewGuid().ToString("N");
+        return new InboundChannelMessage(
+            chatId.ToString(), botId, $"{chatId}:{messageId}", sentAt, text is null ? InboundKinds.Attachment : InboundKinds.Text, text, [], null, null, false);
+    }
 }

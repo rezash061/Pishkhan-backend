@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.7 part 2: Bale, 2026-11-04)
+- Bale (بله), the first domestic messenger:
+  - **Connecting:** `POST /workspaces/{id}/channels/bale/connect` with `{botToken}` (`workspace.channels.manage`) connects the seller's own bot. The token is checked with Bale's `getMe`, stored encrypted, and the bot's webhook is registered. Errors: 422 `channels.bale_token_invalid`, 409 `channels.bale_bot_taken`, 402 `billing.plan_limit` (the plan's `channel_accounts`), 503 `channels.bale_unavailable`. Disconnecting removes the webhook.
+  - **Updates:** Bale posts them to `POST /api/v1/channels/bale/webhook/{accountId}/{signature}` on the Api host, in the domestic zone. The signature is an HMAC of the account id with `Channels:Bale:WebhookSecret`, so a forged URL is refused before any lookup. Updates go on `channels.bale-update-received.v1` to the ingest group.
+  - **Messages in:** private-chat texts (and captions) are recorded like Instagram messages, through the shared `InboundRecorder`. Button presses come in as postbacks. Groups and edits are ignored. Media is recorded without its file (not downloaded yet).
+  - **Messages out:** texts, quick replies and postback buttons become an inline keyboard (pressing a button comes back as the payload); link buttons become URL buttons, cards become text lines, and images are sent with `sendPhoto`.
+  - **No window:** Bale has no 24-hour rule, so a Bale conversation's window does not close.
+  - `Channels:Bale` settings: `ApiBaseUrl`, `WebhookBaseUrl`, `WebhookSecret`, `DeepLinkBaseUrl`.
+- Joining a customer's Bale chat to their contact:
+  - `POST /workspaces/{id}/contacts/{contactId}/bale-link` (`workspace.crm.write`) returns `{url, expiresAt}`, a one-time `https://ble.ir/{bot}?start={token}` valid 14 days. 422 `channels.bale_not_connected`.
+  - When the customer presses start, the bot's `/start {token}` joins the Bale chat to that contact and records a Bale consent with source `channel`, so the customer continues as the same contact in the inbox.
+  - A chat the bot already knows keeps its own contact. The message is recorded as `/start`.
+  - Migration `BaleLinks` (`conversations.contact_link_tokens`).
+- "Move my customers": `{link}` in a campaign text becomes each recipient's own Bale link. It needs a connected bot with a username (422 `outage.link_needs_bale`).
+- Not yet: Bale as a campaign channel (campaigns are SMS), downloading Bale media and voice notes, and the AI's phone-capture tool.
+
 ### Added (Phase 2, BE-2.7 part 1: outage detector, phone capture with consent, "move my customers", 2026-11-03)
 - Outage detector:
   - Every Graph API call is counted per minute in the state Redis: successes, and failures that mean Instagram itself is failing (unreachable, or Meta's transient errors). Token, permission and rate-limit errors are the account's own and aren't counted.

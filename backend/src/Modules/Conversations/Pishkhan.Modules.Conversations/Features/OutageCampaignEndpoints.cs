@@ -8,6 +8,7 @@ using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Conversations.Contracts;
 using Pishkhan.Modules.Conversations.Domain;
 using Pishkhan.Modules.Conversations.Persistence;
+using Pishkhan.Modules.Conversations.Services;
 using Pishkhan.Modules.Tenancy.Contracts;
 using Pishkhan.SharedKernel;
 using Pishkhan.Web.Auth;
@@ -22,10 +23,16 @@ namespace Pishkhan.Modules.Conversations.Features;
 /// </summary>
 public sealed record CampaignAudienceResponse(int Contacts, int WithPhone, int Reachable, bool Outage, DateTimeOffset? NextAllowedAt);
 
-/// <summary>The text (5 to 300 characters) every recipient gets; the shop's name is put in front. Usually it holds a link, for example to a Bale channel.</summary>
+/// <summary>
+/// The text (5 to 300 characters) every recipient gets; the shop's name is put in front. <c>{link}</c> becomes each recipient's own link to the
+/// shop's Bale bot, so their Bale chat joins their contact (needs a connected Bale bot).
+/// </summary>
 public sealed record CampaignRequest(string Text);
 
 /// <summary><c>status</c>: sending, completed or limit_reached (the plan's SMS allowance ran out).</summary>
+/// <summary>A one-time link to the shop's Bale bot that joins the contact's Bale chat to them, valid 14 days.</summary>
+public sealed record BaleLinkResponse(string Url, DateTimeOffset ExpiresAt);
+
 public sealed record CampaignResponse(
     Guid Id, string Channel, string Text, string Status, int Scanned, int Sent, int Failed, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
 
@@ -54,6 +61,14 @@ internal static class OutageCampaignEndpoints
             .RequireWorkspacePermission(Permissions.CrmRead)
             .WithSummary("Campaigns, newest first")
             .Produces<IReadOnlyList<CampaignResponse>>();
+
+        app.MapPanelApi().MapGroup("/workspaces/{workspaceId:guid}/contacts").WithTags("Outage")
+            .MapPost("/{contactId:guid}/bale-link", BaleLinkAsync)
+            .RequireWorkspacePermission(Permissions.CrmWrite)
+            .WithSummary("A one-time link to the shop's Bale bot for this contact (send it on Instagram or by SMS)")
+            .Produces<BaleLinkResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapGet("/campaigns/{campaignId:guid}", GetAsync)
             .RequireWorkspacePermission(Permissions.CrmRead)
@@ -102,6 +117,11 @@ internal static class OutageCampaignEndpoints
             return Error.Conflict("outage.campaign_cooldown").ToProblem();
         }
 
+        if (text.Contains(OutageCampaign.LinkPlaceholder, StringComparison.Ordinal) && await BaleBotAsync(channels, ct) is null)
+        {
+            return Error.Unprocessable("outage.link_needs_bale").ToProblem();
+        }
+
         var now = clock.UtcNow;
         var shop = await workspaces.GetNameAsync(workspaceId, ct) ?? string.Empty;
         var campaign = OutageCampaign.Start(workspaceId, $"{shop}:\n{text}", caller.UserId, now);
@@ -120,6 +140,29 @@ internal static class OutageCampaignEndpoints
 
     private static async Task<IResult> GetAsync(Guid workspaceId, Guid campaignId, ConversationsDbContext db, CancellationToken ct) =>
         await db.OutageCampaigns.AsNoTracking().FirstOrDefaultAsync(c => c.Id == campaignId, ct) is { } campaign ? Results.Ok(ToResponse(campaign)) : Error.NotFound().ToProblem();
+
+    private static async Task<IResult> BaleLinkAsync(
+        Guid workspaceId, Guid contactId, ConversationsDbContext db, IChannelDirectory channels, IBaleLinks links, IClock clock, CancellationToken ct)
+    {
+        if (!await db.Contacts.AnyAsync(c => c.Id == contactId, ct))
+        {
+            return Error.NotFound().ToProblem();
+        }
+
+        if (await BaleBotAsync(channels, ct) is not { } bot)
+        {
+            return Error.Unprocessable("channels.bale_not_connected").ToProblem();
+        }
+
+        var token = ContactLinkToken.Create(workspaceId, contactId, bot.Id, clock.UtcNow);
+        db.ContactLinkTokens.Add(token);
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new BaleLinkResponse(links.DeepLink(bot.Username!, token.Token), token.ExpiresAt));
+    }
+
+    /// <summary>The workspace's active Bale bot with a username (deep links need it), or null.</summary>
+    internal static async Task<ChannelAccountInfo?> BaleBotAsync(IChannelDirectory channels, CancellationToken ct) =>
+        (await channels.ListAsync(ct)).FirstOrDefault(a => a.Kind == ChannelKinds.Bale && a.Status == ChannelStatuses.Active && !string.IsNullOrEmpty(a.Username));
 
     /// <summary>Instagram is down, or one of the workspace's Instagram accounts can no longer send.</summary>
     private static async Task<bool> OutageAsync(IChannelHealth health, IChannelDirectory channels, CancellationToken ct) =>

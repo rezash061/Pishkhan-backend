@@ -26,6 +26,7 @@ public static class Topics
     public const string ConversationActionsRequested = "conversations.actions-requested.v1";
     public const string ContactProfileRequested = "conversations.contact-profile-requested.v1";
     public const string ChannelOutageChanged = "channels.outage-changed.v1";
+    public const string BaleUpdateReceived = "channels.bale-update-received.v1";
     public const string OutageCampaignBatchRequested = "conversations.outage-campaign-batch-requested.v1";
     public const string VoiceNoteReceived = "conversations.voice-note-received.v1";
     public const string RulesChanged = "automation.rules-changed.v1";
@@ -79,6 +80,7 @@ public static class Topics
         new(ConversationActionsRequested, 48, Week, "channel account and customer"),
         new(ContactProfileRequested, 6, Week, "contact id"),
         new(ChannelOutageChanged, 1, Week, "channel kind"),
+        new(BaleUpdateReceived, 12, Week, "channel account id"),
         new(OutageCampaignBatchRequested, 6, Week, "campaign id"),
         new(VoiceNoteReceived, 12, Week, "conversation id"),
         new(RulesChanged, 6, Week, "workspace id"),

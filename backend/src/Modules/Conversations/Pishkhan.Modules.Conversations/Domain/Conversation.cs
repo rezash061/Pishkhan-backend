@@ -147,6 +147,9 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
     /// <summary>Instagram's standard messaging window after the customer's last message.</summary>
     public static readonly TimeSpan MessagingWindow = TimeSpan.FromHours(24);
 
+    /// <summary>Channels without a messaging window (Bale): far enough that every window check passes.</summary>
+    public static readonly TimeSpan UnlimitedWindow = TimeSpan.FromDays(3650);
+
     /// <summary>How long after the customer's last message a person may still reply with the <c>HUMAN_AGENT</c> tag.</summary>
     public static readonly TimeSpan HumanAgentWindow = TimeSpan.FromDays(7);
 
@@ -269,7 +272,9 @@ public sealed class Conversation : AggregateRoot<Guid>, ITenantOwned
         if (LastInboundAt is null || sentAt > LastInboundAt)
         {
             LastInboundAt = sentAt;
-            WindowExpiresAt = sentAt + MessagingWindow;
+
+            // Meta's 24-hour rule is Instagram's; a Bale bot may write to anyone who started it (BE-2.7).
+            WindowExpiresAt = sentAt + (ChannelKind == ChannelKinds.Instagram || string.IsNullOrEmpty(ChannelKind) ? MessagingWindow : UnlimitedWindow);
         }
 
         if (Status == ConversationStatuses.Closed)

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Http.Resilience;
 using Pishkhan.Infrastructure.Jobs;
 using Pishkhan.Infrastructure.Messaging;
 using Pishkhan.Infrastructure.Persistence;
+using Pishkhan.Modules.Channels.Bale;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Domain;
 using Pishkhan.Modules.Channels.Features;
@@ -31,6 +32,9 @@ public static class ChannelsModule
         services.AddScoped<IChannelPacing, ChannelPacingProvider>();
         services.AddScoped<InstagramTokenRefresher>();
         services.AddSingleton<IChannelWebhookParser, InstagramWebhookParser>();
+        services.AddOptions<BaleOptions>().Bind(configuration.GetSection(BaleOptions.Section));
+        services.AddHttpClient<BaleBotClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
+        services.AddSingleton<IBaleLinks, BaleLinks>();
         return services.AddChannelsOutage(configuration);
     }
 
@@ -76,6 +80,7 @@ public static class ChannelsModule
         ChannelEndpoints.Map(app);
         MetaCallbacks.Map(app);
         OutageEndpoints.MapPanel(app);
+        BaleEndpoints.Map(app);
         return app;
     }
 
