@@ -18,7 +18,7 @@
   `POST /receipts/{id}/reject {reason}`; settings `GET/PUT /payments/receipt-settings` (autoApprove, threshold 0.8–1, amountTolerance,
   windowHours). Approval publishes `PaymentConfirmed` (provider `card_to_card`), so the order moves to `paid`. Decisions are audited;
   new receipts notify (kind `receipt`, link `/orders/receipts?receipt={id}`). Each extraction counts on `receipt_verifications`.
-- Topic `payments.receipt-submitted.v1`; tables `payments.bank_accounts`, `payments.receipts`, `payments.receipt_settings` (migration `Receipts`).
+- Topic `payments.receipt-submitted.v1` (already in the catalog) now used; tables `payments.bank_accounts`, `payments.receipts`, `payments.receipt_settings` (migration `Receipts`).
 - `IConversationQueries.GetInboundImageAsync`, `IOrderQueries.FindAwaitingPaymentAsync`; `OrderForPayment` gains `CreatedAt`, `ContactId`, `ConversationId`.
 - Deferred: bank receipt templates in Backoffice, tamper/EXIF heuristics, the labeled receipt eval set, Bale images.
 
