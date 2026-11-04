@@ -47,6 +47,7 @@ public static class Topics
     public const string OrderStatusChanged = "orders.order-status-changed.v1";
     public const string PaymentConfirmed = "payments.payment-confirmed.v1";
     public const string ReceiptSubmitted = "payments.receipt-submitted.v1";
+    public const string ReceiptSubmitted = "payments.receipt-submitted.v1";
     public const string ReceiptVerified = "payments.receipt-verified.v1";
     public const string UsageRecorded = "billing.usage-recorded.v1";
     public const string UserRegistered = "identity.user-registered.v1";
@@ -100,6 +101,7 @@ public static class Topics
         new(OrderCreated, 12, Week, "order id"),
         new(OrderStatusChanged, 12, Week, "order id"),
         new(PaymentConfirmed, 12, Week, "order id"),
+        new(ReceiptSubmitted, 12, Week, "receipt id"),
         new(ReceiptSubmitted, 12, Week, "receipt id"),
         new(ReceiptVerified, 12, Week, "receipt id"),
         new(UsageRecorded, 12, Week, "workspace id"),

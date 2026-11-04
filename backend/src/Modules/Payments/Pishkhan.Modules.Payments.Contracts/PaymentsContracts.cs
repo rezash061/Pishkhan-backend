@@ -8,10 +8,18 @@ public static class PaymentProviders
     public const string Zarinpal = "zarinpal";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Zarinpal };
+
+    /// <summary>A card-to-card transfer the seller approved from its receipt (BE-2.10); not a gateway, so not in <see cref="All"/>.</summary>
+    public const string CardToCard = "card_to_card";
 }
 
+/// <summary>A receipt's image is clean and waits for extraction and checks (backend plan 10.5; commerce group).</summary>
+[IntegrationEvent(Topics.ReceiptSubmitted)]
+public sealed record ReceiptSubmitted(Guid WorkspaceId, Guid ReceiptId) : IIntegrationEvent;
+
 /// <summary>
-/// A payment for an order was verified with the provider (backend plan 9.10). The Orders module moves the order to <c>paid</c> when
+/// A payment for an order was verified with the provider (backend plan 9.10), or a card-to-card receipt was approved (BE-2.10: provider
+/// <c>card_to_card</c>, <c>PaymentLinkId</c> the receipt id). The Orders module moves the order to <c>paid</c> when
 /// it is awaiting payment and the amount equals its total; otherwise it notes the payment on the order's timeline for the seller.
 /// </summary>
 [IntegrationEvent(Topics.PaymentConfirmed)]

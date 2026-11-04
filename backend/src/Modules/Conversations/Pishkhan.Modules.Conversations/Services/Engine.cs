@@ -178,6 +178,23 @@ internal sealed class ConversationQueries(ConversationsDbContext db) : IConversa
     public async Task<ContactSnapshot?> GetContactAsync(Guid contactId, CancellationToken cancellationToken) =>
         await db.Contacts.AsNoTracking().Where(k => k.Id == contactId).Select(k => new ContactSnapshot(k.Id, k.DisplayName, k.Username)).FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<MessageImage?> GetInboundImageAsync(Guid messageId, CancellationToken cancellationToken)
+    {
+        var row = await db.Messages.AsNoTracking()
+            .Where(m => m.Id == messageId && m.Direction == MessageDirections.Inbound && m.AttachmentsJson != null)
+            .Join(db.Conversations.AsNoTracking(), m => m.ConversationId, c => c.Id, (m, c) => new { m.Id, m.CreatedAt, m.AttachmentsJson, c.ContactId, ConversationId = c.Id, c.ChannelKind })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var attachments = System.Text.Json.JsonSerializer.Deserialize<List<InboundAttachment>>(row.AttachmentsJson!, EnvelopeJson.Options) ?? [];
+        return attachments.FirstOrDefault(a => a.Type == AttachmentTypes.Image && a.Url is { Length: > 0 }) is { Url: { } url }
+            ? new MessageImage(row.Id, row.ConversationId, row.ContactId, row.ChannelKind, url, row.CreatedAt)
+            : null;
+    }
+
     public async Task<IReadOnlyList<MessageSnapshot>> RecentMessagesAsync(Guid conversationId, int limit, CancellationToken cancellationToken)
     {
         var rows = await db.Messages.AsNoTracking()

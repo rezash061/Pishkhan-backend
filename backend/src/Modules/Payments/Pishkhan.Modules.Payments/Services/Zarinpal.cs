@@ -19,6 +19,12 @@ public sealed class PaymentsOptions
     public TimeSpan LinkLifetime { get; set; } = TimeSpan.FromDays(3);
 
     public ZarinpalOptions Zarinpal { get; set; } = new();
+
+    /// <summary>
+    /// Whether sellers may turn on receipt auto-approve (BE-2.10). Off until receipt extraction reaches 95% precision on the labeled
+    /// receipt set; until then every receipt that is not an exact duplicate waits for the seller.
+    /// </summary>
+    public bool ReceiptAutoApprove { get; set; }
 }
 
 public sealed class ZarinpalOptions
