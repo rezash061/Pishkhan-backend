@@ -1113,6 +1113,46 @@ namespace Pishkhan.Modules.Conversations.Persistence.Migrations
 
                     b.ToTable("quick_replies", "conversations");
                 });
+
+            modelBuilder.Entity("Pishkhan.Modules.Conversations.Services.ContactLinkToken", b =>
+                {
+                    b.Property<string>("Token")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token");
+
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channel_account_id");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Token")
+                        .HasName("pk_contact_link_tokens");
+
+                    b.HasIndex("WorkspaceId", "ContactId")
+                        .HasDatabaseName("ix_contact_link_tokens_workspace_id_contact_id");
+
+                    b.ToTable("contact_link_tokens", "conversations");
+                });
 #pragma warning restore 612, 618
         }
     }
