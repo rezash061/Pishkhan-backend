@@ -315,7 +315,7 @@ internal static class SubscriptionEndpoints
     private static IQueryable<Subscription> Subscriptions(BillingDbContext db) =>
         db.Subscriptions.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]);
 
-    private static SubscriptionResponse ToResponse(Subscription s, DateTimeOffset now) =>
+    internal static SubscriptionResponse ToResponse(Subscription s, DateTimeOffset now) =>
         new(s.Id, s.PlanId, s.PlanCode, s.PlanVersion, s.StateName(now), s.Trial, s.StartsAt, s.EndsAt, s.EndedAt, s.EndReason, s.Cycle, s.CheckoutId);
 }
 

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (BE-1.11 back office billing: subscriptions, payments, invoices and refunds for admin AD-1.4, 2026-11-05)
+
+- `/admin/v1/billing` (SuperAdmin, Finance, Support, ReadOnly read):
+  - `GET /subscriptions`: across workspaces, `state` current (default), trialing, scheduled, ended or all; `planCode`, `workspaceId`, paging.
+    Rows carry the workspace name.
+  - `GET /payments`: Zarinpal checkouts with their invoice numbers, `status` paid (default), pending, failed, expired or all; `kind`,
+    `workspaceId`, `from`, `to`. Each row has `refunded`, the sum of its refunds. `GET /payments/{id}` adds the refunds and the subscription.
+  - `GET /summary?days=30`: paid, refunded and net totals, failed and pending counts.
+- `POST /admin/v1/billing/payments/{id}/refunds` (Finance, step-up, reason): records money paid back in Zarinpal's panel, up to what is left
+  of the payment (`amount: billing.refund.too_much`; 409 `billing.refund.not_paid`). `endSubscription` ends the subscription the payment
+  bought (end reason `refunded`). Audited as `billing.refund`. New table `billing.refunds` (migration `BillingRefunds`).
+
 ### Added (BE-1.12 back office: staff management, AI traces, dashboard and health for admin AD-0.2, AD-0.4, AD-1.10, 2026-11-05)
 
 - **Staff management** (SuperAdmin, step-up, reason of 5 to 300 characters, audited):

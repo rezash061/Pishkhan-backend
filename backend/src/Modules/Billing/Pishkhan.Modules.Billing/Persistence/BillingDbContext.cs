@@ -35,6 +35,8 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
 
     public DbSet<BillingAlert> Alerts => Set<BillingAlert>();
 
+    public DbSet<Refund> Refunds => Set<Refund>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Plan>(b =>
@@ -89,7 +91,18 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.HasIndex(x => x.Authority).IsUnique().HasFilter("authority IS NOT NULL");
             b.HasIndex(x => x.InvoiceNumber).IsUnique().HasFilter("invoice_number IS NOT NULL");
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+            b.HasIndex(x => new { x.Status, x.PaidAt });
             b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<Refund>(b =>
+        {
+            b.ToTable("refunds");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Reason).HasMaxLength(300);
+            b.Property(x => x.ReferenceId).HasMaxLength(64);
+            b.HasIndex(x => x.CheckoutId);
+            b.HasIndex(x => x.CreatedAt);
         });
 
         modelBuilder.Entity<UsageCounter>(b =>

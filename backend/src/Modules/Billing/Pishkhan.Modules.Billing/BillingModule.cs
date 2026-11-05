@@ -68,6 +68,7 @@ public static class BillingModule
     {
         PlanEndpoints.MapAdmin(app);
         SubscriptionEndpoints.MapAdmin(app);
+        BillingAdminEndpoints.Map(app);
         return app;
     }
 }
