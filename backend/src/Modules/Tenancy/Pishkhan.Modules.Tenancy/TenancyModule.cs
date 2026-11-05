@@ -21,14 +21,22 @@ namespace Pishkhan.Modules.Tenancy;
 
 public static class TenancyModule
 {
+    /// <summary>Api and AdminApi hosts: <see cref="AddTenancyCore"/> plus the workspace and member handlers (they need <c>ICurrentUser</c>).</summary>
     public static IServiceCollection AddTenancyModule(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddTenancyCore(configuration);
+        services.AddHandlersFrom(typeof(TenancyModule).Assembly);
+        return services;
+    }
+
+    /// <summary>Workers host: the database, the membership and workspace queries, the purge job and consumer; no HTTP handlers.</summary>
+    public static IServiceCollection AddTenancyCore(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<TenancyOptions>().Bind(configuration.GetSection(TenancyOptions.Section));
         services.AddModuleDbContext<TenancyDbContext>(TenancyDbContext.SchemaName);
         services.AddScoped<IWorkspaceAccessResolver, WorkspaceAccessResolver>();
         services.AddScoped<IMembershipQueries, MembershipQueries>();
         services.AddScoped<IWorkspaceQueries, WorkspaceQueries>();
-        services.AddHandlersFrom(typeof(TenancyModule).Assembly);
         return services;
     }
 

@@ -20,17 +20,28 @@ namespace Pishkhan.Modules.Identity;
 
 public static class IdentityModule
 {
+    /// <summary>Api host: <see cref="AddIdentityCore"/> plus login, sessions and the <c>/me</c> handlers. Needs <c>AddPishkhanAuthentication</c>.</summary>
     public static IServiceCollection AddIdentityModule(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<IdentityOptions>().Bind(configuration.GetSection(IdentityOptions.Section));
+        services.AddIdentityCore(configuration);
         services.AddOptions<AltchaOptions>().Bind(configuration.GetSection(AltchaOptions.Section));
-        services.AddModuleDbContext<IdentityDbContext>(IdentityDbContext.SchemaName);
         services.AddScoped<SessionService>();
         services.AddScoped<OtpService>();
-        services.AddSingleton<PhoneProtection>();
         services.AddSingleton<AltchaVerifier>();
-        services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddHandlersFrom(typeof(IdentityModule).Assembly);
+        return services;
+    }
+
+    /// <summary>
+    /// Workers host, which has no signed-in caller and issues no tokens: the database and <see cref="IUserDirectory"/> only,
+    /// without the HTTP handlers (they need <c>ICurrentUser</c> and <c>TokenFactory</c>).
+    /// </summary>
+    public static IServiceCollection AddIdentityCore(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<IdentityOptions>().Bind(configuration.GetSection(IdentityOptions.Section));
+        services.AddModuleDbContext<IdentityDbContext>(IdentityDbContext.SchemaName);
+        services.AddSingleton<PhoneProtection>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
         return services;
     }
 

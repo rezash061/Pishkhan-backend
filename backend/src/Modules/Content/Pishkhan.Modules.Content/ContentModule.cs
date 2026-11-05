@@ -26,14 +26,22 @@ namespace Pishkhan.Modules.Content;
 /// </summary>
 public static class ContentModule
 {
+    /// <summary>Api and AdminApi hosts: <see cref="AddContentCore"/> plus leads and the CMS handlers (they need <c>ICurrentUser</c>).</summary>
     public static IServiceCollection AddContentModule(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddModuleDbContext<ContentDbContext>(ContentDbContext.SchemaName);
+        services.AddContentCore(configuration);
         services.AddOptions<AltchaOptions>().Bind(configuration.GetSection(AltchaOptions.Section));
         services.TryAddSingleton<AltchaVerifier>();
+        services.AddHandlersFrom(typeof(ContentModule).Assembly);
+        return services;
+    }
+
+    /// <summary>Workers host: scheduled publishing and the site revalidation webhook; no HTTP handlers.</summary>
+    public static IServiceCollection AddContentCore(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddModuleDbContext<ContentDbContext>(ContentDbContext.SchemaName);
         services.AddOptions<WebsiteOptions>().Bind(configuration.GetSection(WebsiteOptions.Section));
         services.AddHttpClient(SiteRevalidationHandler.ClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
-        services.AddHandlersFrom(typeof(ContentModule).Assembly);
         services.AddScoped<ContentPublisher>();
         services.AddScoped<ScheduledPublishJob>();
         return services;
