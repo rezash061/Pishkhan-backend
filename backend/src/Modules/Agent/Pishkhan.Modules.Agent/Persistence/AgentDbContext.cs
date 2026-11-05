@@ -165,6 +165,7 @@ public sealed class AgentDbContext(DbContextOptions<AgentDbContext> options, ITe
             Json(b.Property(x => x.GuardIssues));
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
             b.HasIndex(x => new { x.ConversationId, x.CreatedAt });
+            b.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_ai_traces_created_at");
         });
     }
 

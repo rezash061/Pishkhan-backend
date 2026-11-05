@@ -21,3 +21,12 @@ public interface IFeatureFlags
     /// <summary>Keys of the flags that are on for the workspace.</summary>
     Task<IReadOnlyList<string>> GetEnabledAsync(Guid workspaceId, CancellationToken cancellationToken);
 }
+
+/// <summary>One dependency on the back office health page. <c>status</c>: Healthy, Degraded or Unhealthy.</summary>
+public sealed record PlatformCheck(string Name, string Status, string? Detail);
+
+/// <summary>A module's own checks for the back office health page (<c>GET /admin/v1/platform/health</c>), for dependencies only it knows about.</summary>
+public interface IPlatformHealthContributor
+{
+    Task<IReadOnlyList<PlatformCheck>> CheckAsync(CancellationToken cancellationToken);
+}

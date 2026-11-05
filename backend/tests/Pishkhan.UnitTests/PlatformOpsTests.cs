@@ -58,4 +58,40 @@ public class PlatformOpsTests
         file.FalsePositiveAt.ShouldBe(T0.AddMinutes(1));
         file.FalsePositiveBy.ShouldBe(staff);
     }
+
+    [Fact]
+    public void ClamAV_signature_age_comes_from_the_version_string()
+    {
+        var now = new DateTimeOffset(2026, 11, 6, 9, 31, 2, TimeSpan.Zero);
+        PlatformOverviewEndpoints.SignatureAge("ClamAV 1.4.1/27450/Tue Nov  4 09:31:02 2026", now).ShouldBe(TimeSpan.FromDays(2));
+        PlatformOverviewEndpoints.SignatureAge("ClamAV 1.4.1", now).ShouldBeNull();
+        PlatformOverviewEndpoints.SignatureAge(null, now).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Staff_activation_clears_a_lockout_and_a_totp_reset_forces_enrollment()
+    {
+        var staff = StaffUser.Create("ops", "hash", ["Support", "Support"], T0);
+        staff.Roles.ShouldBe(["Support"]);
+        for (var i = 0; i < 5; i++)
+        {
+            staff.RecordFailure(T0);
+        }
+
+        staff.IsLocked(T0).ShouldBeTrue();
+        staff.Disable();
+        staff.Activate();
+        staff.Status.ShouldBe(StaffStatus.Active);
+        staff.IsLocked(T0).ShouldBeFalse();
+
+        staff.SetTotpSecret("enc");
+        staff.EnableTotp(10);
+        staff.ResetTotp();
+        staff.TotpEnabled.ShouldBeFalse();
+        staff.TotpSecretEnc.ShouldBeNull();
+        staff.SetTotpSecret("enc2"); // enrollment works again
+
+        staff.SetRoles(["Finance", "Support", "Finance"]);
+        staff.Roles.ShouldBe(["Finance", "Support"]);
+    }
 }

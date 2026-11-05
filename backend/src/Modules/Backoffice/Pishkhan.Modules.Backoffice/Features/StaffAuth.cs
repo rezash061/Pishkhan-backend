@@ -46,7 +46,10 @@ public sealed record StaffMeResponse(Guid Id, string Username, IReadOnlyList<str
 
 public sealed record CreateStaffRequest(string Username, string Password, IReadOnlyList<string> Roles);
 
-public sealed record StaffSummary(Guid Id, string Username, IReadOnlyList<string> Roles, string Status, bool TotpEnabled, DateTimeOffset CreatedAt);
+/// <param name="LastActiveAt">The last sign-in or token refresh; null if never signed in.</param>
+/// <param name="LockedUntil">Set while the account is locked after 5 failed attempts.</param>
+public sealed record StaffSummary(
+    Guid Id, string Username, IReadOnlyList<string> Roles, string Status, bool TotpEnabled, DateTimeOffset CreatedAt, DateTimeOffset? LastActiveAt = null, DateTimeOffset? LockedUntil = null);
 
 public sealed record StaffLogoutCommand;
 
@@ -244,8 +247,13 @@ internal sealed class StaffAuthHandlers(
         return new StaffMeResponse(staff.Id, staff.Username, staff.Roles);
     }
 
-    public async Task<Result<IReadOnlyList<StaffSummary>>> HandleAsync(ListStaffQuery query, CancellationToken cancellationToken) =>
-        (await db.StaffUsers.AsNoTracking().OrderBy(s => s.Username).ToListAsync(cancellationToken)).Select(ToSummary).ToList();
+    public async Task<Result<IReadOnlyList<StaffSummary>>> HandleAsync(ListStaffQuery query, CancellationToken cancellationToken)
+    {
+        var staff = await db.StaffUsers.AsNoTracking().OrderBy(s => s.Username).ToListAsync(cancellationToken);
+        var lastActive = await db.StaffSessions.AsNoTracking().GroupBy(s => s.StaffId).Select(g => new { g.Key, At = g.Max(s => s.CreatedAt) })
+            .ToDictionaryAsync(x => x.Key, x => x.At, cancellationToken);
+        return staff.Select(s => ToSummary(s, lastActive.TryGetValue(s.Id, out var at) ? at : null)).ToList();
+    }
 
     public async Task<Result<StaffSummary>> HandleAsync(CreateStaffRequest command, CancellationToken cancellationToken)
     {
@@ -255,7 +263,7 @@ internal sealed class StaffAuthHandlers(
         }
 
         var id = await CreateAsync(command.Username, command.Password, command.Roles, await CallerActorAsync(cancellationToken), cancellationToken);
-        return ToSummary(await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == id, cancellationToken));
+        return ToSummary(await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == id, cancellationToken), null);
     }
 
     public Task<Guid> CreateAsync(string username, string password, IReadOnlyList<string> roles, CancellationToken cancellationToken) =>
@@ -348,7 +356,8 @@ internal sealed class StaffAuthHandlers(
 
     private static string Clip(string value) => value.Length <= 100 ? value : value[..100];
 
-    private static StaffSummary ToSummary(StaffUser s) => new(s.Id, s.Username, s.Roles, s.Status.ToString().ToLowerInvariant(), s.TotpEnabled, s.CreatedAt);
+    internal static StaffSummary ToSummary(StaffUser s, DateTimeOffset? lastActiveAt) =>
+        new(s.Id, s.Username, s.Roles, s.Status.ToString().ToLowerInvariant(), s.TotpEnabled, s.CreatedAt, lastActiveAt, s.LockedUntil);
 
     private static string Hash(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

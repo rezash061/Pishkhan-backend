@@ -510,6 +510,9 @@ namespace Pishkhan.Modules.Agent.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ai_traces");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_ai_traces_created_at");
+
                     b.HasIndex("ConversationId", "CreatedAt")
                         .HasDatabaseName("ix_ai_traces_conversation_id_created_at");
 
