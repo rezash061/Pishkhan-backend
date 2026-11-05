@@ -41,8 +41,8 @@ internal sealed class FileScanHandler(FilesDbContext db, IObjectStorage storage,
             return;
         }
 
-        // Same bytes already scanned with the current signatures: reuse the verdict.
-        var previous = await db.Files.AsNoTracking()
+        // Same bytes already scanned with the current signatures: reuse the verdict (not after staff marked a false positive).
+        var previous = file.FalsePositiveAt is not null ? null : await db.Files.AsNoTracking()
             .IgnoreQueryFilters([Infrastructure.Persistence.ModuleDbContext.TenantFilter])
             .Where(f => f.Sha256 == file.Sha256 && f.Id != file.Id && (f.Status == FileStatuses.Clean || f.Status == FileStatuses.Infected))
             .OrderByDescending(f => f.ScannedAt)

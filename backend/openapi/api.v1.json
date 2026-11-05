@@ -10487,6 +10487,42 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspaceId}/features": {
+      "get": {
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Feature flags that are on for this workspace",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceFeaturesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces/{workspaceId}/knowledge/sources": {
       "get": {
         "tags": [
@@ -22039,6 +22075,20 @@
           },
           "code": {
             "type": "string"
+          }
+        }
+      },
+      "WorkspaceFeaturesResponse": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

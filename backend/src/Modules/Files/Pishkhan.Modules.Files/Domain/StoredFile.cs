@@ -47,6 +47,11 @@ public sealed class StoredFile : AggregateRoot<Guid>, ITenantOwned
 
     public FileDerivatives Derived { get; private set; } = new(null, null, null);
 
+    /// <summary>When staff marked an infected verdict as a false positive; the next scan then ignores verdicts of other files with the same bytes.</summary>
+    public DateTimeOffset? FalsePositiveAt { get; private set; }
+
+    public Guid? FalsePositiveBy { get; private set; }
+
     public static StoredFile Receive(Guid id, Guid workspaceId, string purpose, string? originalName, string? declared, string detected, long size, string sha256, string bucket, Guid? uploadedBy, DateTimeOffset now) => new()
     {
         Id = id,
@@ -97,7 +102,23 @@ public sealed class StoredFile : AggregateRoot<Guid>, ITenantOwned
         ScannedAt = now;
     }
 
-    /// <summary>Admin re-scan of a failed file.</summary>
+    /// <summary>
+    /// Staff say an infected verdict is wrong. The file is not released: it goes back to pending_scan and is scanned again without reusing
+    /// earlier verdicts, so only a clean scan with the current signatures makes it usable.
+    /// </summary>
+    public void MarkFalsePositive(Guid staffId, DateTimeOffset now)
+    {
+        if (Status != FileStatuses.Infected)
+        {
+            throw new DomainException("files.not_infected");
+        }
+
+        FalsePositiveAt = now;
+        FalsePositiveBy = staffId;
+        ResetForRescan();
+    }
+
+    /// <summary>Admin re-scan of a failed, stuck or infected file.</summary>
     public void ResetForRescan()
     {
         Status = FileStatuses.PendingScan;

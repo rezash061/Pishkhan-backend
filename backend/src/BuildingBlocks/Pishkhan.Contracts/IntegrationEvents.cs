@@ -47,6 +47,12 @@ public sealed record EventEnvelope
 
     /// <summary>Set only on messages in a DLQ topic.</summary>
     public DeadLetterInfo? DeadLetter { get; init; }
+
+    /// <summary>
+    /// Set on a message replayed from a DLQ: the full type name of the one handler that failed it. Every other consumer of the topic
+    /// ignores the message, so a replay never runs handlers that already succeeded.
+    /// </summary>
+    public string? ReplayFor { get; init; }
 }
 
 public sealed record DeadLetterInfo(string OriginalTopic, string ConsumerGroup, string Consumer, string ExceptionType, string ExceptionMessage, int Attempts, DateTimeOffset FailedAt);

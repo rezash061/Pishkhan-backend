@@ -24,7 +24,25 @@ public static class BackofficeModule
         services.AddHandlersFrom(typeof(BackofficeModule).Assembly);
         services.AddScoped<IStaffProvisioning, StaffAuthHandlers>();
         services.AddScoped<IStaffDirectory, StaffDirectory>();
+        services.AddScoped<FeatureFlagEvaluator>();
+        services.AddScoped<IFeatureFlags>(sp => sp.GetRequiredService<FeatureFlagEvaluator>());
         return services;
+    }
+
+    /// <summary>Hosts other than the AdminApi: evaluates feature flags (reads <c>backoffice.feature_flags</c>) and serves the panel's view.</summary>
+    public static IServiceCollection AddFeatureFlags(this IServiceCollection services)
+    {
+        services.AddModuleDbContext<BackofficeDbContext>(BackofficeDbContext.SchemaName);
+        services.AddScoped<FeatureFlagEvaluator>();
+        services.AddScoped<IFeatureFlags>(sp => sp.GetRequiredService<FeatureFlagEvaluator>());
+        return services;
+    }
+
+    /// <summary>Api host: <c>GET /api/v1/workspaces/{id}/features</c>.</summary>
+    public static IEndpointRouteBuilder MapFeatureFlagPanelEndpoints(this IEndpointRouteBuilder app)
+    {
+        FeatureFlagEndpoints.MapPanel(app);
+        return app;
     }
 
     public static IEndpointRouteBuilder MapBackofficeEndpoints(this IEndpointRouteBuilder app)
@@ -89,6 +107,8 @@ public static class BackofficeModule
             .WithStandardProblems()
             .WithExamples(new StartSupportSessionRequest("تیکت ۱۲۴۵: قانون پاسخ خودکار کار نمی‌کند", null));
 
+        PlatformOpsEndpoints.Map(app);
+        FeatureFlagEndpoints.MapAdmin(app);
         return app;
     }
 

@@ -100,6 +100,8 @@ public static class MessagingExtensions
         services.AddSingleton(groups);
         services.TryAddSingleton<IKafkaProducer, KafkaProducer>();
         services.TryAddSingleton<TopicBootstrapper>();
+        services.TryAddScoped<DeadLetterStore>();
+        services.TryAddSingleton<KafkaInspector>();
 
         var builder = new MessagingBuilder(services, groups, hostName);
         configure(builder);

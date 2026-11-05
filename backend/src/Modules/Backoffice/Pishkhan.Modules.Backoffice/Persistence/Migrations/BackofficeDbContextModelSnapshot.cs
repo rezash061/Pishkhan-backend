@@ -190,6 +190,87 @@ namespace Pishkhan.Modules.Backoffice.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Backoffice.Domain.FeatureFlag", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.PrimitiveCollection<List<string>>("Plans")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("plans");
+
+                    b.Property<int>("RolloutPercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("rollout_percent");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Key")
+                        .HasName("pk_feature_flags");
+
+                    b.ToTable("feature_flags", "backoffice");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Backoffice.Domain.FeatureFlagOverride", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Key", "WorkspaceId")
+                        .HasName("pk_feature_flag_overrides");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_feature_flag_overrides_workspace_id");
+
+                    b.ToTable("feature_flag_overrides", "backoffice");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Backoffice.Domain.StaffSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -339,6 +420,16 @@ namespace Pishkhan.Modules.Backoffice.Persistence.Migrations
                         .HasDatabaseName("ix_staff_users_username");
 
                     b.ToTable("staff_users", "backoffice");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Backoffice.Domain.FeatureFlagOverride", b =>
+                {
+                    b.HasOne("Pishkhan.Modules.Backoffice.Domain.FeatureFlag", null)
+                        .WithMany()
+                        .HasForeignKey("Key")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_feature_flag_overrides_feature_flags_key");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Backoffice.Domain.StaffSession", b =>

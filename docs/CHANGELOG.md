@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Added (BE-1.12 back office: platform operations for admin AD-1.6 to AD-1.8, 2026-11-05)
+
+- **File quarantine** (`/admin/v1/files`, SuperAdmin and Support):
+  - `GET /files/quarantine` lists infected, scan_failed and pending files older than 10 minutes (filters `status` = infected,
+    scan_failed, pending or rejected, `workspaceId`, `purpose`; paged). `GET /files/quarantine/summary` counts each state.
+  - `POST /files/{id}/rescan` (reason) re-queues infected, failed and stuck files.
+  - `POST /files/{id}/delete` (reason, step-up) removes the stored objects and the row; clean files are refused (409 `files.clean`).
+  - `POST /files/{id}/false-positive` (SuperAdmin, reason, step-up) re-scans an infected file without reusing earlier verdicts of the
+    same bytes. The file is never released without a clean scan. New columns `false_positive_at` and `false_positive_by`.
+  - Every action is audited in the workspace's log (`file.rescan`, `file.delete`, `file.false_positive`). No endpoint returns bytes.
+- **Dead letters** (`/admin/v1/platform/dead-letters`):
+  - A consumer that gives up on a message now also records it in the new `platform.dead_letters` table (best effort; the Kafka DLQ
+    topic stays the record of truth).
+  - List (filters `group`, `status` = open, replayed, discarded or all, `type`, `workspaceId`), per-group open counts, and the
+    detail with the envelope and payload (payload: SuperAdmin and Support only).
+  - `POST /dead-letters/replay` and `/discard` (SuperAdmin, step-up, 1 to 100 ids, reason). A replay goes back to the original topic
+    through the outbox with a new message id and `EventEnvelope.replayFor` set to the failed handler. Every other consumer of the
+    topic ignores it, so handlers that already succeeded do not run again.
+- **Kafka** `GET /admin/v1/platform/kafka`: topics with partitions and retained messages, and each worker group's state, members
+  and lag per topic and partition, read with the Kafka admin client and cached for 15 seconds. 503 `platform.kafka_unavailable`
+  when the brokers do not answer.
+- **Workers** `GET /admin/v1/platform/workers`: scheduler replicas and their last check-in, and recurring jobs with cron, state
+  and next/previous run (from the Quartz cluster tables), plus the worker groups from Kafka.
+  `POST /platform/jobs/{name}/trigger` (SuperAdmin, step-up, reason) pulls a waiting job's next run to now.
+- **Feature flags** (`backoffice.feature_flags`, `backoffice.feature_flag_overrides`):
+  - `GET/POST /admin/v1/feature-flags`, `PUT /feature-flags/{key}` and `POST /feature-flags/{key}/delete` (step-up). Changes are
+    SuperAdmin only. A flag has a switch, a rollout percentage (a stable bucket per flag and workspace, so raising it only adds
+    workspaces) and an optional list of plan codes.
+  - `GET /workspaces/{id}/feature-flags` shows each flag's effective value and why. `PUT /workspaces/{id}/feature-flags/{key}`
+    (Support or SuperAdmin) sets or clears an override.
+  - `IFeatureFlags` in `Backoffice.Contracts` for modules. The Api host serves `GET /api/v1/workspaces/{id}/features` (the keys
+    that are on) for the user panel. Evaluations are cached for 30 seconds per process.
+- Tests: unit tests for flag evaluation and the false-positive rule; integration tests for every endpoint above.
+
 ### Added (Phase 2, BE-2.11: launch hardening, 2026-11-05)
 
 - **Container images** (ADR 0014):

@@ -164,3 +164,63 @@ public sealed class StaffSession : AggregateRoot<Guid>
         }
     }
 }
+
+/// <summary>A global feature flag (AD-1.8). Evaluated by <see cref="Features.FeatureFlagEvaluator"/>.</summary>
+public sealed class FeatureFlag
+{
+    public string Key { get; private set; } = string.Empty;
+
+    public string? Description { get; private set; }
+
+    public bool Enabled { get; private set; }
+
+    /// <summary>0 to 100: the share of workspaces (stable per flag and workspace) that get the flag.</summary>
+    public int RolloutPercent { get; private set; }
+
+    /// <summary>Plan codes the flag is limited to; empty for every plan.</summary>
+    public List<string> Plans { get; private set; } = [];
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    public Guid? UpdatedBy { get; private set; }
+
+    public static FeatureFlag Create(string key, string? description, bool enabled, int rolloutPercent, List<string> plans, Guid by, DateTimeOffset now) => new()
+    {
+        Key = key,
+        Description = description,
+        Enabled = enabled,
+        RolloutPercent = rolloutPercent,
+        Plans = plans,
+        CreatedAt = now,
+        UpdatedAt = now,
+        UpdatedBy = by,
+    };
+
+    public void Change(string? description, bool enabled, int rolloutPercent, List<string> plans, Guid by, DateTimeOffset now)
+    {
+        Description = description;
+        Enabled = enabled;
+        RolloutPercent = rolloutPercent;
+        Plans = plans;
+        UpdatedAt = now;
+        UpdatedBy = by;
+    }
+}
+
+/// <summary>A workspace's override of a flag: on or off whatever the rollout says.</summary>
+public sealed class FeatureFlagOverride
+{
+    public required string Key { get; init; }
+
+    public Guid WorkspaceId { get; init; }
+
+    public bool Enabled { get; set; }
+
+    public string Reason { get; set; } = string.Empty;
+
+    public Guid UpdatedBy { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
+}

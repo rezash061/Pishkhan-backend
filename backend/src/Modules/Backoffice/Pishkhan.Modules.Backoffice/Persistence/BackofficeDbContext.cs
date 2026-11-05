@@ -16,6 +16,10 @@ public sealed class BackofficeDbContext(DbContextOptions<BackofficeDbContext> op
 
     public DbSet<StaffSession> StaffSessions => Set<StaffSession>();
 
+    public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
+
+    public DbSet<FeatureFlagOverride> FeatureFlagOverrides => Set<FeatureFlagOverride>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StaffUser>(b =>
@@ -42,6 +46,24 @@ public sealed class BackofficeDbContext(DbContextOptions<BackofficeDbContext> op
             b.Property(x => x.UserAgent).HasMaxLength(300);
             b.HasOne<StaffUser>().WithMany().HasForeignKey(x => x.StaffId).OnDelete(DeleteBehavior.Cascade);
             b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<FeatureFlag>(b =>
+        {
+            b.ToTable("feature_flags");
+            b.HasKey(x => x.Key);
+            b.Property(x => x.Key).HasMaxLength(60);
+            b.Property(x => x.Description).HasMaxLength(300);
+        });
+
+        modelBuilder.Entity<FeatureFlagOverride>(b =>
+        {
+            b.ToTable("feature_flag_overrides");
+            b.HasKey(x => new { x.Key, x.WorkspaceId });
+            b.Property(x => x.Key).HasMaxLength(60);
+            b.Property(x => x.Reason).HasMaxLength(300);
+            b.HasIndex(x => x.WorkspaceId);
+            b.HasOne<FeatureFlag>().WithMany().HasForeignKey(x => x.Key).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
