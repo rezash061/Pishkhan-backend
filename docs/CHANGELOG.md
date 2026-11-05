@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.11: launch hardening, 2026-11-05)
+
+- **Container images** (ADR 0014):
+  - One image per host, built by the SDK (`dotnet publish -t:PublishContainer`).
+  - Base is Ubuntu chiseled with ICU and tzdata (`noble-chiseled-extra`): non-root user `app`, no shell, port 8080.
+- **Helm chart** `backend/deploy/helm/pishkhan`:
+  - Deployments for Api, AdminApi and Ingress, plus one Workers Deployment per consumer group (ingest, engine, ai, outbound, media,
+    commerce, platform). Each has an HPA, a PDB, topology spread, probes and a read-only root filesystem.
+  - The Migrator runs as a pre-install/pre-upgrade hook Job.
+  - Services, Ingresses (admin API behind an IP allowlist; the hub without buffering) and network policies.
+  - The ConfigMap is built from values; secrets come from one existing Secret.
+- **Workflow `deploy-artifacts`:**
+  - `helm lint --strict` and a kubeconform check of the rendered chart against Kubernetes 1.30.
+  - Builds every image and checks that it runs as `app` and has no shell.
+  - Pushes the images to the registry from `main` when the registry secrets are set.
+- **Load tests (k6, `backend/tests/load`), at 2× the capacity plan with backend plan 3.5's targets as thresholds:**
+  - `webhook-burst.js`: 4,000 signed webhook events/s, p99 < 150 ms.
+  - `panel-api.js`: 400 agents; reads p95 < 200 ms, writes p95 < 400 ms.
+  - Manual `load` workflow to run either against staging.
+- **Runbooks and docs:**
+  - [Disaster recovery](runbooks/disaster-recovery.md): RPO/RTO targets, scenarios, rebuild and restore steps, and the drill with a
+    record table.
+  - [Penetration test scope](security/pentest-scope.md).
+  - [M2 launch checklist](launch-m2.md).
+  - A Kubernetes section in [deployment notes](deployment.md).
+- **Not done here:** running the load test, the external penetration test and the DR drill. They need the staging cluster and a vendor,
+  and are tracked in the M2 checklist.
+
 ### Added (Phase 2, BE-2.10: card-to-card receipt verification, 2026-11-04)
 
 - **Bank accounts** (backend plan 9.10): `GET/POST /workspaces/{id}/payments/bank-accounts`, `PUT/DELETE …/{accountId}`: card (16 digits,

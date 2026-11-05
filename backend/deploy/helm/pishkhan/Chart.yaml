@@ -1,0 +1,7 @@
+apiVersion: v2
+name: pishkhan
+description: Pishkhan backend (Api, AdminApi, Ingress, Workers per group, Migrator job) on Kubernetes (BE-2.11).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.30.0-0"

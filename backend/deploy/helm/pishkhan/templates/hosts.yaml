@@ -1,0 +1,6 @@
+{{- range $name, $host := .Values.hosts }}
+{{- if $host.enabled }}
+---
+{{ include "pishkhan.workload" (dict "root" $ "name" $name "image" $host.image "spec" $host "env" (dict) "http" true) }}
+{{- end }}
+{{- end }}
