@@ -222,6 +222,14 @@ namespace Pishkhan.Modules.Files.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("derived");
 
+                    b.Property<DateTimeOffset?>("FalsePositiveAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("false_positive_at");
+
+                    b.Property<Guid?>("FalsePositiveBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("false_positive_by");
+
                     b.Property<string>("OriginalName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -305,6 +313,10 @@ namespace Pishkhan.Modules.Files.Persistence.Migrations
 
                     b.HasIndex("Sha256", "Status")
                         .HasDatabaseName("ix_files_sha256_status");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_files_quarantine")
+                        .HasFilter("status <> 'clean'");
 
                     b.HasIndex("WorkspaceId", "CreatedAt")
                         .HasDatabaseName("ix_files_workspace_id_created_at");

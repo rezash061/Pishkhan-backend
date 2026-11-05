@@ -37,6 +37,7 @@ public sealed class FilesDbContext(DbContextOptions<FilesDbContext> options, ITe
                 v => JsonSerializer.Serialize(v, EnvelopeJson.Options),
                 v => JsonSerializer.Deserialize<FileDerivatives>(v, EnvelopeJson.Options) ?? new FileDerivatives(null, null, null));
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+            b.HasIndex(x => new { x.Status, x.CreatedAt }).HasDatabaseName("ix_files_quarantine").HasFilter("status <> 'clean'");
             b.HasIndex(x => new { x.Sha256, x.Status });
             b.HasIndex(x => x.Status).HasFilter("status IN ('pending_scan', 'scan_failed', 'infected')");
             b.Ignore(x => x.DomainEvents);

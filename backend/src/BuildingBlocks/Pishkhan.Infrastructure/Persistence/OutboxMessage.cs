@@ -85,3 +85,53 @@ public sealed class TimerEntry
 
     public DateTimeOffset UpdatedAt { get; set; }
 }
+
+/// <summary>
+/// A row of <c>platform.dead_letters</c>: the back office's copy of a message a consumer gave up on (also in the group's Kafka DLQ topic).
+/// <see cref="Status"/>: open, replayed or discarded.
+/// </summary>
+public sealed class DeadLetter
+{
+    public const string Open = "open";
+    public const string Replayed = "replayed";
+    public const string Discarded = "discarded";
+
+    public Guid Id { get; set; }
+
+    public Guid MessageId { get; set; }
+
+    public required string Topic { get; set; }
+
+    public required string ConsumerGroup { get; set; }
+
+    /// <summary>Full type name of the handler that failed.</summary>
+    public required string Consumer { get; set; }
+
+    public required string Key { get; set; }
+
+    public required string Type { get; set; }
+
+    public Guid? WorkspaceId { get; set; }
+
+    /// <summary>The envelope as it went to the DLQ, with its <c>deadLetter</c> block.</summary>
+    public required JsonDocument Envelope { get; set; }
+
+    public required string ExceptionType { get; set; }
+
+    public required string ExceptionMessage { get; set; }
+
+    public int Attempts { get; set; }
+
+    public DateTimeOffset FailedAt { get; set; }
+
+    public string Status { get; set; } = Open;
+
+    public DateTimeOffset? ResolvedAt { get; set; }
+
+    public Guid? ResolvedBy { get; set; }
+
+    public string? ResolutionReason { get; set; }
+
+    /// <summary>The message id the replay was published with.</summary>
+    public Guid? ReplayMessageId { get; set; }
+}

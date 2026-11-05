@@ -6,6 +6,7 @@ using Pishkhan.Infrastructure.Sms;
 using Pishkhan.Modules.Analytics;
 using Pishkhan.Modules.Audit;
 using Pishkhan.Modules.Automation;
+using Pishkhan.Modules.Backoffice;
 using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Agent;
 using Pishkhan.Modules.Knowledge;
@@ -52,6 +53,7 @@ services
     .AddAgentModule(configuration).AddAgentReplies()
     .AddKnowledgeModule(configuration).AddKnowledgeOnboarding()
     .AddTemplatesModule(configuration).AddTemplatesApply()
+    .AddFeatureFlags()
     .DecorateHandlers();
 services.AddPishkhanRealtime();
 services.AddPishkhanMessaging(configuration, "api", m => m
@@ -73,6 +75,7 @@ app.MapCatalogEndpoints();
 app.MapOrderEndpoints();
 app.MapPaymentsEndpoints();
 app.MapBillingEndpoints();
+app.MapFeatureFlagPanelEndpoints();
 app.MapKnowledgeEndpoints();
 app.MapTemplatesEndpoints();
 app.MapAgentEndpoints();

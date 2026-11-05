@@ -52,6 +52,11 @@ public sealed class EnvelopeConsumer<TEvent, THandler>(
             return;
         }
 
+        if (envelope.ReplayFor is { } replayFor && !string.Equals(replayFor, typeof(THandler).FullName, StringComparison.Ordinal))
+        {
+            return; // a DLQ replay meant for another consumer of this topic
+        }
+
         var attempt = 0;
         while (true)
         {
@@ -115,7 +120,19 @@ public sealed class EnvelopeConsumer<TEvent, THandler>(
         var dead = envelope with
         {
             DeadLetter = new DeadLetterInfo(_registration.Topic, _registration.Group, typeof(THandler).FullName!, ex.GetType().FullName!, Truncate(ex.Message, 2000), attempts, DateTimeOffset.UtcNow),
+            ReplayFor = null,
         };
+
+        // The back office's copy (inspect, replay, discard). Best effort: the Kafka DLQ below stays the record of truth.
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<DeadLetterStore>().RecordAsync(key, dead, CancellationToken.None);
+        }
+        catch (Exception storeError)
+        {
+            logger.LogError(storeError, "Could not record dead letter {MessageId} in the database", envelope.MessageId);
+        }
 
         try
         {

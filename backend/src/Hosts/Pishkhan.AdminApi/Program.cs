@@ -9,6 +9,7 @@ using Pishkhan.Modules.Automation;
 using Pishkhan.Modules.Billing;
 using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
+using Pishkhan.Modules.Files;
 using Pishkhan.Modules.Identity;
 using Pishkhan.Modules.Templates;
 using Pishkhan.Modules.Tenancy;
@@ -34,6 +35,7 @@ services
     .AddChannelsDirectory().AddChannelsOutage(configuration)
     .AddBillingModule(configuration).AddBillingBackoffice()
     .AddAgentModule(configuration).AddAgentBackoffice()
+    .AddFilesModule(configuration).AddFilesBackoffice()
     .AddTemplatesModule(configuration).AddTemplatesBackoffice().AddAutomationTemplateValidator()
     .DecorateHandlers();
 services.AddPishkhanMessaging(configuration, "admin-api", m => m.AddCacheInvalidation());
@@ -51,6 +53,7 @@ app.MapBillingAdminEndpoints();
 app.MapAgentAdminEndpoints();
 app.MapTemplatesAdminEndpoints();
 app.MapChannelsAdminEndpoints();
+app.MapFilesAdminEndpoints();
 await app.RunAsync();
 
 /// <summary>Entry point marker for WebApplicationFactory in integration tests.</summary>
