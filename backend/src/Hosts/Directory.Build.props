@@ -5,6 +5,23 @@
     <IsPublishable>true</IsPublishable>
     <UserSecretsId>pishkhan-dev</UserSecretsId>
   </PropertyGroup>
+  <!--
+    Container images (BE-2.11): `dotnet publish -c Release -t:PublishContainer` builds one image per host with the SDK, no Dockerfile.
+    Chiseled Ubuntu images run as a non-root user and have no shell or package manager; the "extra" flavour adds ICU and tzdata, which
+    Persian formatting and the Asia/Tehran time zone need. Ports: 8080 (HTTP). Set ContainerRegistry and ContainerImageTags in CI.
+  -->
+  <PropertyGroup>
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+    <ContainerFamily>noble-chiseled-extra</ContainerFamily>
+    <ContainerRepository>pishkhan/$(MSBuildProjectName.Replace('Pishkhan.', '').ToLowerInvariant())</ContainerRepository>
+    <ContainerUser>app</ContainerUser>
+    <ContainerImageTags Condition="'$(ContainerImageTags)' == ''">dev</ContainerImageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ContainerLabel Include="org.opencontainers.image.source" Value="https://github.com/rezash061/Pishkhan-backend" />
+    <ContainerEnvironmentVariable Include="DOTNET_gcServer" Value="1" />
+    <ContainerEnvironmentVariable Include="TZ" Value="UTC" />
+  </ItemGroup>
   <ItemGroup>
     <!-- Settings shared by every host (config/), loaded before the host's own appsettings by AddPishkhanPlatform. -->
     <None Include="$(MSBuildThisFileDirectory)../../config/appsettings*.json" Link="shared/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

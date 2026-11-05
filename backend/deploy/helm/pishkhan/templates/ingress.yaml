@@ -1,0 +1,45 @@
+{{- if .Values.ingress.enabled }}
+{{- range $name, $host := .Values.ingress.hosts }}
+{{- if (index $.Values.hosts $name).enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "pishkhan.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  annotations:
+    {{- toYaml $.Values.ingress.annotations | nindent 4 }}
+    {{- if eq $name "adminapi" }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ $.Values.ingress.adminAllowlist | quote }}
+    {{- end }}
+    {{- if eq $name "api" }}
+    # The inbox hub: WebSockets and server-sent events need no buffering and a timeout above the 15 s keep-alive.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    {{- end }}
+    {{- if eq $name "ingress" }}
+    # Meta retries webhooks for hours; never let a slow pod hold a request long (the host answers in milliseconds).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: 2m
+    {{- end }}
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  {{- if $.Values.ingress.tls }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ $.Values.ingress.tlsSecretPrefix }}-{{ $name }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-{{ $name }}
+                port: { name: http }
+{{- end }}
+{{- end }}
+{{- end }}

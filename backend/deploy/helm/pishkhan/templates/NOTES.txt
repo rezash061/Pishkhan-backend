@@ -1,0 +1,8 @@
+Pishkhan {{ .Chart.AppVersion }} is deploying as release {{ .Release.Name }}.
+
+The migrator job ran before the pods (kubectl get jobs -l app.kubernetes.io/component=migrator). Check the hosts:
+
+  kubectl get deploy,hpa -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl port-forward svc/{{ .Release.Name }}-api 8080:80 && curl -s localhost:8080/health/ready
+
+Runbooks: docs/runbooks/README.md. Disaster recovery: docs/runbooks/disaster-recovery.md.

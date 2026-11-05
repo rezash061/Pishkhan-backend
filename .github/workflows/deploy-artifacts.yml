@@ -1,0 +1,67 @@
+name: deploy-artifacts
+
+# Container images and the Helm chart (BE-2.11). On pull requests: build every host's image (not pushed) and render the chart with
+# kubeconform's schema check. On main: also push the images when the registry secrets are set.
+on:
+  pull_request:
+    paths: ["backend/src/**", "backend/deploy/**", "backend/Directory.*", ".github/workflows/deploy-artifacts.yml"]
+  push:
+    branches: [main]
+    paths: ["backend/src/**", "backend/deploy/**", "backend/Directory.*", ".github/workflows/deploy-artifacts.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Lint
+        run: helm lint backend/deploy/helm/pishkhan --strict
+      - name: Render and validate against Kubernetes 1.30 schemas
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          helm template pishkhan backend/deploy/helm/pishkhan --kube-version 1.30.0 > rendered.yaml
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 rendered.yaml
+
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [Api, AdminApi, Ingress, Workers, Migrator]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+      - name: Build the image
+        run: |
+          dotnet publish src/Hosts/Pishkhan.${{ matrix.host }} -c Release -t:PublishContainer \
+            -p:ContainerImageTags='"${{ github.sha }}"' -p:OpenApiGenerateDocuments=false
+          docker image ls | grep pishkhan/
+      - name: Runs as a non-root user without a shell
+        run: |
+          image="pishkhan/$(echo '${{ matrix.host }}' | tr '[:upper:]' '[:lower:]'):${{ github.sha }}"
+          test "$(docker image inspect "$image" --format '{{.Config.User}}')" = "app"
+          ! docker run --rm --entrypoint /bin/sh "$image" -c true 2>/dev/null
+      - name: Push
+        if: github.ref == 'refs/heads/main' && env.REGISTRY != ''
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          dotnet publish src/Hosts/Pishkhan.${{ matrix.host }} -c Release -t:PublishContainer \
+            -p:ContainerRegistry="$REGISTRY" -p:ContainerImageTags='"${{ github.sha }};main"' -p:OpenApiGenerateDocuments=false

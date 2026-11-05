@@ -60,3 +60,28 @@ fine for development. To test WebSockets locally, run the same Nginx block (or a
 ### Admin panel and website
 
 The admin panel uses no hub. The website has no realtime connection. Both call their backends only through their own BFF routes.
+
+## Kubernetes (BE-2.11)
+
+From the public launch the hosts run on Kubernetes with the Helm chart in `backend/deploy/helm/pishkhan`. PostgreSQL (with PgBouncer),
+Kafka, both Redis instances, MinIO, ClamAV and the OpenTelemetry collector are outside the chart; `values.yaml` points at them.
+
+- **Images.** One per host, built by the SDK (`dotnet publish -c Release -t:PublishContainer`, see `src/Hosts/Directory.Build.props`) on
+  Ubuntu chiseled with ICU and tzdata (`noble-chiseled-extra`): non-root (`app`, uid 1654), no shell, port 8080. The `deploy-artifacts`
+  workflow builds them on every pull request and pushes them to Harbor from `main` (secrets `REGISTRY`, `REGISTRY_USER`,
+  `REGISTRY_PASSWORD`). See ADR 0014.
+- **Releases.** `helm upgrade --install pishkhan backend/deploy/helm/pishkhan -f values-production.yaml --set image.tag=<sha>`. The
+  Migrator runs first as a `pre-install,pre-upgrade` hook and the release stops if it fails. Migrations stay backward compatible with the
+  running release (expand now, contract in a later release), so the rolling update never runs old code on a schema it does not know.
+- **Workloads.** `api`, `adminapi` and `ingress` Deployments with Services and Ingresses (the admin API behind an IP allowlist), and one
+  `workers-<group>` Deployment per consumer group (`Workers__Groups__0`). Each has an HPA on CPU (fast up, slow down), a PDB of one,
+  spread over nodes and zones, probes on `/health/live` and `/health/ready`, a read-only root filesystem and a 45-second grace period so
+  Kafka consumers commit before they stop.
+- **Secrets.** The chart references one existing Secret (`existingSecret`), created from Vault. Nothing secret is in values files.
+- **The inbox hub.** The panel's origin still forwards `/hubs/` to the Api Service (section above); with more than one Api replica keep
+  the client on WebSockets only, or turn on sticky sessions in the ingress controller.
+- **Network policies.** HTTP hosts accept traffic only from the ingress controller's namespace and the release's own namespace; worker
+  pods accept nothing from outside the namespace.
+
+Disaster recovery for the cluster and the data: [runbooks/disaster-recovery.md](runbooks/disaster-recovery.md). Launch gates:
+[launch-m2.md](launch-m2.md).

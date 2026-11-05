@@ -1,0 +1,49 @@
+{{- if .Values.migrator.enabled }}
+# Runs `migrate` (extensions, every module's EF migrations, Quartz tables, partitions, Kafka topics) before the new pods start. Migrations
+# are backward compatible with the previous release (expand, then contract in a later release), so old pods keep working meanwhile.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrator-{{ .Release.Revision }}
+  labels:
+    {{- include "pishkhan.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrator
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migrator.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrator.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "pishkhan.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrator
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "pishkhan.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrator
+          image: {{ include "pishkhan.image" (list . .Values.migrator.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["migrate"]
+          envFrom:
+            {{- include "pishkhan.envFrom" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrator.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            {{- include "pishkhan.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "pishkhan.volumes" . | nindent 8 }}
+{{- end }}

@@ -1,0 +1,51 @@
+{{- if .Values.networkPolicy.enabled }}
+# HTTP hosts accept traffic only from the ingress controller (and Prometheus scraping from the same namespace); workers and the
+# migrator accept none. Egress stays open: PostgreSQL, Kafka, Redis, MinIO, ClamAV, Meta, Zarinpal, SMS and AI providers.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-http-hosts
+  labels:
+    {{- include "pishkhan.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name | quote }}]
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, adminapi, ingress]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressControllerNamespace }}
+        - podSelector: {}
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-workers
+  labels:
+    {{- include "pishkhan.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name | quote }}]
+      - key: app.kubernetes.io/component
+        operator: NotIn
+        values: [api, adminapi, ingress]
+  policyTypes: [Ingress]
+  ingress:
+    # Health probes come from the kubelet, which network policies do not restrict; same-namespace scraping only.
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 8080
+{{- end }}

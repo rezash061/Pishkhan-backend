@@ -1,0 +1,131 @@
+# Pishkhan backend on Kubernetes (backend plan 13, BE-2.11). Infrastructure (PostgreSQL with PgBouncer, Kafka, both Redis instances,
+# MinIO, ClamAV, the OpenTelemetry collector) runs outside this chart; point at it with `config` and `secrets` below.
+
+image:
+  # Images are built by `dotnet publish -t:PublishContainer` (one per host) and pushed to the domestic registry (Harbor).
+  registry: harbor.example.ir
+  repositoryPrefix: pishkhan
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Non-secret settings, as environment variables (`__` separates sections: Kafka__BootstrapServers).
+config:
+  ASPNETCORE_ENVIRONMENT: Production
+  Kafka__BootstrapServers: kafka-0.kafka:9092,kafka-1.kafka:9092,kafka-2.kafka:9092
+  Kafka__ReplicationFactor: "3"
+  Redis__KeyPrefix: prod:v1
+  ClamAv__Host: clamav
+  ClamAv__Port: "3310"
+  Storage__Provider: s3
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+
+# The Secret holding connection strings and keys (ConnectionStrings__Postgres, ConnectionStrings__RedisCache, ConnectionStrings__RedisState,
+# Secrets__Keys__*, Storage__UrlSigningKey, Instagram__AppSecret, Payments__Zarinpal…). Created outside the chart (Vault, sealed secrets);
+# the chart only references it. Never put secret values in values files.
+existingSecret: pishkhan-secrets
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1654          # the `app` user of the .NET chiseled images
+  runAsGroup: 1654
+  fsGroup: 1654
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# HTTP hosts. `replicas` is the floor; the HPA scales between it and `maxReplicas` on CPU.
+hosts:
+  api:
+    enabled: true
+    image: api
+    replicas: 3
+    maxReplicas: 12
+    targetCPU: 65
+    resources:
+      requests: { cpu: 500m, memory: 512Mi }
+      limits: { memory: 1Gi }
+  adminapi:
+    enabled: true
+    image: adminapi
+    replicas: 2
+    maxReplicas: 4
+    targetCPU: 70
+    resources:
+      requests: { cpu: 200m, memory: 384Mi }
+      limits: { memory: 768Mi }
+  # Meta webhooks: no database work, verify + dedupe + produce. The capacity plan's 2,000 events/s peak (×2 in the load test) needs
+  # about 4 pods at ≥ 1,000 events/s each; keep headroom for a pod being replaced.
+  ingress:
+    enabled: true
+    image: ingress
+    replicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+    resources:
+      requests: { cpu: 500m, memory: 256Mi }
+      limits: { memory: 512Mi }
+
+# One Deployment of the Workers image per consumer group (Workers__Groups). `platform` also runs the outbox relay, the timer dispatcher
+# and the Quartz jobs (clustered, so more than one replica is safe).
+workers:
+  image: workers
+  groups:
+    ingest:   { replicas: 3, maxReplicas: 8,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 384Mi }, limits: { memory: 768Mi } } }
+    engine:   { replicas: 3, maxReplicas: 8,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 384Mi }, limits: { memory: 768Mi } } }
+    ai:       { replicas: 2, maxReplicas: 8,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 512Mi }, limits: { memory: 1Gi } } }
+    outbound: { replicas: 3, maxReplicas: 8,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 384Mi }, limits: { memory: 768Mi } } }
+    media:    { replicas: 2, maxReplicas: 6,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 768Mi }, limits: { memory: 1536Mi } } }
+    commerce: { replicas: 2, maxReplicas: 4,  targetCPU: 70, resources: { requests: { cpu: 200m, memory: 384Mi }, limits: { memory: 768Mi } } }
+    platform: { replicas: 2, maxReplicas: 4,  targetCPU: 70, resources: { requests: { cpu: 300m, memory: 512Mi }, limits: { memory: 1Gi } } }
+
+# The Migrator runs as a Helm hook before every install and upgrade; the release stops if it fails.
+migrator:
+  enabled: true
+  image: migrator
+  backoffLimit: 1
+  activeDeadlineSeconds: 900
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+probes:
+  startup: { path: /health/live, periodSeconds: 5, failureThreshold: 30 }
+  liveness: { path: /health/live, periodSeconds: 10, failureThreshold: 3 }
+  readiness: { path: /health/ready, periodSeconds: 10, failureThreshold: 3 }
+
+# Pods may lose at most one replica at a time to voluntary disruptions (node drains).
+podDisruptionBudget:
+  maxUnavailable: 1
+
+# Kubernetes Ingress resources. The panel's own origin forwards /hubs to the Api (docs/deployment.md); give the hub WebSockets and long
+# timeouts. Meta webhooks reach the Ingress host on its own hostname.
+ingress:
+  enabled: true
+  className: nginx
+  tls: true
+  tlsSecretPrefix: pishkhan-tls
+  hosts:
+    api: api.example.ir
+    adminapi: admin-api.example.ir
+    ingress: hooks.example.ir
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 25m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+  # The admin API answers only from the office/VPN ranges.
+  adminAllowlist: "10.0.0.0/8"
+
+networkPolicy:
+  enabled: true
+  # Namespaces whose pods may call the HTTP hosts (the ingress controller).
+  ingressControllerNamespace: ingress-nginx

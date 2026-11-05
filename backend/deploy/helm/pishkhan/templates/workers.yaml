@@ -1,0 +1,4 @@
+{{- range $group, $spec := .Values.workers.groups }}
+---
+{{ include "pishkhan.workload" (dict "root" $ "name" (printf "workers-%s" $group) "image" $.Values.workers.image "spec" $spec "env" (dict "Workers__Groups__0" $group) "http" false) }}
+{{- end }}
