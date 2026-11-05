@@ -366,6 +366,9 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasDatabaseName("ix_checkouts_invoice_number")
                         .HasFilter("invoice_number IS NOT NULL");
 
+                    b.HasIndex("Status", "PaidAt")
+                        .HasDatabaseName("ix_checkouts_status_paid_at");
+
                     b.HasIndex("WorkspaceId", "CreatedAt")
                         .HasDatabaseName("ix_checkouts_workspace_id_created_at");
 
@@ -553,6 +556,59 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasFilter("status = 'Published'");
 
                     b.ToTable("plans", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Refund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("CheckoutId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("EndedSubscription")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ended_subscription");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reference_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refunds");
+
+                    b.HasIndex("CheckoutId")
+                        .HasDatabaseName("ix_refunds_checkout_id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_refunds_created_at");
+
+                    b.ToTable("refunds", "billing");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Subscription", b =>

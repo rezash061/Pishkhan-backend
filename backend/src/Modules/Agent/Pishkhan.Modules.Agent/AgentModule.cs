@@ -74,6 +74,7 @@ public static class AgentModule
     public static IServiceCollection AddAgentBackoffice(this IServiceCollection services)
     {
         services.AddScoped<AiAudit>();
+        services.AddScoped<Pishkhan.Modules.Backoffice.Contracts.IPlatformHealthContributor, AiHealthContributor>();
         return services;
     }
 
@@ -81,6 +82,7 @@ public static class AgentModule
     public static IEndpointRouteBuilder MapAgentAdminEndpoints(this IEndpointRouteBuilder app)
     {
         AiAdminEndpoints.Map(app);
+        AiTraceAdminEndpoints.Map(app);
         return app;
     }
 }

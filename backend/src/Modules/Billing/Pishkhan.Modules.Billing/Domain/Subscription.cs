@@ -35,6 +35,9 @@ public sealed class Subscription : AggregateRoot<Guid>, ITenantOwned
 {
     public const string EndReplaced = "replaced";
     public const string EndCancelled = "cancelled";
+
+    /// <summary>Ended by staff together with a refund of the checkout that bought it.</summary>
+    public const string EndRefunded = "refunded";
     public const string EndExpired = "expired";
 
     private Subscription()

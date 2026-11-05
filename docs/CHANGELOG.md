@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Added (BE-1.11 back office billing: subscriptions, payments, invoices and refunds for admin AD-1.4, 2026-11-05)
+
+- `/admin/v1/billing` (SuperAdmin, Finance, Support, ReadOnly read):
+  - `GET /subscriptions`: across workspaces, `state` current (default), trialing, scheduled, ended or all; `planCode`, `workspaceId`, paging.
+    Rows carry the workspace name.
+  - `GET /payments`: Zarinpal checkouts with their invoice numbers, `status` paid (default), pending, failed, expired or all; `kind`,
+    `workspaceId`, `from`, `to`. Each row has `refunded`, the sum of its refunds. `GET /payments/{id}` adds the refunds and the subscription.
+  - `GET /summary?days=30`: paid, refunded and net totals, failed and pending counts.
+- `POST /admin/v1/billing/payments/{id}/refunds` (Finance, step-up, reason): records money paid back in Zarinpal's panel, up to what is left
+  of the payment (`amount: billing.refund.too_much`; 409 `billing.refund.not_paid`). `endSubscription` ends the subscription the payment
+  bought (end reason `refunded`). Audited as `billing.refund`. New table `billing.refunds` (migration `BillingRefunds`).
+
+### Added (BE-1.12 back office: staff management, AI traces, dashboard and health for admin AD-0.2, AD-0.4, AD-1.10, 2026-11-05)
+
+- **Staff management** (SuperAdmin, step-up, reason of 5 to 300 characters, audited):
+  - `POST /admin/v1/staff/{id}/deactivate` and `/activate` (activate also clears a lockout). Deactivating ends the staff member's sessions.
+    409 `backoffice.staff.self` for your own account, `backoffice.staff.last_super_admin` for the last active SuperAdmin.
+  - `POST /staff/{id}/totp-reset`: clears TOTP so the next sign-in enrolls again; ends their sessions.
+  - `PUT /staff/{id}/roles` `{roles, reason}`: ends their sessions so the new roles apply at the next sign-in.
+  - `GET /admin/v1/me/sessions` and `DELETE /me/sessions/{id}` for the caller's own sessions.
+  - `GET /staff` rows gain `lastActiveAt` and `lockedUntil`.
+- **AI traces across workspaces** (`/admin/v1/ai/traces`, SuperAdmin, AIOps, Support, ReadOnly): list with filters (workspace, outcome,
+  intent, handoff reason, `maxConfidence`, `guardIssues`, date range), `/stats` and `/{id}`, all without customer content.
+  `POST /{id}/reveal` (SuperAdmin, AIOps, Support, reason) returns the message, reply, tool arguments and results and guard details, and
+  writes `ai.trace.reveal` to the workspace's audit log. New index `ix_ai_traces_created_at` (migration `AiTraceAdmin`).
+- **Platform health** `GET /admin/v1/platform/health` (every staff role): PostgreSQL, both Redis instances, Kafka (missing topics, lag over
+  1000), object storage, ClamAV (signatures older than 2 days are Degraded), Workers replicas (Quartz check-ins), Instagram outage status
+  and an `ai` check from the Agent module (failed replies in the last hour, providers whose last test failed). Same shape as
+  `/health/ready` with a `detail` per check. Modules add checks through `IPlatformHealthContributor`.
+- **Home dashboard** `GET /admin/v1/dashboard` (every staff role): active workspaces, sign-ups today and in 7 days (Tehran days), paying
+  workspaces, MRR in Rial, AI replies and handoff rate today, quarantined files, open dead letters, max consumer lag, channels needing
+  re-auth and Instagram status, plus alerts (instagram_down, kafka_unavailable, consumer_lag, dead_letters, workers_down, quarantine,
+  channels_reauth, ai_failures). Each number is read on its own and is null when its source fails.
+
 ### Added (BE-1.12 back office: platform operations for admin AD-1.6 to AD-1.8, 2026-11-05)
 
 - **File quarantine** (`/admin/v1/files`, SuperAdmin and Support):

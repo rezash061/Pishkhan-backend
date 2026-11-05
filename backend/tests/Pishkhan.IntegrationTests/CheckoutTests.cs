@@ -264,6 +264,71 @@ public sealed class CheckoutTests(InfraFixture infra, ChannelsHost workers) : IA
     }
 
     [Fact]
+    public async Task Staff_see_payments_and_subscriptions_across_workspaces_and_Finance_records_refunds()
+    {
+        var marker = Guid.NewGuid().ToString("N")[..6];
+        var plan = await PlanAsync("refund-" + marker, 3_000_000, null);
+        var s = await SellerAsync();
+        var paid = await PayAsync(s, plan);
+        var checkoutId = paid.GetProperty("id").GetGuid();
+
+        // Every staff reader sees the payment with its workspace; the default list is paid payments.
+        var reader = _admin.StaffClient(StaffRoles.ReadOnly);
+        var payments = await reader.GetFromJsonAsync<JsonElement>($"/admin/v1/billing/payments?workspaceId={s.WorkspaceId}", Ct);
+        var row = payments.GetProperty("items").EnumerateArray().Single();
+        row.GetProperty("id").GetGuid().ShouldBe(checkoutId);
+        row.GetProperty("status").GetString().ShouldBe("paid");
+        row.GetProperty("amount").GetInt64().ShouldBe(3_000_000);
+        row.GetProperty("refunded").GetInt64().ShouldBe(0);
+        row.GetProperty("workspaceName").GetString().ShouldNotBeNullOrEmpty();
+        (await reader.GetAsync("/admin/v1/billing/payments?status=weird", Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var subscriptions = await reader.GetFromJsonAsync<JsonElement>($"/admin/v1/billing/subscriptions?workspaceId={s.WorkspaceId}", Ct);
+        var sub = subscriptions.GetProperty("items").EnumerateArray().Single();
+        sub.GetProperty("subscription").GetProperty("planId").GetGuid().ShouldBe(plan);
+        sub.GetProperty("subscription").GetProperty("checkoutId").GetGuid().ShouldBe(checkoutId);
+
+        // Refunds need Finance and step-up, a reason, and at most what is left.
+        var url = $"/admin/v1/billing/payments/{checkoutId}/refunds";
+        (await reader.PostAsJsonAsync(url, new { amount = 1_000_000, reason = "مشتری انصراف داد" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await _admin.StaffClient(StaffRoles.Finance).PostAsJsonAsync(url, new { amount = 1_000_000, reason = "مشتری انصراف داد" }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var finance = _admin.StaffClient(StaffRoles.Finance, stepUp: true);
+        await SendAsync(finance, url, new { amount = 1_000_000, reason = "" }, HttpStatusCode.BadRequest);
+        var tooMuch = await SendAsync(finance, url, new { amount = 3_000_001, reason = "مشتری انصراف داد" }, HttpStatusCode.BadRequest);
+        tooMuch.GetProperty("errors").GetProperty("amount")[0].GetString().ShouldBe("billing.refund.too_much");
+
+        var partial = await SendAsync(finance, url, new { amount = 1_000_000, reason = "بخشی برگشت داده شد", referenceId = "R-77" }, HttpStatusCode.OK);
+        partial.GetProperty("payment").GetProperty("refunded").GetInt64().ShouldBe(1_000_000);
+        partial.GetProperty("refunds")[0].GetProperty("referenceId").GetString().ShouldBe("R-77");
+        partial.GetProperty("subscription").GetProperty("state").GetString().ShouldNotBe("ended");
+        (await CurrentAsync(s)).GetProperty("planId").GetGuid().ShouldBe(plan);
+
+        // The rest, ending the subscription: the workspace is back on the free plan.
+        await SendAsync(finance, url, new { amount = 2_000_001, reason = "باقی مبلغ" }, HttpStatusCode.BadRequest);
+        var full = await SendAsync(finance, url, new { amount = 2_000_000, reason = "باقی مبلغ", endSubscription = true }, HttpStatusCode.OK);
+        full.GetProperty("refunds").GetArrayLength().ShouldBe(2);
+        full.GetProperty("refunds")[1].GetProperty("endedSubscription").GetBoolean().ShouldBeTrue();
+        full.GetProperty("subscription").GetProperty("endReason").GetString().ShouldBe("refunded");
+        (await CurrentAsync(s)).GetProperty("source").GetString().ShouldNotBe("subscription");
+        await SendAsync(finance, url, new { amount = 1, reason = "دوباره" }, HttpStatusCode.BadRequest);
+
+        var detail = await reader.GetFromJsonAsync<JsonElement>($"/admin/v1/billing/payments/{checkoutId}", Ct);
+        detail.GetProperty("payment").GetProperty("refunded").GetInt64().ShouldBe(3_000_000);
+        (await reader.GetAsync($"/admin/v1/billing/payments/{Guid.NewGuid()}", Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        // An unpaid checkout cannot be refunded.
+        var (pendingId, _) = await StartAsync(s, plan);
+        Code(await SendAsync(finance, $"/admin/v1/billing/payments/{pendingId}/refunds", new { amount = 1, reason = "پرداخت نشده" }, HttpStatusCode.Conflict))
+            .ShouldBe("billing.refund.not_paid");
+
+        var summary = await reader.GetFromJsonAsync<JsonElement>("/admin/v1/billing/summary?days=1", Ct);
+        summary.GetProperty("paidCount").GetInt32().ShouldBeGreaterThanOrEqualTo(1);
+        summary.GetProperty("refundedAmount").GetInt64().ShouldBeGreaterThanOrEqualTo(3_000_000);
+        summary.GetProperty("netAmount").GetInt64().ShouldBe(summary.GetProperty("paidAmount").GetInt64() - summary.GetProperty("refundedAmount").GetInt64());
+    }
+
+    [Fact]
     public async Task Zarinpal_down_leaves_nothing_paid_and_without_a_merchant_checkout_is_unavailable()
     {
         var marker = Guid.NewGuid().ToString("N")[..6];

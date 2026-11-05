@@ -91,6 +91,23 @@ public sealed class StaffUser : AggregateRoot<Guid>
     public void SetPasswordHash(string hash) => PasswordHash = hash;
 
     public void Disable() => Status = StaffStatus.Disabled;
+
+    public void Activate()
+    {
+        Status = StaffStatus.Active;
+        FailedLogins = 0;
+        LockedUntil = null;
+    }
+
+    /// <summary>Clears TOTP so the next sign-in enrolls a new authenticator.</summary>
+    public void ResetTotp()
+    {
+        TotpEnabled = false;
+        TotpSecretEnc = null;
+        LastTotpStep = null;
+    }
+
+    public void SetRoles(IEnumerable<string> roles) => Roles = [.. roles.Distinct(StringComparer.Ordinal)];
 }
 
 /// <summary>Staff refresh token (rotated like user sessions) with a 15-minute idle timeout and an 8-hour absolute limit.</summary>

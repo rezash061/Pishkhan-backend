@@ -26,6 +26,7 @@ public static class BackofficeModule
         services.AddScoped<IStaffDirectory, StaffDirectory>();
         services.AddScoped<FeatureFlagEvaluator>();
         services.AddScoped<IFeatureFlags>(sp => sp.GetRequiredService<FeatureFlagEvaluator>());
+        services.AddScoped<StaffOps>();
         return services;
     }
 
@@ -107,6 +108,8 @@ public static class BackofficeModule
             .WithStandardProblems()
             .WithExamples(new StartSupportSessionRequest("تیکت ۱۲۴۵: قانون پاسخ خودکار کار نمی‌کند", null));
 
+        StaffManagementEndpoints.Map(app);
+        PlatformOverviewEndpoints.Map(app);
         PlatformOpsEndpoints.Map(app);
         FeatureFlagEndpoints.MapAdmin(app);
         return app;
