@@ -194,7 +194,13 @@ public interface IConversationQueries
 
     /// <summary>A contact of the current workspace, or null.</summary>
     Task<ContactSnapshot?> GetContactAsync(Guid contactId, CancellationToken cancellationToken);
+
+    /// <summary>The first image a customer sent in an inbound message (for a card-to-card receipt), or null.</summary>
+    Task<MessageImage?> GetInboundImageAsync(Guid messageId, CancellationToken cancellationToken);
 }
+
+/// <summary><see cref="Url"/> is the channel's (Instagram CDN) link to the image, valid for a limited time.</summary>
+public sealed record MessageImage(Guid MessageId, Guid ConversationId, Guid ContactId, string ChannelKind, string Url, DateTimeOffset SentAt);
 
 public sealed record ContactSnapshot(Guid Id, string? DisplayName, string? Username);
 

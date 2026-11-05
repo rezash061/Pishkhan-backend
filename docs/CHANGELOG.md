@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added (Phase 2, BE-2.10: card-to-card receipt verification, 2026-11-04)
+
+- **Bank accounts** (backend plan 9.10): `GET/POST /workspaces/{id}/payments/bank-accounts`, `PUT/DELETE …/{accountId}`: card (16 digits,
+  Luhn) and/or Sheba (mod 97), bank detected from BIN or Sheba, up to 10, audited.
+- **Receipts** (plan 10.5, gap G1, ADR 0013): an image a customer sends while their order awaits payment (in a workspace with a bank
+  account) becomes a receipt automatically; members can submit one with `POST /workspaces/{id}/receipts` (`fileId` of an upload with purpose
+  `receipt`, or a customer's `messageId`). Every image is AV-scanned first, then read by the vision route `extract_receipt` (prompt
+  `receipt.extract@1`), then checked: order, amount (tolerance), destination card/Sheba against the seller's accounts (masked digits
+  matched), time window, reference format, duplicates (same reference number, or an image hash within 6 bits).
+- Decisions: an exact duplicate is rejected at once (the seller can still approve it); an amount mismatch or any other failed or unknown
+  check goes to `needs_review`; auto-approve only when `Payments:ReceiptAutoApprove` is on for the platform (off until extraction reaches
+  95% precision on the labeled receipt set), the seller enabled it, confidence ≥ their threshold and every check passes.
+- Queue: `GET /receipts?status=&orderId=&cursor=`, `GET /receipts/{id}` (signed image URL), `POST /receipts/{id}/approve {orderId?}`,
+  `POST /receipts/{id}/reject {reason}`; settings `GET/PUT /payments/receipt-settings` (autoApprove, threshold 0.8–1, amountTolerance,
+  windowHours). Approval publishes `PaymentConfirmed` (provider `card_to_card`), so the order moves to `paid`. Decisions are audited;
+  new receipts notify (kind `receipt`, link `/orders/receipts?receipt={id}`). Each extraction counts on `receipt_verifications`.
+- Topic `payments.receipt-submitted.v1` (already in the catalog) now used; tables `payments.bank_accounts`, `payments.receipts`, `payments.receipt_settings` (migration `Receipts`).
+- `IConversationQueries.GetInboundImageAsync`, `IOrderQueries.FindAwaitingPaymentAsync`; `OrderForPayment` gains `CreatedAt`, `ContactId`, `ConversationId`.
+- Deferred: bank receipt templates in Backoffice, tamper/EXIF heuristics, the labeled receipt eval set, Bale images.
+
 ### Added (Phase 2, BE-2.8: overage billing, cap, alerts and dunning, 2026-11-04)
 
 - **Overage** (gap G31): once a paid plan's AI conversations are used, each new conversation is answered and charged at the plan's

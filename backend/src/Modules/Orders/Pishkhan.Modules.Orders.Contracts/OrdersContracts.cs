@@ -107,7 +107,9 @@ public interface IOrderCommands
 }
 
 /// <summary>An order as the payment page shows it. Amounts are Rial.</summary>
-public sealed record OrderForPayment(Guid Id, Guid WorkspaceId, long Number, string Status, Money Total, IReadOnlyList<OrderForPaymentLine> Lines);
+public sealed record OrderForPayment(
+    Guid Id, Guid WorkspaceId, long Number, string Status, Money Total, IReadOnlyList<OrderForPaymentLine> Lines, DateTimeOffset CreatedAt = default,
+    Guid? ContactId = null, Guid? ConversationId = null);
 
 public sealed record OrderForPaymentLine(string Title, string? VariantLabel, int Quantity, Money LineTotal);
 
@@ -115,6 +117,9 @@ public sealed record OrderForPaymentLine(string Title, string? VariantLabel, int
 public interface IOrderQueries
 {
     Task<OrderForPayment?> GetForPaymentAsync(Guid orderId, CancellationToken cancellationToken);
+
+    /// <summary>The contact's latest order awaiting payment (a card-to-card receipt is matched to it), or null.</summary>
+    Task<OrderForPayment?> FindAwaitingPaymentAsync(Guid contactId, CancellationToken cancellationToken);
 }
 
 /// <summary>Why an order cannot be paid now: <c>orders.not_found</c>, <c>orders.not_payable</c> (status) or <c>orders.incomplete</c> (no items or zero total).</summary>

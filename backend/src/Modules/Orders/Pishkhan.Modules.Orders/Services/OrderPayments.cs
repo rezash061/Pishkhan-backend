@@ -14,9 +14,13 @@ internal sealed class OrderQueries(OrdersDbContext db) : IOrderQueries
     public async Task<OrderForPayment?> GetForPaymentAsync(Guid orderId, CancellationToken cancellationToken) =>
         await db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken) is { } order ? ForPayment(order) : null;
 
+    public async Task<OrderForPayment?> FindAwaitingPaymentAsync(Guid contactId, CancellationToken cancellationToken) =>
+        await db.Orders.AsNoTracking().Where(o => o.ContactId == contactId && o.Status == OrderStatuses.AwaitingPayment)
+            .OrderByDescending(o => o.CreatedAt).FirstOrDefaultAsync(cancellationToken) is { } order ? ForPayment(order) : null;
+
     public static OrderForPayment ForPayment(Order o) => new(
         o.Id, o.WorkspaceId, o.Number, o.Status, o.TotalMoney,
-        [.. o.Items.Select(i => new OrderForPaymentLine(i.Title, i.VariantLabel, i.Quantity, Money.Rial(i.LineTotal)))]);
+        [.. o.Items.Select(i => new OrderForPaymentLine(i.Title, i.VariantLabel, i.Quantity, Money.Rial(i.LineTotal)))], o.CreatedAt, o.ContactId, o.ConversationId);
 }
 
 /// <summary>
@@ -35,7 +39,9 @@ internal sealed class PaymentConfirmedHandler(OrdersDbContext db, IClock clock) 
         }
 
         var now = clock.UtcNow;
-        var reference = $"پرداخت آنلاین ({message.Provider})، کد پیگیری {message.ReferenceId}";
+        var reference = message.Provider == PaymentProviders.CardToCard
+            ? $"کارت به کارت (رسید تأیید شده)، کد پیگیری {message.ReferenceId}"
+            : $"پرداخت آنلاین ({message.Provider})، کد پیگیری {message.ReferenceId}";
         var from = order.Status;
         if (order.Status == OrderStatuses.AwaitingPayment && order.Total == message.Amount.Amount && order.MoveTo(OrderStatuses.Paid, now))
         {

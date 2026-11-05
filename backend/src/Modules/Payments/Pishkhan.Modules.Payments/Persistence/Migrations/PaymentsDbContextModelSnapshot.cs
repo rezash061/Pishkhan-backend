@@ -190,6 +190,63 @@ namespace Pishkhan.Modules.Payments.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pishkhan.Modules.Payments.Domain.BankAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BankCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("bank_code");
+
+                    b.Property<string>("CardNumber")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("card_number");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("HolderName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("holder_name");
+
+                    b.Property<string>("Sheba")
+                        .HasMaxLength(26)
+                        .HasColumnType("character varying(26)")
+                        .HasColumnName("sheba");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_accounts");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_bank_accounts_workspace_id_created_at");
+
+                    b.ToTable("bank_accounts", "payments");
+                });
+
             modelBuilder.Entity("Pishkhan.Modules.Payments.Domain.MerchantAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -412,6 +469,186 @@ namespace Pishkhan.Modules.Payments.Persistence.Migrations
                         .HasDatabaseName("ix_links_workspace_id_order_id_created_at");
 
                     b.ToTable("links", "payments");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Payments.Domain.Receipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Bank")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("bank");
+
+                    b.Property<string>("Checks")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("checks");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DestinationCard")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("destination_card");
+
+                    b.Property<string>("DestinationSheba")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("destination_sheba");
+
+                    b.Property<Guid?>("DuplicateOfId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("duplicate_of_id");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<long?>("ImageHash")
+                        .HasColumnType("bigint")
+                        .HasColumnName("image_hash");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reject_reason");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("SourceCard")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_card");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SubmittedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipts");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_receipts_file_id");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_receipts_message_id")
+                        .HasFilter("message_id IS NOT NULL");
+
+                    b.HasIndex("WorkspaceId", "OrderId")
+                        .HasDatabaseName("ix_receipts_workspace_id_order_id");
+
+                    b.HasIndex("WorkspaceId", "Reference")
+                        .HasDatabaseName("ix_receipts_workspace_id_reference")
+                        .HasFilter("reference IS NOT NULL");
+
+                    b.HasIndex("WorkspaceId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_receipts_workspace_id_status_created_at");
+
+                    b.ToTable("receipts", "payments");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Payments.Domain.ReceiptSettings", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<long>("AmountTolerance")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_tolerance");
+
+                    b.Property<bool>("AutoApprove")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_approve");
+
+                    b.Property<double>("Threshold")
+                        .HasColumnType("double precision")
+                        .HasColumnName("threshold");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("WindowHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("window_hours");
+
+                    b.HasKey("WorkspaceId")
+                        .HasName("pk_receipt_settings");
+
+                    b.ToTable("receipt_settings", "payments");
                 });
 #pragma warning restore 612, 618
         }
