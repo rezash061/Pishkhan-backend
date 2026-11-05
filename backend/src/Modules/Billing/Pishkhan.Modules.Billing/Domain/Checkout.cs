@@ -19,6 +19,12 @@ public static class CheckoutKinds
 
     /// <summary>Pays the workspace's due overage charges (BE-2.8); buys no subscription. The plan fields name the current plan.</summary>
     public const string Overage = "overage";
+
+    /// <summary>Pays money into the workspace's wallet; buys no subscription. The plan fields are empty.</summary>
+    public const string WalletTopUp = "wallet_top_up";
+
+    /// <summary>Kinds that buy a subscription (a coupon and the wallet apply only to these).</summary>
+    public static bool BuysPlan(string kind) => kind is New or Renewal or Upgrade or Downgrade;
 }
 
 public static class CheckoutStatuses
@@ -63,7 +69,23 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
     /// <summary>Unused part of the current period taken off an upgrade (Rial).</summary>
     public long Credit { get; private set; }
 
-    /// <summary>What is paid: <see cref="Price"/> minus <see cref="Credit"/>, at least <see cref="CheckoutPlanner.MinimumAmount"/> (Rial).</summary>
+    /// <summary>The coupon's discount (Rial), taken off after <see cref="Credit"/>.</summary>
+    public long Discount { get; private set; }
+
+    public Guid? CouponId { get; private set; }
+
+    public string? CouponCode { get; private set; }
+
+    /// <summary>Paid from the workspace's wallet (Rial), taken when the checkout is opened.</summary>
+    public long WalletUsed { get; private set; }
+
+    /// <summary>The wallet part was given back (the checkout failed or expired, or a refund ended what it bought).</summary>
+    public bool WalletReleased { get; private set; }
+
+    /// <summary>
+    /// What is paid through Zarinpal: <see cref="Price"/> minus <see cref="Credit"/>, <see cref="Discount"/> and <see cref="WalletUsed"/>; zero
+    /// (paid at once, without Zarinpal) or at least <see cref="CheckoutPlanner.MinimumAmount"/> (Rial).
+    /// </summary>
     public long Amount { get; private set; }
 
     /// <summary>The subscription an upgrade replaces.</summary>
@@ -100,6 +122,10 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
         Cycle = quote.Cycle,
         Price = quote.Price,
         Credit = quote.Credit,
+        Discount = quote.Discount,
+        CouponId = quote.CouponId,
+        CouponCode = quote.CouponCode,
+        WalletUsed = quote.WalletUsed,
         Amount = quote.Amount,
         ReplacesSubscriptionId = quote.ReplacesSubscriptionId,
         CreatedBy = userId,
@@ -124,6 +150,35 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
         UpdatedAt = now,
     };
 
+    /// <summary>Money into the wallet: <paramref name="amount"/> already within the allowed range.</summary>
+    public static Checkout ForWalletTopUp(Guid workspaceId, long amount, Guid userId, DateTimeOffset now) => new()
+    {
+        Id = Uuid.NewV7(now),
+        WorkspaceId = workspaceId,
+        Kind = CheckoutKinds.WalletTopUp,
+        PlanCode = string.Empty,
+        PlanName = "شارژ کیف پول",
+        Price = amount,
+        Amount = amount,
+        CreatedBy = userId,
+        CreatedAt = now,
+        UpdatedAt = now,
+    };
+
+    public void WalletGivenBack(DateTimeOffset now)
+    {
+        WalletReleased = true;
+        UpdatedAt = now;
+    }
+
+    /// <summary>The wallet part was taken again for a checkout paid after its hold was given back (see <see cref="WalletGivenBack"/>).</summary>
+    public void WalletRetaken(long amount, DateTimeOffset now)
+    {
+        WalletReleased = false;
+        WalletUsed = amount;
+        UpdatedAt = now;
+    }
+
     public string StatusAt(DateTimeOffset now) => Status == CheckoutStatuses.Pending && now - CreatedAt > Lifetime ? CheckoutStatuses.Expired : Status;
 
     public void Started(string authority, DateTimeOffset now)
@@ -144,7 +199,7 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
         UpdatedAt = now;
     }
 
-    public void MarkPaid(string referenceId, string? cardMask, long invoiceNumber, Guid? subscriptionId, DateTimeOffset now)
+    public void MarkPaid(string? referenceId, string? cardMask, long invoiceNumber, Guid? subscriptionId, DateTimeOffset now)
     {
         Status = CheckoutStatuses.Paid;
         ReferenceId = referenceId;
@@ -157,9 +212,44 @@ public sealed class Checkout : AggregateRoot<Guid>, ITenantOwned
     }
 }
 
-/// <summary>What buying a plan costs now, and when it would start.</summary>
+/// <summary>What buying a plan costs now, and when it would start. <see cref="Priced"/> applies a coupon and the wallet.</summary>
 public sealed record CheckoutQuote(
-    string Kind, string Cycle, long Price, long Credit, long Amount, DateTimeOffset StartsAt, DateTimeOffset EndsAt, Guid? ReplacesSubscriptionId);
+    string Kind, string Cycle, long Price, long Credit, long Amount, DateTimeOffset StartsAt, DateTimeOffset EndsAt, Guid? ReplacesSubscriptionId)
+{
+    public long Discount { get; init; }
+
+    public Guid? CouponId { get; init; }
+
+    public string? CouponCode { get; init; }
+
+    public long WalletUsed { get; init; }
+
+    /// <summary>
+    /// Takes the coupon's discount off the price after the credit, then up to <paramref name="wallet"/> Rial from the wallet. What is left for
+    /// Zarinpal is zero or at least <see cref="CheckoutPlanner.MinimumAmount"/>: the wallet part shrinks to leave the minimum, and without a
+    /// coupon or the wallet the minimum is paid as before.
+    /// </summary>
+    public CheckoutQuote Priced(Coupon? coupon, long wallet)
+    {
+        var baseAmount = Math.Max(0, Price - Credit);
+        var discount = coupon?.DiscountOn(baseAmount) ?? 0;
+        var due = baseAmount - discount;
+        var fromWallet = Math.Clamp(wallet, 0, due);
+        var rest = due - fromWallet;
+        if (rest is > 0 and < CheckoutPlanner.MinimumAmount && fromWallet > 0)
+        {
+            fromWallet = Math.Max(0, fromWallet - (CheckoutPlanner.MinimumAmount - rest));
+            rest = due - fromWallet;
+        }
+
+        if ((rest is > 0 and < CheckoutPlanner.MinimumAmount) || (rest == 0 && discount == 0 && fromWallet == 0))
+        {
+            rest = CheckoutPlanner.MinimumAmount;
+        }
+
+        return this with { Discount = discount, CouponId = coupon?.Id, CouponCode = coupon?.Code, WalletUsed = fromWallet, Amount = rest };
+    }
+}
 
 /// <summary>
 /// Works out a checkout from the plan and the workspace's subscriptions (the current one and any already paid after it). Buying while a

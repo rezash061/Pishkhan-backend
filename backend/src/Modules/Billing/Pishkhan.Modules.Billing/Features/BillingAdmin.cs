@@ -32,18 +32,23 @@ public sealed record PaymentSearch(string? Status, string? Kind, Guid? Workspace
 public sealed record PaymentResponse(
     Guid Id, Guid WorkspaceId, string? WorkspaceName, string Kind, string PlanCode, string PlanName, int PlanVersion, string? Cycle, long Price, long Credit,
     long Amount, long Refunded, string Status, string? ReferenceId, string? CardMask, string? Error, long? InvoiceNumber, Guid? SubscriptionId,
-    DateTimeOffset CreatedAt, DateTimeOffset? PaidAt);
+    DateTimeOffset CreatedAt, DateTimeOffset? PaidAt, long Discount = 0, string? CouponCode = null, long WalletUsed = 0, bool WalletReleased = false);
 
-/// <summary>A refund. <c>createdBy</c> is the staff member's username.</summary>
-public sealed record RefundResponse(Guid Id, Guid CheckoutId, long Amount, string Reason, string? ReferenceId, bool EndedSubscription, string? CreatedBy, DateTimeOffset CreatedAt);
+/// <summary>A refund. <c>createdBy</c> is the staff member's username.
+/// <c>toWallet</c>: paid into the workspace's wallet; <c>walletReturned</c>: the checkout's wallet part given back with it.</summary>
+public sealed record RefundResponse(
+    Guid Id, Guid CheckoutId, long Amount, string Reason, string? ReferenceId, bool EndedSubscription, string? CreatedBy, DateTimeOffset CreatedAt, bool ToWallet = false,
+    long WalletReturned = 0);
 
 public sealed record PaymentDetail(PaymentResponse Payment, IReadOnlyList<RefundResponse> Refunds, SubscriptionResponse? Subscription);
 
 /// <summary>
 /// Records money paid back in Zarinpal's panel. <c>amount</c> (Rial) at most what is left of the payment; <c>referenceId</c> is Zarinpal's
-/// refund reference (optional); <c>endSubscription</c> ends the subscription the payment bought, if it is still current or scheduled.
+/// refund reference (optional); <c>endSubscription</c> ends the subscription the payment bought, if it is still current or scheduled,
+/// and gives back the part paid from the wallet. <c>toWallet</c> pays the refund into the workspace's wallet instead of through Zarinpal.
+/// <c>amount</c> may be 0 only to give back the wallet part with <c>endSubscription</c>.
 /// </summary>
-public sealed record RefundRequest(long Amount, string Reason, string? ReferenceId, bool EndSubscription);
+public sealed record RefundRequest(long Amount, string Reason, string? ReferenceId, bool EndSubscription, bool ToWallet = false);
 
 /// <summary>Payments over the last <c>days</c>: paid total, refunds, net, and how many failed. Rial.</summary>
 public sealed record BillingSummary(int Days, int PaidCount, long PaidAmount, int RefundCount, long RefundedAmount, long NetAmount, int FailedCount, int PendingCount);
@@ -212,8 +217,8 @@ internal static class BillingAdminEndpoints
     }
 
     private static async Task<IResult> RefundAsync(
-        Guid id, RefundRequest request, BillingDbContext db, IWorkspaceQueries workspaces, IStaffDirectory staff, ICurrentUser caller, ICacheInvalidator cache,
-        IClock clock, CancellationToken ct)
+        Guid id, RefundRequest request, BillingDbContext db, WalletLedger wallets, IWorkspaceQueries workspaces, IStaffDirectory staff, ICurrentUser caller,
+        ICacheInvalidator cache, IClock clock, CancellationToken ct)
     {
         if (PlanEndpoints.Reason(request.Reason, required: true) is { } invalid)
         {
@@ -239,9 +244,32 @@ internal static class BillingAdminEndpoints
         db.Tenant.SetWorkspace(checkout.WorkspaceId);
         var now = clock.UtcNow;
         var already = await db.Refunds.Where(r => r.CheckoutId == id).SumAsync(r => (long?)r.Amount, ct) ?? 0;
-        if (request.Amount <= 0 || request.Amount > checkout.Amount - already)
+        var returnsWallet = request.EndSubscription && checkout.WalletUsed > 0 && !checkout.WalletReleased;
+        if (request.Amount < 0 || (request.Amount == 0 && !returnsWallet) || request.Amount > checkout.Amount - already)
         {
             return PlanEndpoints.Invalid("amount", "billing.refund.too_much");
+        }
+
+        if (request.ToWallet && checkout.Kind == CheckoutKinds.WalletTopUp)
+        {
+            return PlanEndpoints.Invalid("toWallet", "billing.refund.top_up_to_wallet");
+        }
+
+        // Refunding a top-up takes the money back out of the wallet, so it must still be there.
+        Wallet? wallet = null;
+        if (request.ToWallet || returnsWallet || (checkout.Kind == CheckoutKinds.WalletTopUp && request.Amount > 0))
+        {
+            wallet = await wallets.SettledAsync(checkout.WorkspaceId, ct);
+        }
+
+        if (checkout.Kind == CheckoutKinds.WalletTopUp && request.Amount > 0)
+        {
+            if (wallet!.Balance < request.Amount)
+            {
+                return Error.Conflict("billing.refund.wallet_spent").ToProblem();
+            }
+
+            wallets.Change(wallet, -request.Amount, WalletEntryKinds.Refund, request.Reason.Trim(), checkout.Id, WalletActors.Staff, caller.UserId);
         }
 
         Subscription? ended = null;
@@ -251,12 +279,19 @@ internal static class BillingAdminEndpoints
             ended?.End(Subscription.EndRefunded, now);
         }
 
-        var refund = Refund.Create(checkout, already, request.Amount, request.Reason, request.ReferenceId, ended is not null, caller.UserId, now);
+        var walletReturned = returnsWallet ? wallets.GiveBack(wallet!, checkout, "refund", WalletActors.Staff, caller.UserId) : 0;
+        if (request.ToWallet && request.Amount > 0)
+        {
+            wallets.Change(wallet!, request.Amount, WalletEntryKinds.Refund, request.Reason.Trim(), checkout.Id, WalletActors.Staff, caller.UserId);
+        }
+
+        var refund = Refund.Create(
+            checkout, already, request.Amount, request.Reason, request.ReferenceId, ended is not null, caller.UserId, now, request.ToWallet, walletReturned);
         db.Refunds.Add(refund);
         var entry = AuditEntries.Create(
             AuditActor.Staff(caller.UserId, await staff.GetUsernameAsync(caller.UserId, ct), caller.IpAddress), "billing.refund", "checkout", checkout.Id.ToString(),
             checkout.WorkspaceId, now,
-            after: new { refund.Amount, refund.ReferenceId, invoice = checkout.InvoiceNumber, paid = checkout.Amount, refundedTotal = already + refund.Amount, endedSubscription = ended?.Id },
+            after: new { refund.Amount, refund.ReferenceId, refund.ToWallet, refund.WalletReturned, invoice = checkout.InvoiceNumber, paid = checkout.Amount, refundedTotal = already + refund.Amount, endedSubscription = ended?.Id },
             reason: refund.Reason);
         db.Publish(entry, entry.PartitionKey(), checkout.WorkspaceId);
         if (ended is not null)
@@ -264,7 +299,15 @@ internal static class BillingAdminEndpoints
             cache.Enqueue(db, BillingCacheTags.Workspace(checkout.WorkspaceId));
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Error.Conflict("billing.wallet.busy").ToProblem();
+        }
+
         if (ended is not null)
         {
             await cache.InvalidateLocalAsync([BillingCacheTags.Workspace(checkout.WorkspaceId)], ct);
@@ -286,13 +329,14 @@ internal static class BillingAdminEndpoints
         var subscription = checkout.SubscriptionId is { } sid ? await AllSubscriptions(db).FirstOrDefaultAsync(s => s.Id == sid, ct) : null;
         return new PaymentDetail(
             ToPayment(checkout, refunds.Sum(r => r.Amount), await workspaces.GetNameAsync(checkout.WorkspaceId, ct), now),
-            [.. refunds.Select(r => new RefundResponse(r.Id, r.CheckoutId, r.Amount, r.Reason, r.ReferenceId, r.EndedSubscription, who.GetValueOrDefault(r.CreatedBy), r.CreatedAt))],
+            [.. refunds.Select(r => new RefundResponse(r.Id, r.CheckoutId, r.Amount, r.Reason, r.ReferenceId, r.EndedSubscription, who.GetValueOrDefault(r.CreatedBy), r.CreatedAt, r.ToWallet, r.WalletReturned))],
             subscription is null ? null : SubscriptionEndpoints.ToResponse(subscription, now));
     }
 
     private static PaymentResponse ToPayment(Checkout c, long refunded, string? workspaceName, DateTimeOffset now) => new(
         c.Id, c.WorkspaceId, workspaceName, c.Kind, c.PlanCode, c.PlanName, c.PlanVersion, c.Kind == CheckoutKinds.Overage ? null : c.Cycle, c.Price, c.Credit, c.Amount,
-        refunded, c.StatusAt(now), c.ReferenceId, c.CardMask, c.Error, c.InvoiceNumber, c.SubscriptionId, c.CreatedAt, c.PaidAt);
+        refunded, c.StatusAt(now), c.ReferenceId, c.CardMask, c.Error, c.InvoiceNumber, c.SubscriptionId, c.CreatedAt, c.PaidAt, c.Discount, c.CouponCode, c.WalletUsed,
+        c.WalletReleased);
 
     private static async Task<Dictionary<Guid, string?>> NamesAsync(IEnumerable<Guid> ids, IWorkspaceQueries workspaces, CancellationToken ct)
     {

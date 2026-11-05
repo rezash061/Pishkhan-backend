@@ -40,11 +40,22 @@ internal sealed record StartedCheckout(Checkout? Checkout, Uri? PaymentUrl, stri
 /// amount and start the subscription it bought. Repeated or forged callbacks never pay twice or for a different amount.
 /// </summary>
 internal sealed class CheckoutService(
-    BillingDbContext db, IZarinpalClient zarinpal, ITenantContext tenant, ICacheInvalidator cache, IOptions<CheckoutOptions> options, IClock clock)
+    BillingDbContext db, IZarinpalClient zarinpal, ITenantContext tenant, ICacheInvalidator cache, WalletLedger wallets, IOptions<CheckoutOptions> options, IClock clock)
 {
+    /// <summary>Wallet top-ups: 10,000 to 100,000,000 Toman.</summary>
+    public const long MinTopUp = 100_000;
+
+    public const long MaxTopUp = 1_000_000_000;
+
     private const string NextInvoiceSql = "SELECT nextval('billing.invoice_numbers') AS \"Value\"";
 
-    public async Task<(CheckoutQuote? Quote, Plan? Plan, string? Error)> QuoteAsync(Guid workspaceId, Guid planId, string cycle, CancellationToken ct)
+    /// <summary>
+    /// The quote with the coupon (<paramref name="couponCode"/>, case-insensitive) and, when <paramref name="useWallet"/>, as much of the
+    /// wallet as it can take. Coupon errors: <c>billing.coupon.invalid</c>, <c>expired</c>, <c>used_up</c>, <c>not_for_plan</c>,
+    /// <c>first_purchase_only</c>, <c>already_used</c>.
+    /// </summary>
+    public async Task<(CheckoutQuote? Quote, Plan? Plan, string? Error)> QuoteAsync(
+        Guid workspaceId, Guid planId, string cycle, string? couponCode, bool useWallet, CancellationToken ct)
     {
         var plan = await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId, ct);
         if (plan is null)
@@ -54,7 +65,39 @@ internal sealed class CheckoutService(
 
         var standing = await StandingAsync(workspaceId, ct);
         var (quote, error) = standing.Quote(plan, cycle);
-        return (quote, plan, error);
+        if (error is not null)
+        {
+            return (null, plan, error);
+        }
+
+        Coupon? coupon = null;
+        if (!string.IsNullOrWhiteSpace(couponCode))
+        {
+            (coupon, error) = await CouponAsync(workspaceId, couponCode, plan.Code, quote!.Kind, ct);
+            if (error is not null)
+            {
+                return (null, plan, error);
+            }
+        }
+
+        var balance = useWallet ? (await wallets.SettledAsync(workspaceId, ct)).Balance : 0;
+        return (quote!.Priced(coupon, balance), plan, null);
+    }
+
+    private async Task<(Coupon? Coupon, string? Error)> CouponAsync(Guid workspaceId, string code, string planCode, string kind, CancellationToken ct)
+    {
+        var normalized = Coupon.Normalize(code);
+        var coupon = normalized.Length > 32 ? null : await db.Coupons.FirstOrDefaultAsync(c => c.Code == normalized, ct);
+        if (coupon is null)
+        {
+            return (null, "billing.coupon.invalid");
+        }
+
+        var paidBefore = await db.Checkouts.AnyAsync(
+            c => c.WorkspaceId == workspaceId && c.Status == CheckoutStatuses.Paid && c.Kind != CheckoutKinds.Overage && c.Kind != CheckoutKinds.WalletTopUp, ct);
+        var used = await db.CouponRedemptions.CountAsync(r => r.CouponId == coupon.Id && r.WorkspaceId == workspaceId, ct);
+        var refusal = coupon.Refusal(planCode, kind, paidBefore, used, clock.UtcNow);
+        return refusal is null ? (coupon, null) : (null, refusal);
     }
 
     /// <summary>The workspace's subscriptions as a checkout sees them now.</summary>
@@ -69,27 +112,64 @@ internal sealed class CheckoutService(
         return new CheckoutStanding(current, currentPlan, scheduled, now);
     }
 
-    public async Task<StartedCheckout> StartAsync(Guid workspaceId, Guid planId, string cycle, Guid userId, CancellationToken ct)
+    /// <summary>
+    /// Opens the checkout. The wallet part is taken at once (and given back if the payment fails). A checkout the coupon and wallet cover
+    /// entirely is paid at once without Zarinpal: <see cref="StartedCheckout.PaymentUrl"/> is null and the checkout is paid.
+    /// </summary>
+    public async Task<StartedCheckout> StartAsync(Guid workspaceId, Guid planId, string cycle, string? couponCode, bool useWallet, Guid userId, CancellationToken ct)
+    {
+        var (quote, plan, error) = await QuoteAsync(workspaceId, planId, cycle, couponCode, useWallet, ct);
+        if (error is not null)
+        {
+            return new StartedCheckout(null, null, error);
+        }
+
+        if (quote!.Amount > 0 && string.IsNullOrWhiteSpace(options.Value.MerchantId))
+        {
+            return new StartedCheckout(null, null, "billing.checkout.unavailable");
+        }
+
+        var now = clock.UtcNow;
+        var checkout = Checkout.Create(workspaceId, quote, plan!, userId, now);
+        db.Checkouts.Add(checkout);
+        if (checkout.WalletUsed > 0)
+        {
+            wallets.Take(await wallets.GetAsync(workspaceId, ct), checkout);
+        }
+
+        if (checkout.Amount == 0)
+        {
+            await db.SaveChangesAsync(ct);
+            await db.Database.CreateExecutionStrategy().ExecuteAsync(token => PayAsync(checkout, null, null, now, token), ct);
+            await cache.InvalidateLocalAsync([BillingCacheTags.Workspace(workspaceId)], ct);
+            return new StartedCheckout(checkout, null, null);
+        }
+
+        return await OpenAtZarinpalAsync(checkout, $"اشتراک پیشخوان - {plan!.Name}", ct);
+    }
+
+    /// <summary>Money into the wallet through Zarinpal, <see cref="MinTopUp"/> to <see cref="MaxTopUp"/> Rial (checked by the caller).</summary>
+    public async Task<StartedCheckout> StartTopUpAsync(Guid workspaceId, long amount, Guid userId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.Value.MerchantId))
         {
             return new StartedCheckout(null, null, "billing.checkout.unavailable");
         }
 
-        var (quote, plan, error) = await QuoteAsync(workspaceId, planId, cycle, ct);
-        if (error is not null)
-        {
-            return new StartedCheckout(null, null, error);
-        }
-
-        var now = clock.UtcNow;
-        var checkout = Checkout.Create(workspaceId, quote!, plan!, userId, now);
+        var checkout = Checkout.ForWalletTopUp(workspaceId, amount, userId, clock.UtcNow);
         db.Checkouts.Add(checkout);
+        return await OpenAtZarinpalAsync(checkout, "شارژ کیف پول پیشخوان", ct);
+    }
+
+    private async Task<StartedCheckout> OpenAtZarinpalAsync(Checkout checkout, string description, CancellationToken ct)
+    {
+        var now = clock.UtcNow;
         var callback = new Uri($"{options.Value.ApiBaseUrl.TrimEnd('/')}/billing/checkout/callback");
-        var started = await zarinpal.StartAsync(options.Value.MerchantId!, options.Value.Sandbox, checkout.Amount, callback, $"اشتراک پیشخوان - {plan!.Name}", ct);
+        var started = await zarinpal.StartAsync(options.Value.MerchantId!, options.Value.Sandbox, checkout.Amount, callback, description, ct);
         if (!started.Ok)
         {
             checkout.Fail(started.Error!, now);
+            await GiveBackAsync(checkout, "checkout_failed", ct);
             await db.SaveChangesAsync(ct);
             return new StartedCheckout(checkout, null, "billing.checkout.gateway_unavailable");
         }
@@ -97,6 +177,14 @@ internal sealed class CheckoutService(
         checkout.Started(started.Authority!, now);
         await db.SaveChangesAsync(ct);
         return new StartedCheckout(checkout, started.RedirectUrl, null);
+    }
+
+    private async Task GiveBackAsync(Checkout checkout, string reason, CancellationToken ct)
+    {
+        if (checkout.WalletUsed > 0 && !checkout.WalletReleased)
+        {
+            wallets.GiveBack(await wallets.GetAsync(checkout.WorkspaceId, ct), checkout, reason);
+        }
     }
 
     /// <summary>
@@ -172,6 +260,7 @@ internal sealed class CheckoutService(
         if (!customerFinished)
         {
             checkout.Fail("cancelled", now);
+            await GiveBackAsync(checkout, "checkout_cancelled", ct);
             await SaveAsync(ct);
             return checkout;
         }
@@ -183,6 +272,7 @@ internal sealed class CheckoutService(
             if (verified.Code != "unavailable")
             {
                 checkout.Fail(verified.Code, now);
+                await GiveBackAsync(checkout, "checkout_failed", ct);
                 await SaveAsync(ct);
             }
 
@@ -193,7 +283,7 @@ internal sealed class CheckoutService(
         var strategy = db.Database.CreateExecutionStrategy();
         try
         {
-            await strategy.ExecuteAsync(token => PayAsync(checkout, verified, now, token), ct);
+            await strategy.ExecuteAsync(token => PayAsync(checkout, verified.ReferenceId, verified.CardMask, now, token), ct);
         }
         catch (DbUpdateException)
         {
@@ -209,12 +299,35 @@ internal sealed class CheckoutService(
         return checkout;
     }
 
-    private async Task PayAsync(Checkout checkout, ZarinpalVerify verified, DateTimeOffset now, CancellationToken token)
+    /// <summary>Records the payment: what it bought, the coupon's redemption, the invoice and the audit entry. No reference for a checkout paid in full by a coupon or the wallet.</summary>
+    private async Task PayAsync(Checkout checkout, string? referenceId, string? cardMask, DateTimeOffset now, CancellationToken token)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(token);
         Guid? subscriptionId = null;
         var settled = 0;
-        if (checkout.Kind == CheckoutKinds.Overage)
+        if (checkout.WalletUsed > 0 && checkout.WalletReleased)
+        {
+            // Paid at Zarinpal after its wallet hold was given back: take the wallet part again, as much as is there now.
+            var wallet = await wallets.GetAsync(checkout.WorkspaceId, token);
+            var again = Math.Min(wallet.Balance, checkout.WalletUsed);
+            checkout.WalletRetaken(again, now);
+            if (again > 0)
+            {
+                wallets.Change(wallet, -again, WalletEntryKinds.Checkout, "late_payment", checkout.Id, WalletActors.System, null);
+            }
+        }
+
+        if (checkout.CouponId is { } couponId && await db.Coupons.FirstOrDefaultAsync(c => c.Id == couponId, token) is { } coupon)
+        {
+            coupon.Redeemed(now);
+            db.CouponRedemptions.Add(CouponRedemption.Create(couponId, checkout, now));
+        }
+
+        if (checkout.Kind == CheckoutKinds.WalletTopUp)
+        {
+            wallets.Change(await wallets.GetAsync(checkout.WorkspaceId, token), checkout.Amount, WalletEntryKinds.TopUp, null, checkout.Id, WalletActors.User, checkout.CreatedBy);
+        }
+        else if (checkout.Kind == CheckoutKinds.Overage)
         {
             // The charges it was opened for: those due when it was made (a charge made later is paid next time).
             var charges = await db.OverageCharges.Where(c => c.Status == OverageChargeStatuses.Due && c.CreatedAt <= checkout.CreatedAt).ToListAsync(token);
@@ -231,10 +344,14 @@ internal sealed class CheckoutService(
         }
 
         var invoice = await db.Database.SqlQueryRaw<long>(NextInvoiceSql).SingleAsync(token);
-        checkout.MarkPaid(verified.ReferenceId!, verified.CardMask, invoice, subscriptionId, now);
+        checkout.MarkPaid(referenceId, cardMask, invoice, subscriptionId, now);
         var entry = AuditEntries.Create(
             AuditActor.User(checkout.CreatedBy, null, null), "billing.checkout_paid", "checkout", checkout.Id.ToString(), checkout.WorkspaceId, now,
-            after: new { checkout.Kind, checkout.PlanCode, checkout.Cycle, checkout.Amount, checkout.Credit, invoice, referenceId = verified.ReferenceId, overageCharges = settled });
+            after: new
+            {
+                checkout.Kind, checkout.PlanCode, checkout.Cycle, checkout.Amount, checkout.Credit, checkout.Discount, checkout.CouponCode, checkout.WalletUsed, invoice,
+                referenceId, overageCharges = settled,
+            });
         db.Publish(entry, entry.PartitionKey(), checkout.WorkspaceId);
         cache.Enqueue(db, BillingCacheTags.Workspace(checkout.WorkspaceId));
         await db.SaveChangesAsync(token);
@@ -282,7 +399,7 @@ internal sealed class CheckoutService(
             start = all.Where(s => s.Status != SubscriptionStatus.Ended).Select(s => s.EndsAt ?? now).Append(now).Max();
         }
 
-        var subscription = Subscription.Purchase(checkout.WorkspaceId, plan, checkout.Cycle, checkout.Amount, checkout.Id, checkout.CreatedBy, start, now);
+        var subscription = Subscription.Purchase(checkout.WorkspaceId, plan, checkout.Cycle, checkout.Amount + checkout.WalletUsed, checkout.Id, checkout.CreatedBy, start, now);
         db.Subscriptions.Add(subscription);
         return subscription;
     }

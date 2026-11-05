@@ -122,4 +122,63 @@ public class CheckoutPlannerTests
         var scheduled = Bought(Basic, 3_000_000, Now.AddDays(5));
         scheduled.UnusedCredit(Now).ShouldBe(3_000_000);
     }
+
+    private static CheckoutQuote Quote(long price, long credit = 0) =>
+        new(CheckoutKinds.New, BillingCycles.Monthly, price, credit, Math.Max(price - credit, CheckoutPlanner.MinimumAmount), Now, Now.AddDays(30), null);
+
+    private static Coupon CouponOf(string kind, long value) =>
+        Coupon.Create("TEST-1", new CouponTerms(kind, value, null, [], false, null, 1, null, null, true), Guid.NewGuid(), Now);
+
+    [Fact]
+    public void Coupons_come_off_after_the_credit_and_the_wallet_pays_the_rest()
+    {
+        var q = Quote(5_000_000, credit: 1_000_000).Priced(CouponOf(CouponKinds.Percent, 25), wallet: 1_000_000);
+        q.Discount.ShouldBe(1_000_000);
+        q.WalletUsed.ShouldBe(1_000_000);
+        q.Amount.ShouldBe(2_000_000);
+        q.CouponCode.ShouldBe("TEST-1");
+
+        Quote(5_000_000).Priced(CouponOf(CouponKinds.Fixed, 9_000_000), 0).Amount.ShouldBe(0);
+        Quote(5_000_000).Priced(null, 9_000_000).ShouldSatisfyAllConditions(x => x.WalletUsed.ShouldBe(5_000_000), x => x.Amount.ShouldBe(0));
+    }
+
+    [Fact]
+    public void What_Zarinpal_is_asked_for_is_zero_or_at_least_its_minimum()
+    {
+        // The wallet leaves the minimum rather than a few Toman.
+        var q = Quote(5_000_000).Priced(null, 4_995_000);
+        q.Amount.ShouldBe(CheckoutPlanner.MinimumAmount);
+        q.WalletUsed.ShouldBe(5_000_000 - CheckoutPlanner.MinimumAmount);
+
+        // A tiny remainder after a coupon is raised to the minimum, as without one.
+        Quote(5_000_000).Priced(CouponOf(CouponKinds.Fixed, 4_995_000), 0).Amount.ShouldBe(CheckoutPlanner.MinimumAmount);
+
+        // A fully credited upgrade still pays the minimum, as before.
+        Quote(5_000_000, credit: 5_000_000).Priced(null, 0).Amount.ShouldBe(CheckoutPlanner.MinimumAmount);
+    }
+
+    [Fact]
+    public void A_coupon_refuses_outside_its_terms()
+    {
+        var coupon = Coupon.Create("FIRST", new CouponTerms(CouponKinds.Percent, 10, null, ["pro"], true, 2, 1, Now.AddDays(-1), Now.AddDays(1), true), Guid.NewGuid(), Now);
+        coupon.Refusal("pro", CheckoutKinds.New, paidBefore: false, 0, Now).ShouldBeNull();
+        coupon.Refusal("basic", CheckoutKinds.New, false, 0, Now).ShouldBe("billing.coupon.not_for_plan");
+        coupon.Refusal("pro", CheckoutKinds.Renewal, true, 0, Now).ShouldBe("billing.coupon.first_purchase_only");
+        coupon.Refusal("pro", CheckoutKinds.New, false, 1, Now).ShouldBe("billing.coupon.already_used");
+        coupon.Refusal("pro", CheckoutKinds.New, false, 0, Now.AddDays(2)).ShouldBe("billing.coupon.expired");
+        coupon.Redeemed(Now);
+        coupon.Redeemed(Now);
+        coupon.Refusal("pro", CheckoutKinds.New, false, 0, Now).ShouldBe("billing.coupon.used_up");
+        Coupon.Validate("ab", new CouponTerms("percent", 0, null, [], false, null, 1, null, null, true), true).Keys
+            .ShouldBe(["code", "value"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void A_wallet_never_goes_below_zero()
+    {
+        var wallet = Wallet.Open(Guid.NewGuid(), Now);
+        wallet.Change(1_000, WalletEntryKinds.Adjustment, "x", null, WalletActors.Staff, null, Now).BalanceAfter.ShouldBe(1_000);
+        Should.Throw<Pishkhan.SharedKernel.DomainException>(() => wallet.Change(-1_001, WalletEntryKinds.Checkout, null, null, WalletActors.User, null, Now));
+        wallet.Balance.ShouldBe(1_000);
+    }
 }

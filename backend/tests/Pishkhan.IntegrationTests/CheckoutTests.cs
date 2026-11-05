@@ -97,9 +97,9 @@ public sealed class CheckoutTests(InfraFixture infra, ChannelsHost workers) : IA
     private static long Rial(JsonElement e, string name) => e.GetProperty(name).GetProperty("amount").GetInt64();
 
     /// <summary>Opens the checkout and returns (checkout id, Zarinpal authority).</summary>
-    private static async Task<(Guid Id, string Authority)> StartAsync(Seller s, Guid planId, string cycle = "monthly")
+    private static async Task<(Guid Id, string Authority)> StartAsync(Seller s, Guid planId, string cycle = "monthly", string? couponCode = null, bool useWallet = false)
     {
-        var started = await SendAsync(s.Client, s.Url + "/checkout", new { planId, cycle }, HttpStatusCode.Created);
+        var started = await SendAsync(s.Client, s.Url + "/checkout", new { planId, cycle, couponCode, useWallet }, HttpStatusCode.Created);
         var url = started.GetProperty("paymentUrl").GetString()!;
         url.ShouldStartWith("https://payment.zarinpal.com/pg/StartPay/");
         return (started.GetProperty("checkout").GetProperty("id").GetGuid(), Uri.UnescapeDataString(url[(url.LastIndexOf('/') + 1)..]));
@@ -326,6 +326,96 @@ public sealed class CheckoutTests(InfraFixture infra, ChannelsHost workers) : IA
         summary.GetProperty("paidCount").GetInt32().ShouldBeGreaterThanOrEqualTo(1);
         summary.GetProperty("refundedAmount").GetInt64().ShouldBeGreaterThanOrEqualTo(3_000_000);
         summary.GetProperty("netAmount").GetInt64().ShouldBe(summary.GetProperty("paidAmount").GetInt64() - summary.GetProperty("refundedAmount").GetInt64());
+    }
+
+    [Fact]
+    public async Task Coupons_and_the_wallet_lower_what_Zarinpal_is_asked_for_and_can_pay_a_plan_in_full()
+    {
+        var marker = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var plan = await PlanAsync("cw-" + marker.ToLowerInvariant(), 5_000_000, null);
+        var finance = _admin.StaffClient(StaffRoles.Finance, stepUp: true);
+
+        // Finance makes coupons; codes are unique and validated.
+        var half = await SendAsync(finance, "/admin/v1/billing/coupons", new { code = "half-" + marker, kind = "percent", value = 50, firstPurchaseOnly = true }, HttpStatusCode.Created);
+        half.GetProperty("code").GetString().ShouldBe("HALF-" + marker);
+        Code(await SendAsync(finance, "/admin/v1/billing/coupons", new { code = "HALF-" + marker, kind = "percent", value = 10 }, HttpStatusCode.Conflict)).ShouldBe("billing.coupon.code_taken");
+        await SendAsync(finance, "/admin/v1/billing/coupons", new { code = "x", kind = "percent", value = 101 }, HttpStatusCode.BadRequest);
+        var off = await SendAsync(finance, "/admin/v1/billing/coupons", new { code = "OFF-" + marker, kind = "fixed", value = 1_000_000, active = false }, HttpStatusCode.Created);
+        (await _admin.StaffClient(StaffRoles.Support).PostAsJsonAsync("/admin/v1/billing/coupons", new { code = "S-" + marker, kind = "percent", value = 5 }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        var s = await SellerAsync();
+        Code(await SendAsync(s.Client, s.Url + "/checkout/quote", new { planId = plan, couponCode = "nope-" + marker }, HttpStatusCode.UnprocessableEntity)).ShouldBe("billing.coupon.invalid");
+        Code(await SendAsync(s.Client, s.Url + "/checkout/quote", new { planId = plan, couponCode = "off-" + marker }, HttpStatusCode.UnprocessableEntity)).ShouldBe("billing.coupon.expired");
+        var quote = await SendAsync(s.Client, s.Url + "/checkout/quote", new { planId = plan, couponCode = "half-" + marker }, HttpStatusCode.OK);
+        Rial(quote, "discount").ShouldBe(2_500_000);
+        Rial(quote, "amount").ShouldBe(2_500_000);
+
+        // Paid with the coupon: Zarinpal is asked for half, and the coupon counts one redemption.
+        var (id, authority) = await StartAsync(s, plan, couponCode: "half-" + marker);
+        FakeZarinpal.Get(authority).Amount.ShouldBe(2_500_000);
+        FakeZarinpal.Pay(authority);
+        (await CallbackAsync(authority, "OK")).StatusCode.ShouldBe(HttpStatusCode.SeeOther);
+        var paid = await s.Client.GetFromJsonAsync<JsonElement>($"{s.Url}/checkouts/{id}", Ct);
+        paid.GetProperty("couponCode").GetString().ShouldBe("HALF-" + marker);
+        var detail = await finance.GetFromJsonAsync<JsonElement>($"/admin/v1/billing/coupons/{half.GetProperty("id").GetGuid()}", Ct);
+        detail.GetProperty("coupon").GetProperty("redemptions").GetInt32().ShouldBe(1);
+        detail.GetProperty("coupon").GetProperty("discountTotal").GetInt64().ShouldBe(2_500_000);
+        detail.GetProperty("redemptions")[0].GetProperty("workspaceId").GetGuid().ShouldBe(s.WorkspaceId);
+
+        // First purchase only, and once per workspace.
+        Code(await SendAsync(s.Client, s.Url + "/checkout/quote", new { planId = plan, couponCode = "half-" + marker }, HttpStatusCode.UnprocessableEntity))
+            .ShouldBe("billing.coupon.first_purchase_only");
+
+        // Finance credits the wallet (step-up, reason; never below zero).
+        var walletUrl = $"/admin/v1/workspaces/{s.WorkspaceId}/wallet";
+        (await _admin.StaffClient(StaffRoles.Finance).PostAsJsonAsync(walletUrl + "/adjustments", new { amount = 1_000, reason = "جبران قطعی" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        Code(await SendAsync(finance, walletUrl + "/adjustments", new { amount = -1, reason = "تست کسر" }, HttpStatusCode.Conflict)).ShouldBe("billing.wallet.insufficient");
+        var credited = await SendAsync(finance, walletUrl + "/adjustments", new { amount = 3_000_000, reason = "جبران قطعی سرویس" }, HttpStatusCode.OK);
+        Rial(credited, "balance").ShouldBe(3_000_000);
+
+        // A renewal from the wallet: 3,000,000 of 5,000,000, the rest at Zarinpal. Cancelling at the gateway gives the wallet part back.
+        var (cancelledId, cancelled) = await StartAsync(s, plan, useWallet: true);
+        FakeZarinpal.Get(cancelled).Amount.ShouldBe(2_000_000);
+        Rial(await s.Client.GetFromJsonAsync<JsonElement>(s.Url + "/wallet", Ct), "balance").ShouldBe(0);
+        (await CallbackAsync(cancelled, "NOK")).StatusCode.ShouldBe(HttpStatusCode.SeeOther);
+        var wallet = await s.Client.GetFromJsonAsync<JsonElement>(s.Url + "/wallet", Ct);
+        Rial(wallet, "balance").ShouldBe(3_000_000);
+        wallet.GetProperty("entries")[0].GetProperty("kind").GetString().ShouldBe("released");
+        wallet.GetProperty("entries")[0].GetProperty("checkoutId").GetGuid().ShouldBe(cancelledId);
+
+        // Topping up through Zarinpal, then the wallet pays a whole renewal without Zarinpal.
+        var topUp = await SendAsync(s.Client, s.Url + "/wallet/top-up", new { amount = 2_000_000 }, HttpStatusCode.Created);
+        topUp.GetProperty("checkout").GetProperty("kind").GetString().ShouldBe("wallet_top_up");
+        var topUpUrl = topUp.GetProperty("paymentUrl").GetString()!;
+        var topUpAuthority = Uri.UnescapeDataString(topUpUrl[(topUpUrl.LastIndexOf('/') + 1)..]);
+        FakeZarinpal.Pay(topUpAuthority);
+        await CallbackAsync(topUpAuthority, "OK");
+        Rial(await s.Client.GetFromJsonAsync<JsonElement>(s.Url + "/wallet", Ct), "balance").ShouldBe(5_000_000);
+        await SendAsync(s.Client, s.Url + "/wallet/top-up", new { amount = 5 }, HttpStatusCode.BadRequest);
+
+        var full = await SendAsync(s.Client, s.Url + "/checkout", new { planId = plan, useWallet = true }, HttpStatusCode.Created);
+        full.GetProperty("paymentUrl").ValueKind.ShouldBe(JsonValueKind.Null);
+        full.GetProperty("checkout").GetProperty("status").GetString().ShouldBe("paid");
+        Rial(full.GetProperty("checkout"), "amount").ShouldBe(0);
+        Rial(full.GetProperty("checkout"), "walletUsed").ShouldBe(5_000_000);
+        full.GetProperty("checkout").GetProperty("invoiceNumber").GetInt64().ShouldBeGreaterThan(1000);
+        (await CurrentAsync(s)).GetProperty("upcoming").GetArrayLength().ShouldBe(1);
+
+        // Refunding it puts the wallet part back and ends the renewal.
+        var fullId = full.GetProperty("checkout").GetProperty("id").GetGuid();
+        var refunded = await SendAsync(finance, $"/admin/v1/billing/payments/{fullId}/refunds", new { amount = 0, reason = "خرید اشتباهی", endSubscription = true }, HttpStatusCode.OK);
+        refunded.GetProperty("refunds")[0].GetProperty("walletReturned").GetInt64().ShouldBe(5_000_000);
+        var adminWallet = await finance.GetFromJsonAsync<JsonElement>(walletUrl, Ct);
+        Rial(adminWallet, "balance").ShouldBe(5_000_000);
+
+        // A refund into the wallet; a top-up refund takes the money back out.
+        var firstRefund = await SendAsync(finance, $"/admin/v1/billing/payments/{id}/refunds", new { amount = 500_000, reason = "جبران به کیف پول", toWallet = true }, HttpStatusCode.OK);
+        firstRefund.GetProperty("refunds")[0].GetProperty("toWallet").GetBoolean().ShouldBeTrue();
+        var topUpId = topUp.GetProperty("checkout").GetProperty("id").GetGuid();
+        await SendAsync(finance, $"/admin/v1/billing/payments/{topUpId}/refunds", new { amount = 2_000_000, reason = "برگشت شارژ کیف پول" }, HttpStatusCode.OK);
+        Rial(await s.Client.GetFromJsonAsync<JsonElement>(s.Url + "/wallet", Ct), "balance").ShouldBe(3_500_000);
+        _ = off;
     }
 
     [Fact]

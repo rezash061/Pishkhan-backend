@@ -9950,7 +9950,7 @@
           "Billing"
         ],
         "summary": "What buying a plan costs now, and when it would start",
-        "description": "404 `billing.plan.not_found`; 422 `billing.checkout.plan_not_for_sale` or `billing.checkout.cycle_not_offered`; 409 `billing.checkout.managed_subscription` (a plan granted by the Pishkhan team without an end) or `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).",
+        "description": "404 `billing.plan.not_found`; 422 `billing.checkout.plan_not_for_sale` or `billing.checkout.cycle_not_offered`, or for the coupon `billing.coupon.invalid`, `expired`, `used_up`, `not_for_plan`, `first_purchase_only` or `already_used`; 409 `billing.checkout.managed_subscription` (a plan granted by the Pishkhan team without an end) or `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).",
         "parameters": [
           {
             "name": "workspaceId",
@@ -10445,6 +10445,131 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/wallet": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "The wallet balance and its latest changes",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/billing/wallet/top-up": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Pay money into the wallet: opens the payment at Zarinpal",
+        "description": "400 on `amount` outside 100,000 to 1,000,000,000 Rial; 422 `billing.checkout.unavailable` or `billing.checkout.gateway_unavailable`. The balance grows when Zarinpal confirms the payment; the checkout (kind `wallet_top_up`) is the invoice.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID; retries with the same key return the first response.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletTopUpRequest"
+              },
+              "example": {
+                "amount": 5000000
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartCheckoutResponse"
                 }
               }
             }
@@ -13843,7 +13968,10 @@
           "credit",
           "amount",
           "startsAt",
-          "endsAt"
+          "endsAt",
+          "discount",
+          "couponCode",
+          "walletUsed"
         ],
         "type": "object",
         "properties": {
@@ -13879,6 +14007,18 @@
           "endsAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "couponCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "walletUsed": {
+            "$ref": "#/components/schemas/Money"
           }
         }
       },
@@ -13898,6 +14038,16 @@
               "null",
               "string"
             ]
+          },
+          "couponCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useWallet": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -13921,7 +14071,10 @@
           "subscriptionId",
           "createdBy",
           "createdAt",
-          "paidAt"
+          "paidAt",
+          "discount",
+          "couponCode",
+          "walletUsed"
         ],
         "type": "object",
         "properties": {
@@ -14007,6 +14160,18 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "couponCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "walletUsed": {
+            "$ref": "#/components/schemas/Money"
           }
         }
       },
@@ -20722,7 +20887,10 @@
             "$ref": "#/components/schemas/CheckoutResponse"
           },
           "paymentUrl": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -22075,6 +22243,84 @@
           },
           "code": {
             "type": "string"
+          }
+        }
+      },
+      "WalletEntryResponse": {
+        "required": [
+          "id",
+          "kind",
+          "amount",
+          "balanceAfter",
+          "reason",
+          "checkoutId",
+          "actorKind",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "balanceAfter": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checkoutId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorKind": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WalletResponse": {
+        "required": [
+          "balance",
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletEntryResponse"
+            }
+          }
+        }
+      },
+      "WalletTopUpRequest": {
+        "required": [
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
