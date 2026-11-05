@@ -10392,6 +10392,26 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "discount": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "couponCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "walletUsed": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "walletReleased": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -11095,6 +11115,10 @@
           },
           "endSubscription": {
             "type": "boolean"
+          },
+          "toWallet": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -11144,6 +11168,15 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "toWallet": {
+            "type": "boolean",
+            "default": false
+          },
+          "walletReturned": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
           }
         }
       },
