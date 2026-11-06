@@ -4431,6 +4431,395 @@
         ]
       }
     },
+    "/admin/v1/billing/coupons": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Coupons, newest first",
+        "description": "`q` matches the code or description; `state` active, scheduled, expired, used_up or disabled.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfCouponResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Create a coupon",
+        "description": "Finance or SuperAdmin. 409 `billing.coupon.code_taken`. Audited as billing.coupon.create.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCouponRequest"
+              },
+              "example": {
+                "code": "NOWRUZ1406",
+                "kind": "percent",
+                "value": 20,
+                "description": "تخفیف نوروز",
+                "planCodes": [ ],
+                "firstPurchaseOnly": true,
+                "maxRedemptions": 500,
+                "maxPerWorkspace": 1,
+                "validFrom": null,
+                "validUntil": null,
+                "active": true
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/billing/coupons/{id}": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "A coupon and its redemptions (newest 100)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Change a coupon's limits, dates or description, or turn it off",
+        "description": "Finance or SuperAdmin. Audited as billing.coupon.update.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCouponRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}/wallet": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "A workspace's wallet balance and its latest changes",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/workspaces/{workspaceId}/wallet/adjustments": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Add credit to a workspace's wallet or take it off",
+        "description": "Finance or SuperAdmin, step-up, reason. 409 `billing.wallet.insufficient` when it would go below zero. Audited in the workspace as billing.wallet.adjust.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/ai/providers": {
       "get": {
         "tags": [
@@ -7705,6 +8094,246 @@
           }
         }
       },
+      "CouponDetail": {
+        "required": [
+          "coupon",
+          "redemptions"
+        ],
+        "type": "object",
+        "properties": {
+          "coupon": {
+            "$ref": "#/components/schemas/CouponResponse"
+          },
+          "redemptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CouponRedemptionResponse"
+            }
+          }
+        }
+      },
+      "CouponRedemptionResponse": {
+        "required": [
+          "checkoutId",
+          "workspaceId",
+          "workspaceName",
+          "discount",
+          "invoiceNumber",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "checkoutId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "discount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "invoiceNumber": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CouponResponse": {
+        "required": [
+          "id",
+          "code",
+          "description",
+          "kind",
+          "value",
+          "planCodes",
+          "firstPurchaseOnly",
+          "maxRedemptions",
+          "maxPerWorkspace",
+          "validFrom",
+          "validUntil",
+          "active",
+          "state",
+          "redemptions",
+          "discountTotal",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "planCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "firstPurchaseOnly": {
+            "type": "boolean"
+          },
+          "maxRedemptions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxPerWorkspace": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "redemptions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "discountTotal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateCouponRequest": {
+        "required": [
+          "code",
+          "kind",
+          "value",
+          "description",
+          "planCodes",
+          "firstPurchaseOnly",
+          "maxRedemptions",
+          "maxPerWorkspace",
+          "validFrom",
+          "validUntil",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planCodes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "firstPurchaseOnly": {
+            "type": "boolean"
+          },
+          "maxRedemptions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxPerWorkspace": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
       "CreatePlanRequest": {
         "required": [
           "code",
@@ -9383,6 +10012,35 @@
           }
         }
       },
+      "PagedResultOfCouponResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CouponResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResultOfDeadLetterResponse": {
         "required": [
           "items",
@@ -9734,6 +10392,26 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "discount": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "couponCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "walletUsed": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "walletReleased": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -10437,6 +11115,10 @@
           },
           "endSubscription": {
             "type": "boolean"
+          },
+          "toWallet": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -10486,6 +11168,15 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "toWallet": {
+            "type": "boolean",
+            "default": false
+          },
+          "walletReturned": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
           }
         }
       },
@@ -11193,6 +11884,70 @@
           }
         }
       },
+      "UpdateCouponRequest": {
+        "required": [
+          "description",
+          "planCodes",
+          "firstPurchaseOnly",
+          "maxRedemptions",
+          "maxPerWorkspace",
+          "validFrom",
+          "validUntil",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "planCodes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "firstPurchaseOnly": {
+            "type": "boolean"
+          },
+          "maxRedemptions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxPerWorkspace": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
       "UsageMeter": {
         "required": [
           "meter",
@@ -11267,6 +12022,88 @@
           "joinedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "WalletAdjustmentRequest": {
+        "required": [
+          "amount",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletEntryResponse": {
+        "required": [
+          "id",
+          "kind",
+          "amount",
+          "balanceAfter",
+          "reason",
+          "checkoutId",
+          "actorKind",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "balanceAfter": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checkoutId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorKind": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WalletResponse": {
+        "required": [
+          "balance",
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletEntryResponse"
+            }
           }
         }
       },

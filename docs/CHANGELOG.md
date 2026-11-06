@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added (BE-1.11 coupons and wallet, for admin AD-1.4 and the panel's checkout, 2026-11-05)
+
+- **Coupons** (`/admin/v1/billing/coupons`, Finance creates and edits, every staff reader lists): percent or fixed (Rial), plan
+  codes, first purchase only, total and per-workspace limits, valid from/until, on/off. Redemptions are counted when the checkout is
+  paid; `GET /coupons/{id}` lists them. Audited as `billing.coupon.create` and `.update`.
+- **Wallet**: `GET /api/v1/workspaces/{id}/billing/wallet` (balance and changes) and `POST /wallet/top-up` `{amount}` (100,000 to
+  1,000,000,000 Rial through Zarinpal; checkout kind `wallet_top_up`). `GET /admin/v1/workspaces/{id}/wallet` and
+  `POST /admin/v1/workspaces/{id}/wallet/adjustments` (Finance, step-up, reason; never below zero; audited `billing.wallet.adjust`).
+- **Checkout**: quote and checkout accept `couponCode` and `useWallet`. The discount comes off after an upgrade's credit, then the wallet
+  pays what it can; Zarinpal is asked for the rest (zero or at least 1,000 Toman). A checkout paid in full by both completes at once with
+  `paymentUrl: null`. The wallet part is taken when the checkout opens and given back if it fails or is left unpaid for 2 hours.
+  Quotes and checkouts gain `discount`, `couponCode` and `walletUsed`. New coupon errors (422): `billing.coupon.invalid`, `expired`,
+  `used_up`, `not_for_plan`, `first_purchase_only`, `already_used`.
+- **Refunds**: `toWallet` pays a refund into the wallet; `endSubscription` also gives back the wallet part (`amount` may then be 0);
+  refunding a top-up takes it back out of the wallet (409 `billing.refund.wallet_spent` when already spent).
+- Migration `CouponsAndWallet`: tables `coupons`, `coupon_redemptions`, `wallets` (balance >= 0), `wallet_entries`; new checkout and
+  refund columns.
+
 ### Added (BE-1.11 back office billing: subscriptions, payments, invoices and refunds for admin AD-1.4, 2026-11-05)
 
 - `/admin/v1/billing` (SuperAdmin, Finance, Support, ReadOnly read):

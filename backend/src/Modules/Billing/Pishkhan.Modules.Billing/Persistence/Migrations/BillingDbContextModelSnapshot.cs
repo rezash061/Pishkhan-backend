@@ -259,6 +259,15 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("card_mask");
 
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("coupon_code");
+
+                    b.Property<Guid?>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -276,6 +285,10 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("cycle");
+
+                    b.Property<long>("Discount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("discount");
 
                     b.Property<string>("Error")
                         .HasMaxLength(40)
@@ -349,6 +362,14 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<bool>("WalletReleased")
+                        .HasColumnType("boolean")
+                        .HasColumnName("wallet_released");
+
+                    b.Property<long>("WalletUsed")
+                        .HasColumnType("bigint")
+                        .HasColumnName("wallet_used");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
@@ -360,6 +381,10 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_checkouts_authority")
                         .HasFilter("authority IS NOT NULL");
+
+                    b.HasIndex("CouponId")
+                        .HasDatabaseName("ix_checkouts_coupon_id")
+                        .HasFilter("coupon_id IS NOT NULL");
 
                     b.HasIndex("InvoiceNumber")
                         .IsUnique()
@@ -373,6 +398,136 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasDatabaseName("ix_checkouts_workspace_id_created_at");
 
                     b.ToTable("checkouts", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Coupon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("FirstPurchaseOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("first_purchase_only");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("MaxPerWorkspace")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_per_workspace");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_redemptions");
+
+                    b.PrimitiveCollection<List<string>>("PlanCodes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("plan_codes");
+
+                    b.Property<int>("Redemptions")
+                        .HasColumnType("integer")
+                        .HasColumnName("redemptions");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_coupons");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_coupons_code");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_coupons_created_at");
+
+                    b.ToTable("coupons", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.CouponRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CheckoutId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_id");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("Discount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("discount");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_coupon_redemptions");
+
+                    b.HasIndex("CheckoutId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_coupon_redemptions_checkout_id");
+
+                    b.HasIndex("CouponId", "WorkspaceId")
+                        .HasDatabaseName("ix_coupon_redemptions_coupon_id_workspace_id");
+
+                    b.ToTable("coupon_redemptions", "billing");
                 });
 
             modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.OverageCharge", b =>
@@ -595,6 +750,14 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("reference_id");
 
+                    b.Property<bool>("ToWallet")
+                        .HasColumnType("boolean")
+                        .HasColumnName("to_wallet");
+
+                    b.Property<long>("WalletReturned")
+                        .HasColumnType("bigint")
+                        .HasColumnName("wallet_returned");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
@@ -759,6 +922,107 @@ namespace Pishkhan.Modules.Billing.Persistence.Migrations
                         .HasName("pk_usage_subjects");
 
                     b.ToTable("usage_subjects", "billing");
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.Wallet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Balance")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wallets");
+
+                    b.HasIndex("WorkspaceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_wallets_workspace_id");
+
+                    b.ToTable("wallets", "billing", t =>
+                        {
+                            t.HasCheckConstraint("ck_wallets_balance", "balance >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pishkhan.Modules.Billing.Domain.WalletEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("BalanceAfter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_after");
+
+                    b.Property<Guid?>("CheckoutId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wallet_entries");
+
+                    b.HasIndex("CheckoutId")
+                        .HasDatabaseName("ix_wallet_entries_checkout_id")
+                        .HasFilter("checkout_id IS NOT NULL");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_wallet_entries_workspace_id_created_at");
+
+                    b.ToTable("wallet_entries", "billing");
                 });
 #pragma warning restore 612, 618
         }

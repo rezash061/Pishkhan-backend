@@ -25,6 +25,12 @@ public sealed class Refund : ITenantOwned
 
     public string? ReferenceId { get; private set; }
 
+    /// <summary>Paid into the workspace's wallet instead of back through Zarinpal.</summary>
+    public bool ToWallet { get; private set; }
+
+    /// <summary>The wallet part of the checkout given back to the wallet with this refund (Rial).</summary>
+    public long WalletReturned { get; private set; }
+
     /// <summary>The subscription the checkout bought was ended with the refund.</summary>
     public bool EndedSubscription { get; private set; }
 
@@ -33,14 +39,17 @@ public sealed class Refund : ITenantOwned
     public DateTimeOffset CreatedAt { get; private set; }
 
     /// <summary>Validates against what the checkout was paid and what was already refunded; throws <see cref="DomainException"/>.</summary>
-    public static Refund Create(Checkout checkout, long alreadyRefunded, long amount, string reason, string? referenceId, bool endSubscription, Guid staffId, DateTimeOffset now)
+    /// <remarks><paramref name="amount"/> may be zero only when <paramref name="walletReturned"/> gives back the wallet part.</remarks>
+    public static Refund Create(
+        Checkout checkout, long alreadyRefunded, long amount, string reason, string? referenceId, bool endSubscription, Guid staffId, DateTimeOffset now,
+        bool toWallet = false, long walletReturned = 0)
     {
         if (checkout.Status != CheckoutStatuses.Paid)
         {
             throw new DomainException("billing.refund.not_paid");
         }
 
-        if (amount <= 0 || amount > checkout.Amount - alreadyRefunded)
+        if (amount < 0 || (amount == 0 && walletReturned <= 0) || amount > checkout.Amount - alreadyRefunded)
         {
             throw new DomainException("billing.refund.too_much");
         }
@@ -52,7 +61,9 @@ public sealed class Refund : ITenantOwned
             CheckoutId = checkout.Id,
             Amount = amount,
             Reason = reason.Trim(),
-            ReferenceId = string.IsNullOrWhiteSpace(referenceId) ? null : referenceId.Trim(),
+            ReferenceId = toWallet || string.IsNullOrWhiteSpace(referenceId) ? null : referenceId.Trim(),
+            ToWallet = toWallet,
+            WalletReturned = walletReturned,
             EndedSubscription = endSubscription,
             CreatedBy = staffId,
             CreatedAt = now,

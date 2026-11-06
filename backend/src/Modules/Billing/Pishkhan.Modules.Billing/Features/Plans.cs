@@ -434,4 +434,16 @@ internal sealed class PlanAudit(ICurrentUser caller, IStaffDirectory staff, IClo
             reason: string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
         db.Publish(entry, entry.PartitionKey(), workspaceId: null);
     }
+
+    public async Task RecordCouponAsync(ModuleDbContext db, Coupon coupon, string action, CancellationToken ct)
+    {
+        var entry = AuditEntries.Create(
+            AuditActor.Staff(caller.UserId, await staff.GetUsernameAsync(caller.UserId, ct), caller.IpAddress), action, "coupon", coupon.Id.ToString(), null, clock.UtcNow,
+            after: new
+            {
+                coupon.Code, coupon.Kind, coupon.Value, coupon.PlanCodes, coupon.FirstPurchaseOnly, coupon.MaxRedemptions, coupon.MaxPerWorkspace, coupon.ValidFrom,
+                coupon.ValidUntil, coupon.Active,
+            });
+        db.Publish(entry, entry.PartitionKey(), workspaceId: null);
+    }
 }

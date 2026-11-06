@@ -21,6 +21,7 @@ public static class BillingModule
     {
         services.AddModuleDbContext<BillingDbContext>(BillingDbContext.SchemaName);
         services.AddSingleton<IEntitlements, EntitlementService>();
+        services.AddScoped<WalletLedger>();
         return services;
     }
 
@@ -57,6 +58,7 @@ public static class BillingModule
         SubscriptionEndpoints.MapPanel(app);
         CheckoutEndpoints.Map(app);
         OverageEndpoints.Map(app);
+        WalletEndpoints.Map(app);
         return app;
     }
 
@@ -69,6 +71,7 @@ public static class BillingModule
         PlanEndpoints.MapAdmin(app);
         SubscriptionEndpoints.MapAdmin(app);
         BillingAdminEndpoints.Map(app);
+        CouponAdminEndpoints.Map(app);
         return app;
     }
 }

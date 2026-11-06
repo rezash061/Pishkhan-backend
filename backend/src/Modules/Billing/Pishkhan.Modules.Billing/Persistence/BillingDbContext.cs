@@ -37,6 +37,14 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
 
     public DbSet<Refund> Refunds => Set<Refund>();
 
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+
+    public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
+
+    public DbSet<Wallet> Wallets => Set<Wallet>();
+
+    public DbSet<WalletEntry> WalletEntries => Set<WalletEntry>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Plan>(b =>
@@ -88,6 +96,8 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.Property(x => x.ReferenceId).HasMaxLength(64);
             b.Property(x => x.CardMask).HasMaxLength(32);
             b.Property(x => x.Error).HasMaxLength(40);
+            b.Property(x => x.CouponCode).HasMaxLength(32);
+            b.HasIndex(x => x.CouponId).HasFilter("coupon_id IS NOT NULL");
             b.HasIndex(x => x.Authority).IsUnique().HasFilter("authority IS NOT NULL");
             b.HasIndex(x => x.InvoiceNumber).IsUnique().HasFilter("invoice_number IS NOT NULL");
             b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
@@ -103,6 +113,46 @@ public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options,
             b.Property(x => x.ReferenceId).HasMaxLength(64);
             b.HasIndex(x => x.CheckoutId);
             b.HasIndex(x => x.CreatedAt);
+        });
+
+        modelBuilder.Entity<Coupon>(b =>
+        {
+            b.ToTable("coupons");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Code).HasMaxLength(32);
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Description).HasMaxLength(Coupon.MaxDescription);
+            b.HasIndex(x => x.Code).IsUnique();
+            b.HasIndex(x => x.CreatedAt);
+            b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<CouponRedemption>(b =>
+        {
+            b.ToTable("coupon_redemptions");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasIndex(x => x.CheckoutId).IsUnique();
+            b.HasIndex(x => new { x.CouponId, x.WorkspaceId });
+        });
+
+        modelBuilder.Entity<Wallet>(b =>
+        {
+            b.ToTable("wallets");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasIndex(x => x.WorkspaceId).IsUnique();
+            b.ToTable(t => t.HasCheckConstraint("ck_wallets_balance", "balance >= 0"));
+            b.Ignore(x => x.DomainEvents);
+        });
+
+        modelBuilder.Entity<WalletEntry>(b =>
+        {
+            b.ToTable("wallet_entries");
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Kind).HasMaxLength(20);
+            b.Property(x => x.Reason).HasMaxLength(WalletEntry.MaxReason);
+            b.Property(x => x.ActorKind).HasMaxLength(10);
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+            b.HasIndex(x => x.CheckoutId).HasFilter("checkout_id IS NOT NULL");
         });
 
         modelBuilder.Entity<UsageCounter>(b =>

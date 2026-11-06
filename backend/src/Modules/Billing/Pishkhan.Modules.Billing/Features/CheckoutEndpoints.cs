@@ -14,28 +14,37 @@ using Pishkhan.Web.OpenApi;
 
 namespace Pishkhan.Modules.Billing.Features;
 
-/// <summary><c>cycle</c>: <c>monthly</c> (30 days, the default) or <c>annual</c> (365 days, when the plan has a yearly price).</summary>
-public sealed record CheckoutRequest(Guid PlanId, string? Cycle);
+/// <summary>
+/// <c>cycle</c>: <c>monthly</c> (30 days, the default) or <c>annual</c> (365 days, when the plan has a yearly price). <c>couponCode</c>
+/// (optional, any case) takes its discount off; <c>useWallet</c> pays as much as it can from the workspace's wallet.
+/// </summary>
+public sealed record CheckoutRequest(Guid PlanId, string? Cycle, string? CouponCode = null, bool UseWallet = false);
 
 /// <summary>
 /// What buying the plan costs now. <c>kind</c>: <c>new</c> (starts now), <c>renewal</c> (same plan, starts when the paid time ends),
 /// <c>upgrade</c> (starts now; <c>credit</c> is the unused part of the current period) or <c>downgrade</c> (starts when the paid time ends).
-/// <c>amount</c> is what is paid: <c>price</c> minus <c>credit</c>, at least 1,000 Toman.
+/// <c>amount</c> is what is paid through Zarinpal: <c>price</c> minus <c>credit</c>, the coupon's <c>discount</c> and <c>walletUsed</c>;
+/// zero (paid at once without Zarinpal) or at least 1,000 Toman.
 /// </summary>
 public sealed record CheckoutQuoteResponse(
-    string Kind, Guid PlanId, string PlanCode, string PlanName, string Cycle, Money Price, Money Credit, Money Amount, DateTimeOffset StartsAt, DateTimeOffset EndsAt);
+    string Kind, Guid PlanId, string PlanCode, string PlanName, string Cycle, Money Price, Money Credit, Money Amount, DateTimeOffset StartsAt, DateTimeOffset EndsAt,
+    Money Discount, string? CouponCode, Money WalletUsed);
 
 /// <summary>
 /// A checkout, and once paid the invoice. <c>status</c>: pending, paid, failed or expired (not paid within an hour). <c>error</c> is
-/// Zarinpal's code for a failed one, or <c>cancelled</c> when the payer left the gateway.
+/// Zarinpal's code for a failed one, or <c>cancelled</c> when the payer left the gateway. <c>kind</c> <c>wallet_top_up</c> is money into the
+/// wallet (no plan).
 /// </summary>
 public sealed record CheckoutResponse(
     Guid Id, string Kind, Guid PlanId, string PlanCode, string PlanName, int PlanVersion, string Cycle, Money Price, Money Credit, Money Amount,
     string Status, string? Error, long? InvoiceNumber, string? ReferenceId, string? CardMask, Guid? SubscriptionId, Guid CreatedBy, DateTimeOffset CreatedAt,
-    DateTimeOffset? PaidAt);
+    DateTimeOffset? PaidAt, Money Discount, string? CouponCode, Money WalletUsed);
 
-/// <summary><c>paymentUrl</c> is Zarinpal's page; send the browser there. Zarinpal returns the payer to the panel's billing page with <c>?checkout={id}</c>.</summary>
-public sealed record StartCheckoutResponse(CheckoutResponse Checkout, string PaymentUrl);
+/// <summary>
+/// <c>paymentUrl</c> is Zarinpal's page; send the browser there. Zarinpal returns the payer to the panel's billing page with <c>?checkout={id}</c>.
+/// Null when the coupon and wallet paid it all: the checkout is already paid.
+/// </summary>
+public sealed record StartCheckoutResponse(CheckoutResponse Checkout, string? PaymentUrl);
 
 /// <summary>
 /// A plan on sale as the panel's billing page shows it. <c>current</c>: the workspace is on this plan now (the free plan when nothing is
@@ -59,7 +68,7 @@ internal static class CheckoutEndpoints
         ws.MapPost("/checkout/quote", QuoteAsync)
             .RequireWorkspacePermission(Permissions.BillingManage)
             .WithSummary("What buying a plan costs now, and when it would start")
-            .WithDescription("404 `billing.plan.not_found`; 422 `billing.checkout.plan_not_for_sale` or `billing.checkout.cycle_not_offered`; 409 `billing.checkout.managed_subscription` (a plan granted by the Pishkhan team without an end) or `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).")
+            .WithDescription("404 `billing.plan.not_found`; 422 `billing.checkout.plan_not_for_sale` or `billing.checkout.cycle_not_offered`, or for the coupon `billing.coupon.invalid`, `expired`, `used_up`, `not_for_plan`, `first_purchase_only` or `already_used`; 409 `billing.checkout.managed_subscription` (a plan granted by the Pishkhan team without an end) or `billing.checkout.scheduled_pending` (an upgrade while a later period is already paid for).")
             .Produces<CheckoutQuoteResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
@@ -101,7 +110,7 @@ internal static class CheckoutEndpoints
             return PlanEndpoints.Invalid("cycle", "billing.checkout.cycle_invalid");
         }
 
-        var (quote, plan, error) = await checkouts.QuoteAsync(workspaceId, request.PlanId, Cycle(request), ct);
+        var (quote, plan, error) = await checkouts.QuoteAsync(workspaceId, request.PlanId, Cycle(request), request.CouponCode, request.UseWallet, ct);
         return error is not null ? Problem(error) : Results.Ok(ToResponse(quote!, plan!));
     }
 
@@ -130,10 +139,10 @@ internal static class CheckoutEndpoints
             return PlanEndpoints.Invalid("cycle", "billing.checkout.cycle_invalid");
         }
 
-        var started = await checkouts.StartAsync(workspaceId, request.PlanId, Cycle(request), caller.UserId, ct);
+        var started = await checkouts.StartAsync(workspaceId, request.PlanId, Cycle(request), request.CouponCode, request.UseWallet, caller.UserId, ct);
         return started.Error is not null
             ? Problem(started.Error)
-            : Results.Json(new StartCheckoutResponse(ToResponse(started.Checkout!, clock.UtcNow), started.PaymentUrl!.ToString()), statusCode: StatusCodes.Status201Created);
+            : Results.Json(new StartCheckoutResponse(ToResponse(started.Checkout!, clock.UtcNow), started.PaymentUrl?.ToString()), statusCode: StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> ListAsync(Guid workspaceId, BillingDbContext db, IClock clock, CancellationToken ct)
@@ -172,9 +181,11 @@ internal static class CheckoutEndpoints
     };
 
     private static CheckoutQuoteResponse ToResponse(CheckoutQuote q, Plan plan) => new(
-        q.Kind, plan.Id, plan.Code, plan.Name, q.Cycle, Money.Rial(q.Price), Money.Rial(q.Credit), Money.Rial(q.Amount), q.StartsAt, q.EndsAt);
+        q.Kind, plan.Id, plan.Code, plan.Name, q.Cycle, Money.Rial(q.Price), Money.Rial(q.Credit), Money.Rial(q.Amount), q.StartsAt, q.EndsAt,
+        Money.Rial(q.Discount), q.CouponCode, Money.Rial(q.WalletUsed));
 
     internal static CheckoutResponse ToResponse(Checkout c, DateTimeOffset now) => new(
         c.Id, c.Kind, c.PlanId, c.PlanCode, c.PlanName, c.PlanVersion, c.Cycle, Money.Rial(c.Price), Money.Rial(c.Credit), Money.Rial(c.Amount), c.StatusAt(now),
-        c.Error, c.InvoiceNumber, c.ReferenceId, c.CardMask, c.SubscriptionId, c.CreatedBy, c.CreatedAt, c.PaidAt);
+        c.Error, c.InvoiceNumber, c.ReferenceId, c.CardMask, c.SubscriptionId, c.CreatedBy, c.CreatedAt, c.PaidAt, Money.Rial(c.Discount), c.CouponCode,
+        Money.Rial(c.WalletUsed));
 }
