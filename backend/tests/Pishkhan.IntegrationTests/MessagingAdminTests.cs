@@ -61,5 +61,13 @@ public sealed class MessagingAdminTests(InfraFixture infra) : IAsyncLifetime
 
         (await support.GetFromJsonAsync<JsonElement>("/admin/v1/platform/bale/bots", Ct)).GetProperty("items").ValueKind.ShouldBe(JsonValueKind.Array);
         (await support.PostAsync($"/admin/v1/platform/bale/bots/{Guid.NewGuid()}/check", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        // The Meta app page: settings without secrets, webhook counts and Instagram accounts by status.
+        (await _admin.StaffClient(StaffRoles.Finance).GetAsync("/admin/v1/platform/meta-app", Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var meta = await support.GetFromJsonAsync<JsonElement>("/admin/v1/platform/meta-app", Ct);
+        meta.GetProperty("apiVersion").GetString().ShouldNotBeNullOrEmpty();
+        meta.GetProperty("webhooks").GetProperty("last24Hours").ValueKind.ShouldBe(JsonValueKind.Object);
+        meta.GetProperty("accounts").ValueKind.ShouldBe(JsonValueKind.Object);
+        meta.TryGetProperty("appSecret", out _).ShouldBeFalse();
     }
 }

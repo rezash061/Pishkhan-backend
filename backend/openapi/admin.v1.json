@@ -6411,6 +6411,31 @@
         ]
       }
     },
+    "/admin/v1/platform/meta-app": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The Meta app's settings, webhook health and Instagram accounts by status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaAppResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/platform/sms/log": {
       "get": {
         "tags": [
@@ -11238,6 +11263,68 @@
           }
         }
       },
+      "MetaAppResponse": {
+        "required": [
+          "appId",
+          "apiVersion",
+          "graphBaseUrl",
+          "redirectUri",
+          "appSecretSet",
+          "webhookVerifyTokenSet",
+          "scopes",
+          "webhookFields",
+          "webhooks",
+          "accounts",
+          "tokensExpiringSoon"
+        ],
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "apiVersion": {
+            "type": "string"
+          },
+          "graphBaseUrl": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string"
+          },
+          "appSecretSet": {
+            "type": "boolean"
+          },
+          "webhookVerifyTokenSet": {
+            "type": "boolean"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "webhookFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "webhooks": {
+            "$ref": "#/components/schemas/WebhookStats"
+          },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "tokensExpiringSoon": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Money": {
         "type": "object",
         "properties": {
@@ -13872,6 +13959,29 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/WalletEntryResponse"
+            }
+          }
+        }
+      },
+      "WebhookStats": {
+        "required": [
+          "last24Hours",
+          "lastSeen"
+        ],
+        "type": "object",
+        "properties": {
+          "last24Hours": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "lastSeen": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "format": "date-time"
             }
           }
         }

@@ -37,9 +37,13 @@ public static class ChannelsModule
         return services.AddChannelsOutage(configuration);
     }
 
-    /// <summary>The Bale Bot API client and options (the Api and Workers through the module, the AdminApi for checking sellers' bots).</summary>
+    /// <summary>
+    /// The Bale Bot API client and options, and the Instagram options (the Api and Workers through the module; the AdminApi for checking
+    /// sellers' bots and the Meta app page).
+    /// </summary>
     public static IServiceCollection AddChannelsBale(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<InstagramOptions>().Bind(configuration.GetSection(InstagramOptions.Section));
         services.AddOptions<BaleOptions>().Bind(configuration.GetSection(BaleOptions.Section));
         services.AddHttpClient<BaleBotClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
         return services;

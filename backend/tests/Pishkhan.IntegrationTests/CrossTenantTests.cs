@@ -88,6 +88,7 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
         ["POST /knowledge/unanswered/{questionId}/answer"] = new { answer = "x", question = (string?)null },
         ["PATCH /members/{userId}"] = new { role = "agent" },
         ["PATCH /quick-replies/{id}"] = new { shortcut = "x", text = "y" },
+        ["POST /support/tickets/{ticketId}/messages"] = new { body = "x" },
     };
 
     /// <summary>
@@ -309,6 +310,9 @@ public sealed partial class CrossTenantTests(InfraFixture infra, ChannelsHost wo
         });
         ids["linkId"] = await Created($"/orders/{payable}/payment-links", new { });
         ids["batchId"] = await Created("/catalog/price-changes", new { scope = new { productIds = new[] { Guid.Parse(ids["productId"]) } }, kind = "percent", percent = 10 });
+        var ticket = await b.Client.PostAsJsonAsync(url + "/support/tickets", new { subject = "تیکت ب", category = "other", body = "سلام" }, Ct);
+        ticket.StatusCode.ShouldBe(HttpStatusCode.Created);
+        ids["ticketId"] = (await ticket.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("ticket").GetProperty("id").GetString()!;
         ids["invitationId"] = await Created("/invitations", new { phone = "0912" + Random.Shared.Next(1_000_000, 9_999_999), role = "agent" });
         return ids;
     }

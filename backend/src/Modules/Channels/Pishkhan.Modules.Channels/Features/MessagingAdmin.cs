@@ -2,12 +2,16 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Pishkhan.Infrastructure.Persistence;
 using Pishkhan.Infrastructure.Security;
 using Pishkhan.Infrastructure.Sms;
 using Pishkhan.Modules.Audit.Contracts;
+using Pishkhan.Infrastructure.Caching;
 using Pishkhan.Modules.Channels.Bale;
+using Pishkhan.Modules.Channels.Instagram;
+using StackExchange.Redis;
 using Pishkhan.Modules.Channels.Contracts;
 using Pishkhan.Modules.Channels.Persistence;
 using Pishkhan.Modules.Channels.Services;
@@ -52,6 +56,15 @@ public sealed record AdminBaleBot(
 public sealed record BaleCheckResult(AdminBaleBot Bot, string Result);
 
 /// <summary>
+/// The Meta (Instagram) app as configured: ids and URLs, whether the secrets are set (never their values), the login scopes and
+/// webhook fields, webhook results in the last 24 hours and when each was last seen, and sellers' Instagram accounts by status.
+/// <c>tokensExpiringSoon</c>: active accounts whose token ends within 10 days.
+/// </summary>
+public sealed record MetaAppResponse(
+    string AppId, string ApiVersion, string GraphBaseUrl, string RedirectUri, bool AppSecretSet, bool WebhookVerifyTokenSet, IReadOnlyList<string> Scopes,
+    IReadOnlyList<string> WebhookFields, WebhookStats Webhooks, IReadOnlyDictionary<string, int> Accounts, int TokensExpiringSoon);
+
+/// <summary>
 /// SMS provider and Bale configuration and the SMS log in the AdminApi (admin plan AD-2.4). Readers: SuperAdmin, Support, ReadOnly.
 /// A test SMS: SuperAdmin with step-up. Checking a Bale bot: Support.
 /// </summary>
@@ -68,6 +81,10 @@ internal static class MessagingAdminEndpoints
         read.MapGet("/messaging", OverviewAsync)
             .WithSummary("SMS provider and Bale settings and their state")
             .Produces<MessagingOverview>();
+
+        read.MapGet("/meta-app", MetaAppAsync)
+            .WithSummary("The Meta app's settings, webhook health and Instagram accounts by status")
+            .Produces<MetaAppResponse>();
 
         read.MapGet("/sms/log", LogAsync)
             .WithSummary("SMS the platform sent, newest first (kept 90 days)")
@@ -118,6 +135,22 @@ internal static class MessagingAdminEndpoints
         return Results.Ok(new MessagingOverview(
             new SmsOverview(await provider.StatusAsync(ct), traffic),
             new BaleOverview(o.ApiBaseUrl, o.WebhookBaseUrl, o.WebhookSecret != new BaleOptions().WebhookSecret && o.WebhookSecret.Length >= 16, bots)));
+    }
+
+    private static async Task<IResult> MetaAppAsync(
+        ChannelsDbContext db, IOptions<InstagramOptions> instagram, [FromKeyedServices(RedisInstances.State)] IConnectionMultiplexer redis, RedisKeys keys,
+        IClock clock, CancellationToken ct)
+    {
+        var o = instagram.Value;
+        var now = clock.UtcNow;
+        var accounts = db.Accounts.AsNoTracking().IgnoreQueryFilters([ModuleDbContext.TenantFilter]).Where(a => a.Kind == ChannelKinds.Instagram);
+        var byStatus = await accounts.GroupBy(a => a.Status).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var soon = now.AddDays(10);
+        var expiring = await accounts.CountAsync(a => a.Status != ChannelStatuses.Disconnected && a.TokenExpiresAt != null && a.TokenExpiresAt < soon, ct);
+        var stats = await InstagramWebhookStats.ReadAsync(redis.GetDatabase(), keys, now);
+        return Results.Ok(new MetaAppResponse(
+            o.AppId, o.ApiVersion, o.GraphBaseUrl, o.RedirectUri, !string.IsNullOrEmpty(o.AppSecret), !string.IsNullOrEmpty(o.WebhookVerifyToken), o.Scopes,
+            o.WebhookFields, stats, byStatus, expiring));
     }
 
     private static IResult Invalid(string field, string code) =>

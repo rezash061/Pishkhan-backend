@@ -69,7 +69,7 @@ internal static class InstagramWebhooks
         var ct = http.RequestAborted;
         if (http.Request.ContentLength > MaxBodyBytes)
         {
-            Received.Add(1, new KeyValuePair<string, object?>("result", "too_large"));
+            Count(redis, keys, clock, "too_large");
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
@@ -85,14 +85,14 @@ internal static class InstagramWebhooks
         }
         catch (Exception ex) when (ex is InvalidDataException || ex is BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge })
         {
-            Received.Add(1, new KeyValuePair<string, object?>("result", "too_large"));
+            Count(redis, keys, clock, "too_large");
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
 
         // Signature first: nothing of an unsigned body is parsed.
         if (!InstagramSignatures.VerifyWebhook(body, http.Request.Headers["X-Hub-Signature-256"], options.Value.AppSecret))
         {
-            Received.Add(1, new KeyValuePair<string, object?>("result", "bad_signature"));
+            Count(redis, keys, clock, "bad_signature");
             logger.LogWarning("Instagram webhook with an invalid signature from {RemoteIp}", http.Connection.RemoteIpAddress);
             return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, type: ProblemTypes.Unauthorized, title: "webhook.invalid_signature");
         }
@@ -104,7 +104,7 @@ internal static class InstagramWebhooks
         }
         catch (JsonException)
         {
-            Received.Add(1, new KeyValuePair<string, object?>("result", "bad_json"));
+            Count(redis, keys, clock, "bad_json");
             return Results.BadRequest();
         }
 
@@ -114,7 +114,7 @@ internal static class InstagramWebhooks
             var obj = root.TryGetProperty("object", out var o) ? o.GetString() ?? string.Empty : string.Empty;
             if (!root.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
             {
-                Received.Add(1, new KeyValuePair<string, object?>("result", "ignored"));
+                Count(redis, keys, clock, "ignored");
                 return Results.Ok();
             }
 
@@ -131,7 +131,7 @@ internal static class InstagramWebhooks
                 var dedupeKey = keys.For("igwh", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(entry.GetRawText()))));
                 if (!await db.StringSetAsync(dedupeKey, 1, DedupeWindow, When.NotExists))
                 {
-                    Received.Add(1, new KeyValuePair<string, object?>("result", "duplicate"));
+                    Count(redis, keys, clock, "duplicate");
                     continue;
                 }
 
@@ -144,15 +144,22 @@ internal static class InstagramWebhooks
                     // Let Meta retry: forget the dedupe mark and answer 5xx.
                     await db.KeyDeleteAsync(dedupeKey);
                     logger.LogError(ex, "Could not produce Instagram webhook for account {AccountExternalId}", accountId);
-                    Received.Add(1, new KeyValuePair<string, object?>("result", "produce_failed"));
+                    Count(redis, keys, clock, "produce_failed");
                     return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
                 }
 
-                Received.Add(1, new KeyValuePair<string, object?>("result", "accepted"));
+                Count(redis, keys, clock, "accepted");
             }
         }
 
         return Results.Ok();
+    }
+
+    /// <summary>The metric, plus hourly counts and the last time of each result in Redis for the back office's Meta app page.</summary>
+    private static void Count(IConnectionMultiplexer redis, RedisKeys keys, IClock clock, string result)
+    {
+        Received.Add(1, new KeyValuePair<string, object?>("result", result));
+        InstagramWebhookStats.Record(redis.GetDatabase(), keys, clock.UtcNow, result);
     }
 
     private static async Task<byte[]> ReadBodyAsync(Stream body, CancellationToken ct)
