@@ -23,5 +23,6 @@
     <ProjectReference Include="..\..\Modules\Identity\Pishkhan.Modules.Identity\Pishkhan.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Channels\Pishkhan.Modules.Channels\Pishkhan.Modules.Channels.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Pishkhan.Modules.Files\Pishkhan.Modules.Files.csproj" />
+    <ProjectReference Include="..\..\Modules\Notifications\Pishkhan.Modules.Notifications\Pishkhan.Modules.Notifications.csproj" />
   </ItemGroup>
 </Project>

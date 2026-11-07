@@ -18,6 +18,7 @@ using Pishkhan.Modules.Channels;
 using Pishkhan.Modules.Content;
 using Pishkhan.Modules.Files;
 using Pishkhan.Modules.Identity;
+using Pishkhan.Modules.Notifications;
 using Pishkhan.Modules.Templates;
 using Pishkhan.Modules.Tenancy;
 using Pishkhan.SharedKernel;
@@ -53,6 +54,7 @@ public sealed class AdminHost : IAsyncDisposable
             .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddChannelsOutage(builder.Configuration).AddBillingModule(builder.Configuration).AddBillingBackoffice()
             .AddAgentModule(builder.Configuration).AddAgentBackoffice()
             .AddFilesModule(builder.Configuration).AddFilesBackoffice()
+            .AddNotificationsModule(builder.Configuration)
             .AddTemplatesModule(builder.Configuration).AddTemplatesBackoffice().AddAutomationTemplateValidator().DecorateHandlers();
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-admin-api", m => m.AddCacheInvalidation());
         var app = builder.Build();
@@ -66,6 +68,7 @@ public sealed class AdminHost : IAsyncDisposable
         app.MapTemplatesAdminEndpoints();
         app.MapChannelsAdminEndpoints();
         app.MapFilesAdminEndpoints();
+        app.MapNotificationsAdminEndpoints();
         await app.StartAsync(ct);
         return new AdminHost(app);
     }
