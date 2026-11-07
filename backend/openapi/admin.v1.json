@@ -235,6 +235,42 @@
         ]
       }
     },
+    "/admin/v1/me/recovery-codes": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Make new recovery codes (the old ones stop working)",
+        "description": "Step-up. The codes are shown once; each replaces a TOTP code for one sign-in or step-up. Audited as staff.recovery_codes_regenerated.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/staff": {
       "get": {
         "tags": [
@@ -6350,6 +6386,313 @@
         ]
       }
     },
+    "/admin/v1/platform/messaging": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "SMS provider and Bale settings and their state",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/sms/log": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "SMS the platform sent, newest first (kept 90 days)",
+        "description": "`phone` (any Iranian mobile format) finds one number's messages; `purpose` otp, invitation, notification, campaign, test or other; `status` sent or failed; `workspaceId`.",
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "purpose",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfSmsLogItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/bale/bots": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Sellers' Bale bots, newest first",
+        "description": "`status`; `q` matches the bot username; `workspaceId`.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAdminBaleBot"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/sms/test": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Send a test SMS through the provider",
+        "description": "SuperAdmin, step-up. 502 `sms.send_failed` with the provider's error. Audited as platform.sms.test.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsLogItem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/bale/bots/{id}/check": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Check a bot's token with Bale and register its webhook again",
+        "description": "Support or SuperAdmin. A token Bale refuses moves the bot to reauth_required (the seller is told to connect it again). Audited as channels.bale.check.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaleCheckResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/files/quarantine": {
       "get": {
         "tags": [
@@ -7410,6 +7753,72 @@
   },
   "components": {
     "schemas": {
+      "AdminBaleBot": {
+        "required": [
+          "id",
+          "workspaceId",
+          "workspaceName",
+          "botId",
+          "username",
+          "displayName",
+          "status",
+          "statusReason",
+          "statusChangedAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "botId": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statusChangedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminOutageResponse": {
         "required": [
           "kind",
@@ -8932,6 +9341,48 @@
                 "$ref": "#/components/schemas/JsonElement"
               }
             ]
+          }
+        }
+      },
+      "BaleCheckResult": {
+        "required": [
+          "bot",
+          "result"
+        ],
+        "type": "object",
+        "properties": {
+          "bot": {
+            "$ref": "#/components/schemas/AdminBaleBot"
+          },
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "BaleOverview": {
+        "required": [
+          "apiBaseUrl",
+          "webhookBaseUrl",
+          "webhookSecretSet",
+          "bots"
+        ],
+        "type": "object",
+        "properties": {
+          "apiBaseUrl": {
+            "type": "string"
+          },
+          "webhookBaseUrl": {
+            "type": "string"
+          },
+          "webhookSecretSet": {
+            "type": "boolean"
+          },
+          "bots": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -10772,6 +11223,21 @@
           }
         }
       },
+      "MessagingOverview": {
+        "required": [
+          "sms",
+          "bale"
+        ],
+        "type": "object",
+        "properties": {
+          "sms": {
+            "$ref": "#/components/schemas/SmsOverview"
+          },
+          "bale": {
+            "$ref": "#/components/schemas/BaleOverview"
+          }
+        }
+      },
       "Money": {
         "type": "object",
         "properties": {
@@ -10796,6 +11262,35 @@
           },
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "PagedResultOfAdminBaleBot": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminBaleBot"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -11247,6 +11742,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QuarantineFileResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfSmsLogItem": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SmsLogItem"
             }
           },
           "totalCount": {
@@ -12021,6 +12545,20 @@
           }
         }
       },
+      "RecoveryCodesResponse": {
+        "required": [
+          "codes"
+        ],
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RecurringJobInfo": {
         "required": [
           "name",
@@ -12218,6 +12756,161 @@
           }
         }
       },
+      "SmsLogItem": {
+        "required": [
+          "id",
+          "createdAt",
+          "purpose",
+          "workspaceId",
+          "workspaceName",
+          "phone",
+          "provider",
+          "status",
+          "error",
+          "segments",
+          "template"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "segments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "template": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SmsOverview": {
+        "required": [
+          "provider",
+          "last24Hours"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/SmsProviderStatus"
+          },
+          "last24Hours": {
+            "$ref": "#/components/schemas/SmsTraffic"
+          }
+        }
+      },
+      "SmsProviderStatus": {
+        "required": [
+          "provider",
+          "configured",
+          "otpTemplate",
+          "credit",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "otpTemplate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "credit": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SmsTestRequest": {
+        "required": [
+          "phone"
+        ],
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string"
+          }
+        }
+      },
+      "SmsTraffic": {
+        "required": [
+          "sent",
+          "failed",
+          "byPurpose"
+        ],
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byPurpose": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
       "StaffActionRequest": {
         "required": [
           "reason"
@@ -12303,6 +12996,15 @@
               "null",
               "string"
             ]
+          },
+          "recoveryCodes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -12326,6 +13028,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "recoveryCodesLeft": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
           }
         }
       },

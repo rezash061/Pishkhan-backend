@@ -33,7 +33,7 @@ services
     .AddContentModule(configuration).AddContentBackoffice()
     .AddTenancyModule(configuration)
     .AddIdentityDirectory()
-    .AddChannelsDirectory().AddChannelsOutage(configuration)
+    .AddChannelsDirectory().AddChannelsOutage(configuration).AddChannelsBale(configuration)
     .AddBillingModule(configuration).AddBillingBackoffice()
     .AddAgentModule(configuration).AddAgentBackoffice()
     .AddFilesModule(configuration).AddFilesBackoffice()

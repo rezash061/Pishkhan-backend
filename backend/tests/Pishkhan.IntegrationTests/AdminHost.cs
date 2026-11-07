@@ -51,7 +51,7 @@ public sealed class AdminHost : IAsyncDisposable
         builder.Services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
         builder.Services.AddPishkhanOpenApi(ApiDocuments.Admin);
         builder.Services.AddBackofficeModule(builder.Configuration).AddContentModule(builder.Configuration).AddContentBackoffice()
-            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddChannelsOutage(builder.Configuration).AddBillingModule(builder.Configuration).AddBillingBackoffice()
+            .AddTenancyModule(builder.Configuration).AddIdentityDirectory().AddChannelsDirectory().AddChannelsOutage(builder.Configuration).AddChannelsBale(builder.Configuration).AddBillingModule(builder.Configuration).AddBillingBackoffice()
             .AddAgentModule(builder.Configuration).AddAgentBackoffice()
             .AddFilesModule(builder.Configuration).AddFilesBackoffice()
             .AddNotificationsModule(builder.Configuration)

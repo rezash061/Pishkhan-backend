@@ -143,7 +143,7 @@ internal sealed class OutageCampaignBatchHandler(
         {
             try
             {
-                await sms.SendAsync(new SmsMessage(phone, text), cancellationToken);
+                await sms.SendAsync(new SmsMessage(phone, text, Purpose: SmsPurposes.Campaign, WorkspaceId: _campaign.WorkspaceId), cancellationToken);
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException && !cancellationToken.IsCancellationRequested)
             {

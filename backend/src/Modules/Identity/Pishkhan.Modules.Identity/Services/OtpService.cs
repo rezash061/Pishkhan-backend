@@ -54,7 +54,7 @@ internal sealed class OtpService(
         await db.KeyExpireAsync(key, o.OtpLifetime);
 
         var text = $"کد ورود شما به پیشخوان: {PersianDigits.ToPersian(code)}\nاین کد را به کسی ندهید.";
-        await sms.SendAsync(new SmsMessage(phone, text, smsOptions.Value.OtpTemplate, [code]), cancellationToken);
+        await sms.SendAsync(new SmsMessage(phone, text, smsOptions.Value.OtpTemplate, [code], SmsPurposes.Otp), cancellationToken);
         return ((int)o.OtpLifetime.TotalSeconds, (int)o.OtpResendCooldown.TotalSeconds);
     }
 

@@ -32,10 +32,17 @@ public static class ChannelsModule
         services.AddScoped<IChannelPacing, ChannelPacingProvider>();
         services.AddScoped<InstagramTokenRefresher>();
         services.AddSingleton<IChannelWebhookParser, InstagramWebhookParser>();
-        services.AddOptions<BaleOptions>().Bind(configuration.GetSection(BaleOptions.Section));
-        services.AddHttpClient<BaleBotClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
+        services.AddChannelsBale(configuration);
         services.AddSingleton<IBaleLinks, BaleLinks>();
         return services.AddChannelsOutage(configuration);
+    }
+
+    /// <summary>The Bale Bot API client and options (the Api and Workers through the module, the AdminApi for checking sellers' bots).</summary>
+    public static IServiceCollection AddChannelsBale(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<BaleOptions>().Bind(configuration.GetSection(BaleOptions.Section));
+        services.AddHttpClient<BaleBotClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
+        return services;
     }
 
     /// <summary>The outage detector's counters and the outage status (every host that calls Instagram, and the AdminApi's outage mode).</summary>
@@ -84,10 +91,11 @@ public static class ChannelsModule
         return app;
     }
 
-    /// <summary>AdminApi: <c>/admin/v1/platform/outage</c>. Needs <see cref="AddChannelsDirectory"/> and <see cref="AddChannelsOutage"/>.</summary>
+    /// <summary>AdminApi: <c>/admin/v1/platform/outage</c>, <c>/messaging</c>, <c>/sms</c> and <c>/bale</c>. Needs <see cref="AddChannelsDirectory"/>, <see cref="AddChannelsOutage"/> and <see cref="AddChannelsBale"/>.</summary>
     public static IEndpointRouteBuilder MapChannelsAdminEndpoints(this IEndpointRouteBuilder app)
     {
         OutageEndpoints.MapAdmin(app);
+        MessagingAdminEndpoints.Map(app);
         return app;
     }
 
