@@ -32,7 +32,13 @@ public sealed record StaffLoginResponse(
     DateTimeOffset? RefreshTokenExpiresAt = null,
     string? EnrollmentToken = null,
     string? TotpSecret = null,
-    string? OtpAuthUri = null);
+    string? OtpAuthUri = null,
+    IReadOnlyList<string>? RecoveryCodes = null);
+
+/// <summary>New one-time recovery codes; shown once. Each replaces a TOTP code for one sign-in or step-up.</summary>
+public sealed record RecoveryCodesResponse(IReadOnlyList<string> Codes);
+
+public sealed record RegenerateRecoveryCodesCommand;
 
 public sealed record TotpEnrollRequest(string EnrollmentToken, string Code);
 
@@ -42,7 +48,8 @@ public sealed record StepUpRequest(string Password, string TotpCode);
 
 public sealed record StepUpResponse(string AccessToken, DateTimeOffset AccessTokenExpiresAt);
 
-public sealed record StaffMeResponse(Guid Id, string Username, IReadOnlyList<string> Roles);
+/// <summary><c>recoveryCodesLeft</c>: unused recovery codes; 0 means the staff member should make new ones.</summary>
+public sealed record StaffMeResponse(Guid Id, string Username, IReadOnlyList<string> Roles, int RecoveryCodesLeft = 0);
 
 public sealed record CreateStaffRequest(string Username, string Password, IReadOnlyList<string> Roles);
 
@@ -107,6 +114,7 @@ internal sealed class StaffAuthHandlers(
     ICommandHandler<StaffLogoutCommand, Unit>,
     ICommandHandler<StepUpRequest, StepUpResponse>,
     IQueryHandler<StaffMeQuery, StaffMeResponse>,
+    ICommandHandler<RegenerateRecoveryCodesCommand, RecoveryCodesResponse>,
     IQueryHandler<ListStaffQuery, IReadOnlyList<StaffSummary>>,
     ICommandHandler<CreateStaffRequest, StaffSummary>,
     IStaffProvisioning
@@ -181,8 +189,10 @@ internal sealed class StaffAuthHandlers(
         }
 
         staff.EnableTotp(step);
+        var codes = NewRecoveryCodes(staff);
         Audit(Actor(staff), "staff.totp_enrolled", "staff", staff.Id);
-        return await StartSessionAsync(staff, "staff.login", cancellationToken);
+        var session = await StartSessionAsync(staff, "staff.login", cancellationToken);
+        return session with { RecoveryCodes = codes };
     }
 
     public async Task<Result<StaffLoginResponse>> HandleAsync(StaffRefreshRequest command, CancellationToken cancellationToken)
@@ -244,7 +254,7 @@ internal sealed class StaffAuthHandlers(
     public async Task<Result<StaffMeResponse>> HandleAsync(StaffMeQuery query, CancellationToken cancellationToken)
     {
         var staff = await db.StaffUsers.AsNoTracking().FirstAsync(s => s.Id == caller.UserId, cancellationToken);
-        return new StaffMeResponse(staff.Id, staff.Username, staff.Roles);
+        return new StaffMeResponse(staff.Id, staff.Username, staff.Roles, staff.RecoveryCodeHashes.Count);
     }
 
     public async Task<Result<IReadOnlyList<StaffSummary>>> HandleAsync(ListStaffQuery query, CancellationToken cancellationToken)
@@ -279,11 +289,58 @@ internal sealed class StaffAuthHandlers(
         return staff.Id;
     }
 
+    public async Task<Result<RecoveryCodesResponse>> HandleAsync(RegenerateRecoveryCodesCommand command, CancellationToken cancellationToken)
+    {
+        var staff = await db.StaffUsers.FirstAsync(s => s.Id == caller.UserId, cancellationToken);
+        if (!staff.TotpEnabled)
+        {
+            return Error.Conflict("backoffice.totp.not_enabled");
+        }
+
+        var codes = NewRecoveryCodes(staff);
+        Audit(Actor(staff), "staff.recovery_codes_regenerated", "staff", staff.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return new RecoveryCodesResponse(codes);
+    }
+
+    internal const int RecoveryCodeCount = 10;
+    private const string RecoveryAlphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+
+    /// <summary>Ten fresh codes like <c>k7m2p-x9q4r</c>; only their hashes are kept, so the old ones stop working.</summary>
+    private static IReadOnlyList<string> NewRecoveryCodes(StaffUser staff)
+    {
+        var codes = Enumerable.Range(0, RecoveryCodeCount)
+            .Select(_ => RandomNumberGenerator.GetString(RecoveryAlphabet, 10))
+            .Select(c => $"{c[..5]}-{c[5..]}")
+            .ToList();
+        staff.SetRecoveryCodes(codes.Select(c => Hash(NormalizeRecoveryCode(c)!)));
+        return codes;
+    }
+
+    /// <summary>Lower case, without spaces and dashes; null when it cannot be a recovery code.</summary>
+    internal static string? NormalizeRecoveryCode(string code)
+    {
+        var plain = new string([.. code.Trim().ToLowerInvariant().Where(c => c is not ('-' or ' '))]);
+        return plain.Length == 10 && plain.All(c => RecoveryAlphabet.Contains(c)) ? plain : null;
+    }
+
+    /// <summary>A TOTP code, or one of the staff member's unused recovery codes (spent on use and audited).</summary>
     private bool VerifyTotp(StaffUser staff, string? code, DateTimeOffset now)
     {
         if (staff.TotpSecretEnc is null || string.IsNullOrEmpty(code))
         {
             return false;
+        }
+
+        if (NormalizeRecoveryCode(code) is { } recovery)
+        {
+            if (!staff.UseRecoveryCode(Hash(recovery)))
+            {
+                return false;
+            }
+
+            Audit(Actor(staff), "staff.recovery_code_used", "staff", staff.Id, after: new { left = staff.RecoveryCodeHashes.Count });
+            return true;
         }
 
         var secret = Convert.FromBase64String(secrets.Unprotect(staff.TotpSecretEnc, TotpPurpose));

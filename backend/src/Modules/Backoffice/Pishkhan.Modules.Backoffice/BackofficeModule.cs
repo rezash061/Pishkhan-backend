@@ -82,6 +82,15 @@ public static class BackofficeModule
             .WithSummary("Current staff member")
             .Produces<StaffMeResponse>();
 
+        admin.MapPost("/me/recovery-codes", (ICommandHandler<RegenerateRecoveryCodesCommand, RecoveryCodesResponse> handler, CancellationToken ct) =>
+                Send(handler.HandleAsync(new RegenerateRecoveryCodesCommand(), ct)))
+            .RequireStepUp()
+            .WithSummary("Make new recovery codes (the old ones stop working)")
+            .WithDescription("Step-up. The codes are shown once; each replaces a TOTP code for one sign-in or step-up. Audited as " +
+                "staff.recovery_codes_regenerated.")
+            .Produces<RecoveryCodesResponse>()
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         admin.MapGet("/staff", (IQueryHandler<ListStaffQuery, IReadOnlyList<StaffSummary>> handler, CancellationToken ct) => Send(handler.HandleAsync(new ListStaffQuery(), ct)))
             .RequireAuthorization(AuthPolicies.StaffRole(StaffRoles.SuperAdmin))
             .WithSummary("Staff accounts")

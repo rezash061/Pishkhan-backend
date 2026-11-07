@@ -284,6 +284,79 @@ namespace Pishkhan.Infrastructure.Persistence.Migrations
 
                     b.ToTable("timers", "platform");
                 });
+
+            modelBuilder.Entity("Pishkhan.Infrastructure.Sms.SmsLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error");
+
+                    b.Property<string>("PhoneBidx")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("phone_bidx");
+
+                    b.Property<string>("PhoneMasked")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_masked");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("purpose");
+
+                    b.Property<int>("Segments")
+                        .HasColumnType("integer")
+                        .HasColumnName("segments");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Template")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("template");
+
+                    b.Property<Guid?>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sms_log");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_sms_log_created_at");
+
+                    b.HasIndex("PhoneBidx", "CreatedAt")
+                        .HasDatabaseName("ix_sms_log_phone_bidx_created_at");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .HasDatabaseName("ix_sms_log_workspace_id_created_at");
+
+                    b.ToTable("sms_log", "platform");
+                });
 #pragma warning restore 612, 618
         }
     }

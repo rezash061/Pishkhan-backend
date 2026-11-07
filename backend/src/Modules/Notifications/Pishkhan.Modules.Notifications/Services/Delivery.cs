@@ -133,7 +133,7 @@ internal abstract class NotifyingHandler<TEvent>(
             {
                 if (await users.GetPhoneAsync(userId, cancellationToken) is { } phone)
                 {
-                    await sms.SendAsync(new SmsMessage(phone, text), cancellationToken);
+                    await sms.SendAsync(new SmsMessage(phone, text, Purpose: SmsPurposes.Notification, WorkspaceId: Db.Tenant.WorkspaceId), cancellationToken);
                 }
             }
             catch (Exception e) when (e is not OperationCanceledException)

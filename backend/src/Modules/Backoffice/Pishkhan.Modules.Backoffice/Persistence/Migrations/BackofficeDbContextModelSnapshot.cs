@@ -376,6 +376,11 @@ namespace Pishkhan.Modules.Backoffice.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("password_hash");
 
+                    b.PrimitiveCollection<List<string>>("RecoveryCodeHashes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("recovery_code_hashes");
+
                     b.PrimitiveCollection<List<string>>("Roles")
                         .IsRequired()
                         .HasColumnType("text[]")

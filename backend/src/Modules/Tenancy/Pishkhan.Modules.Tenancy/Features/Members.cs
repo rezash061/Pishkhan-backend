@@ -174,7 +174,7 @@ internal sealed class MemberHandlers(
         await db.SaveChangesAsync(cancellationToken);
 
         var workspaceName = await db.Workspaces.Where(w => w.Id == invitation.WorkspaceId).Select(w => w.Name).FirstAsync(cancellationToken);
-        await sms.SendAsync(new SmsMessage(phone, $"شما به «{workspaceName}» در پیشخوان دعوت شده‌اید:\n{options.Value.InvitationUrl}{token}"), cancellationToken);
+        await sms.SendAsync(new SmsMessage(phone, $"شما به «{workspaceName}» در پیشخوان دعوت شده‌اید:\n{options.Value.InvitationUrl}{token}", Purpose: SmsPurposes.Invitation, WorkspaceId: invitation.WorkspaceId), cancellationToken);
         return new InvitationResponse(invitation.Id, invitation.Role, invitation.ExpiresAt, "pending");
     }
 

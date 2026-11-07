@@ -19,6 +19,7 @@ using Pishkhan.Modules.Backoffice;
 using Pishkhan.Modules.Backoffice.Contracts;
 using Pishkhan.Modules.Backoffice.Features;
 using Pishkhan.Modules.Backoffice.Persistence;
+using Pishkhan.Modules.Tenancy;
 using Pishkhan.Web.Auth;
 using Pishkhan.Web.Hosting;
 using Pishkhan.Web.OpenApi;
@@ -48,7 +49,7 @@ public sealed class AuditTests(InfraFixture infra, ChannelsHost workers) : IAsyn
         builder.AddPishkhanWebHost("it-admin-api").AddPostgresCheck();
         builder.Services.AddPishkhanAuthentication(builder.Configuration, builder.Environment, AuthSchemes.Staff);
         builder.Services.AddPishkhanOpenApi(ApiDocuments.Admin);
-        builder.Services.AddBackofficeModule(builder.Configuration).AddAuditModule(builder.Configuration).DecorateHandlers();
+        builder.Services.AddBackofficeModule(builder.Configuration).AddAuditModule(builder.Configuration).AddTenancyModule(builder.Configuration).DecorateHandlers();
         builder.Services.AddPishkhanMessaging(builder.Configuration, "it-admin-api", m => m.AddCacheInvalidation());
         _admin = builder.Build();
         _admin.UsePishkhanWebHost();
@@ -158,6 +159,53 @@ public sealed class AuditTests(InfraFixture infra, ChannelsHost workers) : IAsyn
     {
         var (username, password) = await ProvisionAsync(role);
         return await EnrollAsync(username, password);
+    }
+
+    [Fact]
+    public async Task Recovery_codes_come_with_enrollment_work_once_each_and_can_be_replaced_after_step_up()
+    {
+        var (username, password) = await ProvisionAsync(StaffRoles.Support);
+        var client = _admin.GetTestClient();
+        var login = await client.PostAsJsonAsync("/admin/v1/auth/login", new { username, password }, Ct);
+        var enrollmentToken = (await login.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("enrollmentToken").GetString();
+        byte[] secret;
+        await using (var scope = _admin.Services.CreateAsyncScope())
+        {
+            var staff = await scope.ServiceProvider.GetRequiredService<BackofficeDbContext>().StaffUsers.AsNoTracking().SingleAsync(s => s.Username == username, Ct);
+            secret = Convert.FromBase64String(scope.ServiceProvider.GetRequiredService<ISecretProtector>().Unprotect(staff.TotpSecretEnc!, StaffAuthHandlers.TotpPurpose));
+        }
+
+        var enrolled = await (await client.PostAsJsonAsync("/admin/v1/auth/totp/enroll", new { enrollmentToken, code = Totp.Compute(secret, DateTimeOffset.UtcNow) }, Ct))
+            .Content.ReadFromJsonAsync<JsonElement>(Ct);
+        var codes = enrolled.GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!).ToList();
+        codes.Count.ShouldBe(10);
+        codes.Distinct().Count().ShouldBe(10);
+        codes[0].ShouldMatch("^[a-z2-9]{5}-[a-z2-9]{5}$");
+
+        // A recovery code (any case, without the dash) signs in once.
+        var withCode = new { username, password, totpCode = codes[0].Replace("-", "", StringComparison.Ordinal).ToUpperInvariant() };
+        var signedIn = await _admin.GetTestClient().PostAsJsonAsync("/admin/v1/auth/login", withCode, Ct);
+        signedIn.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await _admin.GetTestClient().PostAsJsonAsync("/admin/v1/auth/login", withCode, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        var session = _admin.GetTestClient();
+        session.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", (await signedIn.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("accessToken").GetString());
+        (await session.GetFromJsonAsync<JsonElement>("/admin/v1/me", Ct)).GetProperty("recoveryCodesLeft").GetInt32().ShouldBe(9);
+        (await session.PostAsync("/admin/v1/me/recovery-codes", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        // Step-up with another recovery code, then new codes replace the old ones.
+        var stepUp = await session.PostAsJsonAsync("/admin/v1/auth/step-up", new { password, totpCode = codes[1] }, Ct);
+        stepUp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var fresh = _admin.GetTestClient();
+        fresh.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", (await stepUp.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("accessToken").GetString());
+        var regenerated = await fresh.PostAsync("/admin/v1/me/recovery-codes", null, Ct);
+        regenerated.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var newCodes = (await regenerated.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("codes").EnumerateArray().Select(c => c.GetString()!).ToList();
+        newCodes.Count.ShouldBe(10);
+        (await _admin.GetTestClient().PostAsJsonAsync("/admin/v1/auth/login", new { username, password, totpCode = codes[2] }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await _admin.GetTestClient().PostAsJsonAsync("/admin/v1/auth/login", new { username, password, totpCode = newCodes[0] }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     private async Task<(string Username, string Password)> ProvisionAsync(string role)

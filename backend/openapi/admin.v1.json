@@ -235,6 +235,42 @@
         ]
       }
     },
+    "/admin/v1/me/recovery-codes": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "Make new recovery codes (the old ones stop working)",
+        "description": "Step-up. The codes are shown once; each replaces a TOTP code for one sign-in or step-up. Audited as staff.recovery_codes_regenerated.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/staff": {
       "get": {
         "tags": [
@@ -6350,6 +6386,338 @@
         ]
       }
     },
+    "/admin/v1/platform/messaging": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "SMS provider and Bale settings and their state",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/meta-app": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The Meta app's settings, webhook health and Instagram accounts by status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaAppResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/sms/log": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "SMS the platform sent, newest first (kept 90 days)",
+        "description": "`phone` (any Iranian mobile format) finds one number's messages; `purpose` otp, invitation, notification, campaign, test or other; `status` sent or failed; `workspaceId`.",
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "purpose",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfSmsLogItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/bale/bots": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Sellers' Bale bots, newest first",
+        "description": "`status`; `q` matches the bot username; `workspaceId`.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAdminBaleBot"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/sms/test": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Send a test SMS through the provider",
+        "description": "SuperAdmin, step-up. 502 `sms.send_failed` with the provider's error. Audited as platform.sms.test.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsLogItem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/bale/bots/{id}/check": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Check a bot's token with Bale and register its webhook again",
+        "description": "Support or SuperAdmin. A token Bale refuses moves the bot to reauth_required (the seller is told to connect it again). Audited as channels.bale.check.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaleCheckResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
     "/admin/v1/files/quarantine": {
       "get": {
         "tags": [
@@ -6714,10 +7082,768 @@
           }
         ]
       }
+    },
+    "/admin/v1/support/tickets": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "The support queue, latest activity first",
+        "description": "`status` open, answered or closed; `category`; `assigned` me or none; `workspaceId`; `q` matches the subject or the ticket number.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigned",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAdminTicket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/counts": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "How many tickets are in each queue tab",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCounts"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/{ticketId}": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "A ticket and all its messages, oldest first",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/announcements": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Announcements, newest start first",
+        "description": "`state` scheduled, active or ended.",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAnnouncementResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Publish an announcement to every seller's panel",
+        "description": "Support or SuperAdmin. Audited as support.announcement.create.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementRequest"
+              },
+              "example": {
+                "title": "به‌روزرسانی شبانه",
+                "body": "پنل امشب از ساعت ۲ تا ۳ در دسترس نیست.",
+                "severity": "warning",
+                "link": null,
+                "startsAt": null,
+                "endsAt": null
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/{ticketId}/messages": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Answer the seller",
+        "description": "Support or SuperAdmin. Marks the ticket answered, takes it if nobody has, and notifies the member who opened it (in-app and push). Audited as support.ticket.reply.",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketReplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/{ticketId}/assign": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Give the ticket to a staff member, or to nobody",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTicket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/{ticketId}/close": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Close a ticket",
+        "description": "Audited as support.ticket.close.",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTicket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/support/tickets/{ticketId}/reopen": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Open a closed ticket again",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTicket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/announcements/{id}": {
+      "put": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Change an announcement",
+        "description": "Audited as support.announcement.update.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Delete an announcement",
+        "description": "Audited as support.announcement.delete.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/v1/announcements/{id}/end": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Stop showing an announcement now",
+        "description": "Audited as support.announcement.end.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminBaleBot": {
+        "required": [
+          "id",
+          "workspaceId",
+          "workspaceName",
+          "botId",
+          "username",
+          "displayName",
+          "status",
+          "statusReason",
+          "statusChangedAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "botId": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "statusReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statusChangedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminOutageResponse": {
         "required": [
           "kind",
@@ -6848,6 +7974,149 @@
               "null",
               "string"
             ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminTicket": {
+        "required": [
+          "id",
+          "number",
+          "workspaceId",
+          "workspaceName",
+          "subject",
+          "category",
+          "status",
+          "lastMessageBy",
+          "messageCount",
+          "assignedTo",
+          "assignedToName",
+          "createdBy",
+          "lastMessageAt",
+          "createdAt",
+          "closedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastMessageBy": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assignedTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "assignedToName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminTicketDetail": {
+        "required": [
+          "ticket",
+          "messages"
+        ],
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "$ref": "#/components/schemas/AdminTicket"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminTicketMessage"
+            }
+          }
+        }
+      },
+      "AdminTicketMessage": {
+        "required": [
+          "id",
+          "authorKind",
+          "authorId",
+          "authorName",
+          "body",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorKind": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
             "format": "date-time"
           }
         }
@@ -7860,6 +9129,117 @@
           }
         }
       },
+      "AnnouncementRequest": {
+        "required": [
+          "title",
+          "body",
+          "severity",
+          "link",
+          "startsAt",
+          "endsAt"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "severity": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AnnouncementResponse": {
+        "required": [
+          "id",
+          "title",
+          "body",
+          "severity",
+          "link",
+          "startsAt",
+          "endsAt",
+          "state",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "severity": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ArchiveEntryRequest": {
         "required": [
           "reason"
@@ -7871,6 +9251,21 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "AssignTicketRequest": {
+        "required": [
+          "staffId"
+        ],
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -7971,6 +9366,48 @@
                 "$ref": "#/components/schemas/JsonElement"
               }
             ]
+          }
+        }
+      },
+      "BaleCheckResult": {
+        "required": [
+          "bot",
+          "result"
+        ],
+        "type": "object",
+        "properties": {
+          "bot": {
+            "$ref": "#/components/schemas/AdminBaleBot"
+          },
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "BaleOverview": {
+        "required": [
+          "apiBaseUrl",
+          "webhookBaseUrl",
+          "webhookSecretSet",
+          "bots"
+        ],
+        "type": "object",
+        "properties": {
+          "apiBaseUrl": {
+            "type": "string"
+          },
+          "webhookBaseUrl": {
+            "type": "string"
+          },
+          "webhookSecretSet": {
+            "type": "boolean"
+          },
+          "bots": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -9811,6 +11248,83 @@
           }
         }
       },
+      "MessagingOverview": {
+        "required": [
+          "sms",
+          "bale"
+        ],
+        "type": "object",
+        "properties": {
+          "sms": {
+            "$ref": "#/components/schemas/SmsOverview"
+          },
+          "bale": {
+            "$ref": "#/components/schemas/BaleOverview"
+          }
+        }
+      },
+      "MetaAppResponse": {
+        "required": [
+          "appId",
+          "apiVersion",
+          "graphBaseUrl",
+          "redirectUri",
+          "appSecretSet",
+          "webhookVerifyTokenSet",
+          "scopes",
+          "webhookFields",
+          "webhooks",
+          "accounts",
+          "tokensExpiringSoon"
+        ],
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "apiVersion": {
+            "type": "string"
+          },
+          "graphBaseUrl": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string"
+          },
+          "appSecretSet": {
+            "type": "boolean"
+          },
+          "webhookVerifyTokenSet": {
+            "type": "boolean"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "webhookFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "webhooks": {
+            "$ref": "#/components/schemas/WebhookStats"
+          },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "tokensExpiringSoon": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Money": {
         "type": "object",
         "properties": {
@@ -9835,6 +11349,35 @@
           },
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "PagedResultOfAdminBaleBot": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminBaleBot"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -9880,6 +11423,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AdminTemplateResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfAdminTicket": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminTicket"
             }
           },
           "totalCount": {
@@ -9967,6 +11539,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AdminWorkspaceSummary"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfAnnouncementResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementResponse"
             }
           },
           "totalCount": {
@@ -10228,6 +11829,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QuarantineFileResponse"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResultOfSmsLogItem": {
+        "required": [
+          "items",
+          "totalCount",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SmsLogItem"
             }
           },
           "totalCount": {
@@ -11002,6 +12632,20 @@
           }
         }
       },
+      "RecoveryCodesResponse": {
+        "required": [
+          "codes"
+        ],
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RecurringJobInfo": {
         "required": [
           "name",
@@ -11199,6 +12843,161 @@
           }
         }
       },
+      "SmsLogItem": {
+        "required": [
+          "id",
+          "createdAt",
+          "purpose",
+          "workspaceId",
+          "workspaceName",
+          "phone",
+          "provider",
+          "status",
+          "error",
+          "segments",
+          "template"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "workspaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "segments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "template": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SmsOverview": {
+        "required": [
+          "provider",
+          "last24Hours"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/SmsProviderStatus"
+          },
+          "last24Hours": {
+            "$ref": "#/components/schemas/SmsTraffic"
+          }
+        }
+      },
+      "SmsProviderStatus": {
+        "required": [
+          "provider",
+          "configured",
+          "otpTemplate",
+          "credit",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "otpTemplate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "credit": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SmsTestRequest": {
+        "required": [
+          "phone"
+        ],
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string"
+          }
+        }
+      },
+      "SmsTraffic": {
+        "required": [
+          "sent",
+          "failed",
+          "byPurpose"
+        ],
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byPurpose": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
       "StaffActionRequest": {
         "required": [
           "reason"
@@ -11284,6 +13083,15 @@
               "null",
               "string"
             ]
+          },
+          "recoveryCodes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -11307,6 +13115,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "recoveryCodesLeft": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -11789,6 +13602,49 @@
           }
         }
       },
+      "TicketCounts": {
+        "required": [
+          "open",
+          "answered",
+          "closed",
+          "unassigned",
+          "mine"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "answered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "closed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unassigned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mine": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TicketReplyRequest": {
+        "required": [
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        }
+      },
       "TotpEnrollRequest": {
         "required": [
           "enrollmentToken",
@@ -12107,6 +13963,29 @@
           }
         }
       },
+      "WebhookStats": {
+        "required": [
+          "last24Hours",
+          "lastSeen"
+        ],
+        "type": "object",
+        "properties": {
+          "last24Hours": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "lastSeen": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
       "WorkerGroupInfo": {
         "required": [
           "group",
@@ -12313,6 +14192,9 @@
     },
     {
       "name": "Files"
+    },
+    {
+      "name": "Support"
     }
   ]
 }

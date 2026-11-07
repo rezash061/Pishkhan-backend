@@ -71,6 +71,7 @@ public sealed class OutboxCleanupJob(NpgsqlDataSource dataSource) : IJob
         await connection.ExecuteAsync(new CommandDefinition("DELETE FROM platform.outbox_messages WHERE published_at < now() - interval '3 days'", cancellationToken: context.CancellationToken));
         await connection.ExecuteAsync(new CommandDefinition("DELETE FROM platform.processed_messages WHERE processed_at < now() - interval '14 days'", cancellationToken: context.CancellationToken));
         await connection.ExecuteAsync(new CommandDefinition("DELETE FROM platform.timers WHERE status <> 'Pending' AND updated_at < now() - interval '30 days'", cancellationToken: context.CancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM platform.sms_log WHERE created_at < now() - interval '90 days'", cancellationToken: context.CancellationToken));
     }
 }
 

@@ -10,9 +10,28 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<DeadLetter> DeadLetters => Set<DeadLetter>();
 
+    public DbSet<Sms.SmsLogEntry> SmsLog => Set<Sms.SmsLogEntry>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         // Outbox, inbox and timers are mapped by the base class; this context owns their migrations.
+        modelBuilder.Entity<Sms.SmsLogEntry>(b =>
+        {
+            b.ToTable("sms_log");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Purpose).HasMaxLength(20);
+            b.Property(x => x.PhoneMasked).HasMaxLength(20);
+            b.Property(x => x.PhoneBidx).HasMaxLength(64);
+            b.Property(x => x.Provider).HasMaxLength(20);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.Error).HasMaxLength(300);
+            b.Property(x => x.Template).HasMaxLength(100);
+            b.HasIndex(x => x.CreatedAt);
+            b.HasIndex(x => new { x.PhoneBidx, x.CreatedAt });
+            b.HasIndex(x => new { x.WorkspaceId, x.CreatedAt });
+        });
+
         modelBuilder.Entity<DeadLetter>(b =>
         {
             b.ToTable("dead_letters");

@@ -37,11 +37,22 @@ public static class NotificationsModule
         .AddConsumer<ChannelStatusChanged, ChannelNotificationHandler>("platform")
         .AddConsumer<TimerFired, HandoffWaitingHandler>("platform");
 
-    /// <summary>Api: <c>/workspaces/{workspaceId}/notifications</c>, <c>/notification-preferences</c> and <c>/me/push-subscriptions</c>.</summary>
+    /// <summary>Api: <c>/workspaces/{workspaceId}/notifications</c>, <c>/notification-preferences</c> and <c>/me/push-subscriptions</c>, support tickets and announcements.</summary>
     public static IEndpointRouteBuilder MapNotificationsEndpoints(this IEndpointRouteBuilder app)
     {
         NotificationEndpoints.Map(app);
         PushEndpoints.Map(app);
+        SupportEndpoints.Map(app);
+        return app;
+    }
+
+    /// <summary>
+    /// AdminApi: <c>/admin/v1/support/tickets</c> and <c>/admin/v1/announcements</c>. The host also needs the Backoffice module (staff
+    /// names), Tenancy (workspace names) and <see cref="AddNotificationsModule"/>.
+    /// </summary>
+    public static IEndpointRouteBuilder MapNotificationsAdminEndpoints(this IEndpointRouteBuilder app)
+    {
+        SupportAdminEndpoints.Map(app);
         return app;
     }
 }
