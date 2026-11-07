@@ -33,6 +33,9 @@ public sealed class StaffUser : AggregateRoot<Guid>
 
     public DateTimeOffset? LockedUntil { get; private set; }
 
+    /// <summary>SHA-256 hashes of the unused one-time recovery codes (admin plan AD-0.2), given out at TOTP enrollment.</summary>
+    public List<string> RecoveryCodeHashes { get; private set; } = [];
+
     public static StaffUser Create(string username, string passwordHash, IEnumerable<string> roles, DateTimeOffset now) => new()
     {
         Id = Uuid.NewV7(now),
@@ -88,6 +91,20 @@ public sealed class StaffUser : AggregateRoot<Guid>
         return true;
     }
 
+    public void SetRecoveryCodes(IEnumerable<string> hashes) => RecoveryCodeHashes = [.. hashes];
+
+    /// <summary>Spends a recovery code (each works once). False when it is not one of the unused codes.</summary>
+    public bool UseRecoveryCode(string hash)
+    {
+        if (!RecoveryCodeHashes.Contains(hash))
+        {
+            return false;
+        }
+
+        RecoveryCodeHashes = [.. RecoveryCodeHashes.Where(h => h != hash)];
+        return true;
+    }
+
     public void SetPasswordHash(string hash) => PasswordHash = hash;
 
     public void Disable() => Status = StaffStatus.Disabled;
@@ -105,6 +122,7 @@ public sealed class StaffUser : AggregateRoot<Guid>
         TotpEnabled = false;
         TotpSecretEnc = null;
         LastTotpStep = null;
+        RecoveryCodeHashes = [];
     }
 
     public void SetRoles(IEnumerable<string> roles) => Roles = [.. roles.Distinct(StringComparer.Ordinal)];
